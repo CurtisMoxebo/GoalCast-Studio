@@ -235,6 +235,77 @@ export class VideoComposer {
     const outputVideoPath = path.join(workDir, `final_goalcast_${input.jobId}.mp4`);
     const outputThumbPath = path.join(workDir, `thumbnail_${input.jobId}.jpg`);
 
+    // 4b. Generate Synchronized Top-Karaoke Subtitles (.ass)
+    notify(65, 'Generating synchronized top karaoke subtitles');
+    const spokenPhrases: { text: string; startTime: number; duration: number; marginV?: number }[] = [];
+    let phraseOffset = 0.3; // matches initial audio delay
+
+    // Intro speech
+    spokenPhrases.push({
+      text: introText,
+      startTime: phraseOffset,
+      duration: introSpeech.durationSeconds,
+      marginV: 120
+    });
+    phraseOffset += introDuration;
+
+    // Celebration speech (if present)
+    if (celebrationSpeech) {
+      spokenPhrases.push({
+        text: 'Congratulations everyone! Our last prediction was a success! We won big!',
+        startTime: phraseOffset,
+        duration: celebrationSpeech.durationSeconds,
+        marginV: 120
+      });
+      phraseOffset += celebrationDuration;
+    }
+
+    // Transition speech
+    spokenPhrases.push({
+      text: 'Save this video for later and enjoy!',
+      startTime: phraseOffset,
+      duration: transSpeech.durationSeconds,
+      marginV: 260
+    });
+    phraseOffset += transDuration;
+
+    // Match speeches (Intro announcement + Prediction reveal)
+    for (let i = 0; i < input.games.length; i++) {
+      const g = input.games[i];
+      const m = matchScenes[i];
+      const predSpoken = g.selections?.[0]?.spokenText || 'Both teams to score';
+
+      const matchIntroText = `Match ${i + 1}, ${g.homeTeam} versus ${g.awayTeam}.`;
+      spokenPhrases.push({
+        text: matchIntroText,
+        startTime: phraseOffset + 0.35,
+        duration: matchIntroSpeeches[i].durationSeconds,
+        marginV: 260
+      });
+
+      const matchPredText = `${predSpoken} stands out as the strongest outcome.`;
+      const predRevealTime = phraseOffset + m.predRevealOffset;
+      spokenPhrases.push({
+        text: matchPredText,
+        startTime: predRevealTime + 0.1,
+        duration: matchPredSpeeches[i].durationSeconds,
+        marginV: 260
+      });
+
+      phraseOffset += m.sceneDuration;
+    }
+
+    // Outro speech
+    spokenPhrases.push({
+      text: 'Like, share and subscribe to get more daily predictions.',
+      startTime: phraseOffset,
+      duration: outroSpeech.durationSeconds,
+      marginV: 260
+    });
+
+    const assSubtitlesPath = path.join(workDir, 'subtitles_karaoke.ass');
+    this.generateKaraokeAssFile(spokenPhrases, assSubtitlesPath);
+
     // 5. Build Combined Audio Track
     notify(70, 'Mixing voice track, sound effects, and background beat');
     const masterAudioPath = path.join(workDir, 'master_audio.wav');
@@ -267,6 +338,7 @@ export class VideoComposer {
       celebrationDuration,
       matchScenes,
       transDuration,
+      assSubtitlesPath,
       outputVideoPath
     });
 
@@ -474,6 +546,7 @@ export class VideoComposer {
       sceneDuration: number;
     }[];
     transDuration: number;
+    assSubtitlesPath?: string;
     outputVideoPath: string;
   }): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -562,6 +635,13 @@ export class VideoComposer {
         currentTime = matchEnd;
       }
 
+      // 3. Top-positioned Karaoke Subtitles with real-time active word highlight
+      if (params.assSubtitlesPath && fs.existsSync(params.assSubtitlesPath)) {
+        const escapedAss = params.assSubtitlesPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+        filters.push(`${lastVideoStage}subtitles='${escapedAss}'[v_subbed]`);
+        lastVideoStage = '[v_subbed]';
+      }
+
       command
         .complexFilter(filters.join(';'))
         .outputOptions([
@@ -596,6 +676,105 @@ export class VideoComposer {
         .on('error', (err) => reject(err))
         .run();
     });
+  }
+
+  /**
+   * Format seconds to ASS timestamp format H:MM:SS.cs
+   */
+  private formatAssTime(seconds: number): string {
+    const safeSec = Math.max(0, seconds);
+    const h = Math.floor(safeSec / 3600);
+    const m = Math.floor((safeSec % 3600) / 60);
+    const s = Math.floor(safeSec % 60);
+    const cs = Math.floor((safeSec % 1) * 100);
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+  }
+
+  /**
+   * Generate ASS subtitles file with dynamic active-word highlighting
+   * positioned at the top of the video canvas (MarginV: 260 / 120)
+   */
+  private generateKaraokeAssFile(
+    phrases: { text: string; startTime: number; duration: number; marginV?: number }[],
+    outputPath: string
+  ): void {
+    const dialogues: string[] = [];
+
+    for (const phrase of phrases) {
+      const cleanText = (phrase.text || '')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/[{}]/g, '')
+        .replace(/\\/g, '')
+        .trim();
+
+      if (!cleanText) continue;
+
+      const words = cleanText.split(/\s+/).filter(Boolean);
+      if (words.length === 0) continue;
+
+      // Weight words by character length plus pause on ending punctuation
+      const weights = words.map((w) => {
+        const letters = w.replace(/[^a-zA-Z0-9]/g, '').length;
+        const base = Math.max(1, letters);
+        const pause = /[.,!?]$/.test(w) ? 1.5 : 0;
+        return base + pause;
+      });
+      const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+      const marginV = phrase.marginV !== undefined ? phrase.marginV : 260;
+      let elapsed = 0;
+
+      for (let i = 0; i < words.length; i++) {
+        const wordDur =
+          totalWeight > 0
+            ? (weights[i] / totalWeight) * phrase.duration
+            : phrase.duration / words.length;
+
+        const wStart = phrase.startTime + elapsed;
+        const wEnd =
+          i === words.length - 1 ? phrase.startTime + phrase.duration : wStart + wordDur;
+        elapsed += wordDur;
+
+        // Render full phrase with currently spoken word in yellow highlight
+        const line = words
+          .map((w, idx) => {
+            if (idx === i) {
+              return `{\\c&H0000FFFF&}${w}{\\c&H00FFFFFF&}`;
+            }
+            return w;
+          })
+          .join(' ');
+
+        dialogues.push(
+          `Dialogue: 0,${this.formatAssTime(wStart)},${this.formatAssTime(wEnd)},TopKaraoke,,0,0,${marginV},,${line}`
+        );
+      }
+
+      // Hold complete phrase in crisp white for 0.35s after audio ends before clearing
+      const holdStart = phrase.startTime + phrase.duration;
+      const holdEnd = holdStart + 0.35;
+      dialogues.push(
+        `Dialogue: 0,${this.formatAssTime(holdStart)},${this.formatAssTime(holdEnd)},TopKaraoke,,0,0,${marginV},,${words.join(' ')}`
+      );
+    }
+
+    const assContent = [
+      '[Script Info]',
+      'ScriptType: v4.00+',
+      'PlayResX: 1080',
+      'PlayResY: 1920',
+      'ScaledBorderAndShadow: yes',
+      '',
+      '[V4+ Styles]',
+      'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+      'Style: TopKaraoke,Arial,48,&H00FFFFFF&,&H00000000&,&H00000000&,&H90000000&,-1,0,0,0,100,100,1,0,1,4.5,2.5,8,60,60,260,1',
+      '',
+      '[Events]',
+      'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+      ...dialogues
+    ].join('\r\n');
+
+    fs.writeFileSync(outputPath, assContent, 'utf-8');
   }
 }
 
