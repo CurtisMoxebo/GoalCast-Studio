@@ -120,6 +120,7 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
       backgroundAudio,
       voiceActor,
       thumbnailTimestamp,
+      previousWonGroup: params.previousWonGroup,
       onProgress: (percent, step) => {
         videoJobManager.updateProgress(jobId, percent, step);
       }
