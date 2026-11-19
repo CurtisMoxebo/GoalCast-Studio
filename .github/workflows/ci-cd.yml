@@ -1,0 +1,76 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-ci:
+    name: Backend Test & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run Unit Tests
+        run: npm test
+
+      - name: Build TypeScript
+        run: npm run build
+
+  build-docker:
+    name: Build Backend Docker Image
+    needs: [backend-ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: goalcast-backend:${{ github.sha }}
+
+  deploy:
+    name: Deploy to Windows Server 2022 (Docker for Windows)
+    needs: [build-docker]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Remote Windows Server
+        env:
+          SERVER_HOST: ${{ secrets.DEPLOY_SERVER_HOST }}
+          SERVER_USER: ${{ secrets.DEPLOY_SERVER_USER }}
+          SERVER_SSH_KEY: ${{ secrets.DEPLOY_SERVER_KEY }}
+        run: |
+          if [ -z "$SERVER_HOST" ]; then
+            echo "DEPLOY_SERVER_HOST secret is not configured yet. Skipping remote deployment step."
+            exit 0
+          fi
+          echo "Connecting to Windows Server 2022 to refresh container..."
+          # Deploy commands targeting Docker for Windows
+          ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_HOST" "docker compose -f C:\\GoalCast-Studio\\docker-compose.yml pull && docker compose -f C:\\GoalCast-Studio\\docker-compose.yml up -d --build"
