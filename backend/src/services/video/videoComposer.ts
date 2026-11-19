@@ -301,33 +301,38 @@ export class VideoComposer {
       let currentOffset = 0.3; // start intro speech at 0.3s after initial swoosh
       const filterSteps: string[] = [];
 
-      // 1. Background music at low volume (volume=0.15)
-      filterSteps.push(`[0:a]volume=0.15,atrim=0:${params.totalDuration},aformat=sample_rates=44100:channel_layouts=stereo[bgm]`);
+      // 1. Background music at low volume (volume=0.20)
+      filterSteps.push(
+        `[0:a]volume=0.20,atrim=0:${params.totalDuration},aformat=sample_rates=44100:channel_layouts=stereo[bgm]`
+      );
 
       // 2. Intro voice & swoosh
+      const introMs = Math.round(currentOffset * 1000);
       filterSteps.push(
-        `[1:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[intro_v]`
+        `[1:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${introMs}|${introMs}[intro_v]`
       );
       filterSteps.push(
-        `[2:a]volume=0.8,aformat=sample_rates=44100:channel_layouts=stereo,adelay=0:all=1[swoosh_0]`
+        `[2:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=0|0[swoosh_0]`
       );
 
       currentOffset += params.introDuration;
 
       // 3. Celebration (if any)
       if (celebrationVoiceIdx >= 0) {
+        const celebMs = Math.round(currentOffset * 1000);
         filterSteps.push(
-          `[${celebrationVoiceIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[celeb_v]`
+          `[${celebrationVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${celebMs}|${celebMs}[celeb_v]`
         );
         filterSteps.push(
-          `[${celebrationSfxIdx}:a]volume=0.8,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[celeb_sfx]`
+          `[${celebrationSfxIdx}:a]volume=1.2,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${celebMs}|${celebMs}[celeb_sfx]`
         );
         currentOffset += params.celebrationDuration;
       }
 
       // 4. Transition voice
+      const transMs = Math.round(currentOffset * 1000);
       filterSteps.push(
-        `[${transVoiceIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[trans_v]`
+        `[${transVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${transMs}|${transMs}[trans_v]`
       );
       currentOffset += params.transDuration;
 
@@ -337,21 +342,25 @@ export class VideoComposer {
         const sIdx = matchSwooshIndices[i];
         const matchDur = params.matchDurations[i];
 
+        const cardSwooshMs = Math.round(currentOffset * 1000);
+        const voiceStartMs = Math.round((currentOffset + 0.3) * 1000);
+
         // Swoosh as card slides in
         filterSteps.push(
-          `[${sIdx}:a]volume=0.8,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[swoosh_${i + 1}]`
+          `[${sIdx}:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${cardSwooshMs}|${cardSwooshMs}[swoosh_${i + 1}]`
         );
         // Voice starts slightly after card enters
         filterSteps.push(
-          `[${vIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round((currentOffset + 0.3) * 1000)}:all=1[match_v_${i}]`
+          `[${vIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${voiceStartMs}|${voiceStartMs}[match_v_${i}]`
         );
 
         currentOffset += matchDur;
       }
 
       // 6. Outro voice
+      const outroMs = Math.round(currentOffset * 1000);
       filterSteps.push(
-        `[${outroVoiceIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[outro_v]`
+        `[${outroVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${outroMs}|${outroMs}[outro_v]`
       );
 
       // Collect all audio labels for amix
@@ -366,7 +375,7 @@ export class VideoComposer {
       mixInputs.push('[outro_v]');
 
       filterSteps.push(
-        `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=2:normalize=0[aout]`
+        `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=2[aout]`
       );
 
       command
