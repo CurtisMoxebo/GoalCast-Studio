@@ -472,33 +472,33 @@ export class OverlayGenerator {
         const badgeHeight = rowHeight - 28;
         const badgeWidth = 268;
 
-        // Check mark icon on the RIGHT of this section
-        const checkRadius = Math.min(24, Math.round(badgeHeight * 0.18));
+        // Check mark icon on the RIGHT of this section (enlarged)
+        const checkRadius = Math.min(30, Math.round(badgeHeight * 0.22));
         const checkCx = badgeWidth - checkRadius - 16;
         const checkCy = Math.round(badgeHeight / 2);
 
-        // Winning prediction text: black text with green highlight, and bigger
-        const highlightWidth = checkCx - checkRadius - 22;
-        const highlightHeight = Math.min(88, Math.round(badgeHeight * 0.54));
+        // Winning prediction text: black text with green highlight (slightly smaller for sleek fit)
+        const highlightWidth = checkCx - checkRadius - 20;
+        const highlightHeight = Math.min(74, Math.round(badgeHeight * 0.44));
         const highlightY = Math.round((badgeHeight - highlightHeight) / 2);
 
-        let predFontSize = Math.min(46, Math.round(highlightHeight * 0.60));
-        if (shortPred.length > 7) predFontSize = Math.min(28, Math.round(highlightHeight * 0.44));
-        else if (shortPred.length > 5) predFontSize = Math.min(34, Math.round(highlightHeight * 0.50));
+        let predFontSize = Math.min(34, Math.round(highlightHeight * 0.52));
+        if (shortPred.length > 7) predFontSize = Math.min(22, Math.round(highlightHeight * 0.38));
+        else if (shortPred.length > 5) predFontSize = Math.min(26, Math.round(highlightHeight * 0.44));
 
         const badgeContent = `
           <!-- Section Container on Right -->
           <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
 
-          <!-- Green Highlight with Bold Black Text (Bigger, Short Version) -->
+          <!-- Green Highlight with Bold Black Text (Short Version) -->
           <rect x="14" y="${highlightY}" width="${highlightWidth}" height="${highlightHeight}" rx="12" fill="#22c55e"/>
           <text x="${14 + highlightWidth / 2}" y="${Math.round(highlightY + highlightHeight / 2 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
             ${this.escapeXml(shortPred)}
           </text>
 
-          <!-- Green Check Mark Icon on the RIGHT of this section -->
+          <!-- Green Check Mark Icon on the RIGHT of this section (Enlarged) -->
           <circle cx="${checkCx}" cy="${checkCy}" r="${checkRadius}" fill="#16a34a"/>
-          <path d="M${checkCx - Math.round(checkRadius * 0.35)} ${checkCy} L${checkCx - Math.round(checkRadius * 0.08)} ${checkCy + Math.round(checkRadius * 0.28)} L${checkCx + Math.round(checkRadius * 0.35)} ${checkCy - Math.round(checkRadius * 0.28)}" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M${checkCx - Math.round(checkRadius * 0.38)} ${checkCy} L${checkCx - Math.round(checkRadius * 0.10)} ${checkCy + Math.round(checkRadius * 0.30)} L${checkCx + Math.round(checkRadius * 0.38)} ${checkCy - Math.round(checkRadius * 0.30)}" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
         `;
 
         // Is this the last game row? If not, render a clear divider between games
@@ -663,9 +663,9 @@ export class OverlayGenerator {
       teamLogoService.getLogoDataUri(game.awayTeam, game.awayTeamLogo, logoSize)
     ]);
 
-    // Adaptive font sizes for team names in the single game section
-    const homeFontSize = home.length > 14 ? 30 : 36;
-    const awayFontSize = away.length > 14 ? 30 : 36;
+    // Adaptive font sizes for team names in the single game section (made slightly smaller)
+    const homeFontSize = home.length > 14 ? 24 : 29;
+    const awayFontSize = away.length > 14 ? 24 : 29;
 
     const svg = `
       <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
@@ -692,27 +692,27 @@ export class OverlayGenerator {
           <!-- TEAMS & CENTER MATCH INFO SECTION (No enclosing boxes around teams, extra large logos) -->
           <!-- HOME TEAM (Left, centered at x=220) -->
           <image href="${homeLogoUri}" x="145" y="786" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="220" y="990" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="220" y="982" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${home}
           </text>
 
           <!-- CENTER SECTION (Competition above, Time in middle, Date under) -->
           <!-- Above Time: Competition Name -->
-          <text x="540" y="852" fill="#38bdf8" font-size="26" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="852" fill="#38bdf8" font-size="24" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
             🏆 ${comp}
           </text>
-          <!-- Middle: Kickoff Time (e.g. 05:00 PM) -->
-          <text x="540" y="910" fill="#ffffff" font-size="46" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          <!-- Middle: Kickoff Time (made smaller) -->
+          <text x="540" y="906" fill="#ffffff" font-size="36" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             ${timeAmPm}
           </text>
           <!-- Under Time: Date (Tomorrow / dd/mm/yyyy) -->
-          <text x="540" y="958" fill="#94a3b8" font-size="23" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="952" fill="#94a3b8" font-size="22" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
             ${dateText}
           </text>
 
           <!-- AWAY TEAM (Right, centered at x=860) -->
           <image href="${awayLogoUri}" x="785" y="786" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="860" y="990" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="860" y="982" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${away}
           </text>
         </g>
