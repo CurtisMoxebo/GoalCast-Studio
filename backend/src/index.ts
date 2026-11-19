@@ -32,10 +32,12 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`[GoalCast Backend] Server running on port ${port}`);
-  console.log(`[GoalCast Backend] Health check: http://localhost:${port}/api/health`);
-  console.log(`[GoalCast Backend] Video Test:  http://localhost:${port}/api/video/test`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`[GoalCast Backend] Server running on port ${port}`);
+    console.log(`[GoalCast Backend] Health check: http://localhost:${port}/api/health`);
+    console.log(`[GoalCast Backend] Video Test:  http://localhost:${port}/api/video/test`);
+  });
+}
 
 export default app;

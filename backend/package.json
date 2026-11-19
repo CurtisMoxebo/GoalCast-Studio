@@ -40,7 +40,9 @@
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^22.13.9",
     "@types/sharp": "^0.31.1",
+    "@types/supertest": "^7.2.1",
     "prisma": "^6.4.1",
+    "supertest": "^7.3.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
