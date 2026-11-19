@@ -31,7 +31,7 @@ services:
       DATABASE_URL: "mysql://goalcast_user:goalcast_pass@mariadb:3306/goalcast_db"
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
       DEFAULT_TTS_VOICE: hearth
     volumes:
       - ./resources:/resources:ro

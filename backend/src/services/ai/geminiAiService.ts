@@ -20,7 +20,7 @@ export class GeminiAIService implements IAIService {
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
-    this.modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    this.modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
     if (apiKey && apiKey.trim() !== '' && apiKey !== 'your_gemini_api_key_here') {
       this.aiClient = new GoogleGenAI({ apiKey });
