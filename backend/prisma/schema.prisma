@@ -1,0 +1,87 @@
+// Prisma Schema for GoalCast Studio
+// Database: MariaDB (compatible with mysql provider)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum PredictionGroupStatus {
+  PREVIEW
+  ACCEPTED
+  CANCELLED
+}
+
+enum PredictionCategory {
+  RESULT
+  GOALS
+  CORNERS
+}
+
+model PredictionGroup {
+  id                   String                 @id @default(uuid())
+  status               PredictionGroupStatus  @default(PREVIEW)
+  targetDate           DateTime
+  description          String                 @db.Text
+  backgroundVideo      String                 @default("background_video_1.mp4")
+  backgroundAudio      String                 @default("background_track_1.mp3")
+  voiceActor           String                 @default("hearth")
+  thumbnailTimestamp   Float                  @default(3.0)
+  
+  // AI validation result of whether this entire group won
+  // null = never checked, true = all hit, false = not all hit
+  isHit                Boolean?
+  validationNotes      String?                @db.Text
+  validationCheckedAt  DateTime?
+
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  games                GamePrediction[]
+
+  @@map("prediction_groups")
+}
+
+model GamePrediction {
+  id                   String                 @id @default(uuid())
+  groupId              String
+  group                PredictionGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  homeTeam             String
+  homeTeamLogo         String?                @db.Text
+  awayTeam             String
+  awayTeamLogo         String?                @db.Text
+  competition          String
+  competitionLogo      String?                @db.Text
+  kickoffTime          DateTime
+  orderIndex           Int                    @default(0)
+
+  selections           PredictionSelection[]
+
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@map("game_predictions")
+}
+
+model PredictionSelection {
+  id                   String                 @id @default(uuid())
+  gamePredictionId     String
+  gamePrediction       GamePrediction         @relation(fields: [gamePredictionId], references: [id], onDelete: Cascade)
+
+  category             PredictionCategory
+  code                 String
+  label                String
+  spokenText           String
+  
+  // Individual hit status if evaluated
+  isHit                Boolean?
+
+  createdAt            DateTime               @default(now())
+
+  @@map("prediction_selections")
+}
