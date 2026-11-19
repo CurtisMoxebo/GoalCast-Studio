@@ -39,14 +39,16 @@ export interface VideoComposerResult {
 export class VideoComposer {
   private formatDisplayDate(dateStr: string): string {
     try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-US', {
+      const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`);
+      if (isNaN(d.getTime())) return dateStr.replace(/,/g, '');
+      const formatted = d.toLocaleDateString('en-US', {
         weekday: 'long',
         day: 'numeric',
         month: 'long'
       });
+      return formatted.replace(/,/g, '');
     } catch {
-      return dateStr;
+      return dateStr.replace(/,/g, '');
     }
   }
 
@@ -735,11 +737,11 @@ export class VideoComposer {
           i === words.length - 1 ? phrase.startTime + phrase.duration : wStart + wordDur;
         elapsed += wordDur;
 
-        // Render full phrase with currently spoken word in yellow highlight
+        // Render full phrase with currently spoken word in vibrant green highlight
         const line = words
           .map((w, idx) => {
             if (idx === i) {
-              return `{\\c&H0000FFFF&}${w}{\\c&H00FFFFFF&}`;
+              return `{\\c&H0000FF00&}${w}{\\c&H00FFFFFF&}`;
             }
             return w;
           })
