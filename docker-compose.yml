@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: goalcast-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: goalcast_db
+      MYSQL_USER: goalcast_user
+      MYSQL_PASSWORD: goalcast_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: goalcast-backend
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      DATABASE_URL: "mysql://goalcast_user:goalcast_pass@mariadb:3306/goalcast_db"
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      DEFAULT_TTS_VOICE: hearth
+    volumes:
+      - ./resources:/resources:ro
+
+volumes:
+  mariadb_data:
