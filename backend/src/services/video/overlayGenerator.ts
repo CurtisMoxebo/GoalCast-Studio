@@ -334,36 +334,64 @@ export class OverlayGenerator {
 
   /**
    * Generate Celebration Table SVG / PNG (when previous prediction won!)
+   * Matches the regular table structure (white background, real team logos, away team under home team,
+   * snug content height vertically centered, title with white highlight and black text),
+   * but displays the winning prediction in green with a green check mark instead of competition/time.
    */
   async generateCelebrationTableOverlay(
     games: OverlayGameData[],
     outputPath: string
   ): Promise<string> {
-    const tableRows = games
-      .slice(0, 6)
-      .map((game, i) => {
-        const yPos = 520 + i * 150;
-        const matchTitle = this.escapeXml(`${game.homeTeam} vs ${game.awayTeam}`);
-        const pred = this.escapeXml(game.selections?.[0]?.label || 'Won');
+    const totalGames = Math.min(games.length, 10);
+    const displayGames = games.slice(0, totalGames);
 
-        return `
-        <g transform="translate(60, ${yPos})">
-          <rect width="960" height="126" rx="20" fill="#064e3b" fill-opacity="0.9" stroke="#10b981" stroke-width="2.5"/>
-          <text x="50" y="55" fill="#f0fdf4" font-size="28" font-weight="bold" font-family="Arial, sans-serif">${matchTitle}</text>
-          <text x="50" y="95" fill="#a7f3d0" font-size="24" font-weight="600" font-family="Arial, sans-serif">Pick: ${pred}</text>
-          
-          <!-- Green checkmark circle -->
-          <circle cx="890" cy="63" r="32" fill="#10b981"/>
-          <path d="M878 63 L886 71 L904 53" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-        </g>
-      `;
-      })
-      .join('\n');
+    // Dynamic row heights, logo sizes, and font sizes matching regular table
+    let rowHeight = 250;
+    let logoSize = 108;
+    let nameFontSize = 56;
 
-    // Confetti visual particles in SVG
+    if (totalGames >= 9) {
+      rowHeight = 142;
+      logoSize = 64;
+      nameFontSize = 32;
+    } else if (totalGames >= 7) {
+      rowHeight = 168;
+      logoSize = 76;
+      nameFontSize = 38;
+    } else if (totalGames >= 5) {
+      rowHeight = 200;
+      logoSize = 90;
+      nameFontSize = 46;
+    }
+
+    const tableWidth = 1000;
+    const tableX = Math.round((1080 - tableWidth) / 2); // 40
+    const titleHeight = 88;
+    const titleFontSize = 38;
+    const gapBetweenTitleAndTable = 24;
+
+    // Fetch real team logos concurrently
+    const [homeLogos, awayLogos] = await Promise.all([
+      Promise.all(
+        displayGames.map((g) => teamLogoService.getLogoDataUri(g.homeTeam, g.homeTeamLogo, logoSize))
+      ),
+      Promise.all(
+        displayGames.map((g) => teamLogoService.getLogoDataUri(g.awayTeam, g.awayTeamLogo, logoSize))
+      )
+    ]);
+
+    // Total table height matches content exactly (no space between games)
+    const totalTableHeight = displayGames.length * rowHeight;
+    const combinedHeight = titleHeight + gapBetweenTitleAndTable + totalTableHeight;
+    const startY = Math.round((1920 - combinedHeight) / 2);
+
+    const titleY = startY;
+    const tableStartY = titleY + titleHeight + gapBetweenTitleAndTable;
+
+    // Confetti visual particles in SVG background
     const confettiColors = ['#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#8b5cf6', '#eab308'];
     const confettiElements: string[] = [];
-    for (let c = 0; c < 35; c++) {
+    for (let c = 0; c < 40; c++) {
       const cx = Math.floor(Math.random() * 1040) + 20;
       const cy = Math.floor(Math.random() * 1800) + 60;
       const color = confettiColors[c % confettiColors.length];
@@ -373,30 +401,138 @@ export class OverlayGenerator {
       );
     }
 
+    // Render game rows inside unified white table with dividers
+    const rowsSvg = displayGames
+      .map((game, i) => {
+        const rowY = i * rowHeight;
+        const home = this.escapeXml(game.homeTeam);
+        const away = this.escapeXml(game.awayTeam);
+        const pred = this.escapeXml(game.selections?.[0]?.label || 'Won');
+
+        // Team line offsets (home on top half, away on bottom half)
+        const rowHalf = rowHeight / 2;
+        const homeLogoY = rowY + Math.round((rowHalf - logoSize) / 2);
+        const awayLogoY = rowY + Math.round(rowHalf + (rowHalf - logoSize) / 2);
+
+        const homeTextBaselineY = Math.round(homeLogoY + logoSize / 2 + nameFontSize * 0.35);
+        const awayTextBaselineY = Math.round(awayLogoY + logoSize / 2 + nameFontSize * 0.35);
+
+        const logoX = 92;
+        const nameX = logoX + logoSize + 22;
+        const badgeHeight = rowHeight - 28;
+        const badgeWidth = 268;
+
+        // Is this the last game row? If not, render a clear divider between games
+        const isLastRow = i === displayGames.length - 1;
+        const dividerSvg = !isLastRow
+          ? `<line x1="20" y1="${rowY + rowHeight}" x2="${tableWidth - 20}" y2="${rowY + rowHeight}" stroke="#cbd5e1" stroke-width="2"/>`
+          : '';
+
+        // Render prediction text & green checkmark inside badge
+        const circleCy = Math.round(badgeHeight * 0.34);
+        const circleR = Math.min(24, Math.round(badgeHeight * 0.16));
+        const checkIcon = `
+          <circle cx="${badgeWidth / 2}" cy="${circleCy}" r="${circleR}" fill="#16a34a"/>
+          <path d="M${badgeWidth / 2 - 8} ${circleCy} L${badgeWidth / 2 - 2} ${circleCy + 6} L${badgeWidth / 2 + 8} ${circleCy - 6}" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        `;
+
+        let predContent = '';
+        if (pred.includes(' - ')) {
+          const parts = pred.split(' - ');
+          const main = parts[0].trim();
+          const sub = parts.slice(1).join(' - ').trim();
+          const mainSize = main.length > 18 ? 16 : 19;
+          const subSize = 22;
+          predContent = `
+            ${checkIcon}
+            <text x="${badgeWidth / 2}" y="${Math.round(badgeHeight * 0.64)}" fill="#15803d" font-size="${mainSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
+              ${main}
+            </text>
+            <text x="${badgeWidth / 2}" y="${Math.round(badgeHeight * 0.83)}" fill="#16a34a" font-size="${subSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+              ${sub}
+            </text>
+          `;
+        } else {
+          let predFontSize = 23;
+          if (pred.length > 22) predFontSize = 16;
+          else if (pred.length > 16) predFontSize = 19;
+          predContent = `
+            ${checkIcon}
+            <text x="${badgeWidth / 2}" y="${Math.round(badgeHeight * 0.74)}" fill="#15803d" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+              ${pred}
+            </text>
+          `;
+        }
+
+        return `
+        <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
+        <g>
+          <!-- Match Index Circle on Left -->
+          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="28" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="48" y="${rowY + Math.round(rowHeight / 2 + 8)}" fill="#0f172a" font-size="24" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
+
+          <!-- Vertical Divider between index badge and teams -->
+          <line x1="80" y1="${rowY + 12}" x2="80" y2="${rowY + rowHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
+
+          <!-- HOME TEAM (Top Row - Real Logo & Extra Enlarged Name) -->
+          <image href="${homeLogos[i]}" x="${logoX}" y="${homeLogoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="${nameX}" y="${homeTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
+            ${home}
+          </text>
+
+          <!-- Subtle Divider between Home & Away inside the row -->
+          <line x1="${logoX}" y1="${rowY + Math.round(rowHalf)}" x2="${tableWidth - (badgeWidth + 28)}" y2="${rowY + Math.round(rowHalf)}" stroke="#f1f5f9" stroke-width="1.5"/>
+
+          <!-- AWAY TEAM (Bottom Row - DIRECTLY UNDER HOME TEAM) -->
+          <image href="${awayLogos[i]}" x="${logoX}" y="${awayLogoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <!-- Same size, font and color as home team -->
+          <text x="${nameX}" y="${awayTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
+            ${away}
+          </text>
+
+          <!-- Winning Prediction Badge on Right (in green with a green check mark) -->
+          <g transform="translate(${tableWidth - (badgeWidth + 18)}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
+            <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f0fdf4" stroke="#86efac" stroke-width="2"/>
+            ${predContent}
+          </g>
+
+          <!-- Clear divider between games -->
+          ${dividerSvg}
+        </g>
+      `;
+      })
+      .join('\n');
+
+    const titleText = '🎉100% SUCCESS - LAST PREDICTIONS HIT!🎉';
+
     const svg = `
       <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <linearGradient id="winGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#10b981"/>
-            <stop offset="100%" stop-color="#047857"/>
-          </linearGradient>
+          <filter id="celebCardShadow" x="-5%" y="-10%" width="110%" height="130%">
+            <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.55"/>
+          </filter>
         </defs>
 
-        <!-- Confetti background -->
+        <!-- Confetti festive particles floating in background -->
         ${confettiElements.join('\n')}
 
-        <!-- Main Card Container -->
-        <g>
-          <rect x="30" y="200" width="1020" height="1520" rx="36" fill="#022c22" fill-opacity="0.94" stroke="#10b981" stroke-width="4"/>
-          
-          <!-- Header Banner -->
-          <rect x="60" y="240" width="960" height="230" rx="28" fill="url(#winGrad)"/>
-          <text x="540" y="325" fill="#ffffff" font-size="52" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">🎉 100% SUCCESS! 🎉</text>
-          <text x="540" y="385" fill="#d1fae5" font-size="34" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">OUR LAST PREDICTIONS HIT BIG!</text>
-          <text x="540" y="435" fill="#a7f3d0" font-size="26" font-family="Arial, sans-serif" text-anchor="middle">All recommended selections won</text>
-          
-          <!-- Rows -->
-          ${tableRows}
+        <!-- 1. TITLE ABOVE THE WINNING GROUP: White highlight background + Black text on one line -->
+        <g filter="url(#celebCardShadow)" transform="translate(${tableX}, ${titleY})">
+          <!-- White Highlight Box -->
+          <rect width="${tableWidth}" height="${titleHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <!-- Black Title Text -->
+          <text x="${tableWidth / 2}" y="${Math.round(titleHeight / 2 + titleFontSize * 0.35)}" fill="#000000" font-size="${titleFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
+            ${titleText}
+          </text>
+        </g>
+
+        <!-- 2. GAME WINNING TABLE: Same white container as regular table, NO spaces between games, crisp divider lines -->
+        <g filter="url(#celebCardShadow)" transform="translate(${tableX}, ${tableStartY})">
+          <!-- Unified White Table Background matching exact content height -->
+          <rect width="${tableWidth}" height="${totalTableHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+
+          <!-- Match Rows & Dividers -->
+          ${rowsSvg}
         </g>
       </svg>
     `;
