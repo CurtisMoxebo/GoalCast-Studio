@@ -301,29 +301,33 @@ export class VideoComposer {
       let currentOffset = 0.3; // start intro speech at 0.3s after initial swoosh
       const filterSteps: string[] = [];
 
-      // 1. Background music at low volume (volume=0.10)
-      filterSteps.push(`[0:a]volume=0.10,atrim=0:${params.totalDuration}[bgm]`);
+      // 1. Background music at low volume (volume=0.15)
+      filterSteps.push(`[0:a]volume=0.15,atrim=0:${params.totalDuration},aformat=sample_rates=44100:channel_layouts=stereo[bgm]`);
 
       // 2. Intro voice & swoosh
-      filterSteps.push(`[1:a]adelay=${Math.round(currentOffset * 1000)}|${Math.round(currentOffset * 1000)}[intro_v]`);
-      filterSteps.push(`[2:a]adelay=0|0,volume=0.7[swoosh_0]`);
+      filterSteps.push(
+        `[1:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[intro_v]`
+      );
+      filterSteps.push(
+        `[2:a]volume=0.8,aformat=sample_rates=44100:channel_layouts=stereo,adelay=0:all=1[swoosh_0]`
+      );
 
       currentOffset += params.introDuration;
 
       // 3. Celebration (if any)
       if (celebrationVoiceIdx >= 0) {
         filterSteps.push(
-          `[${celebrationVoiceIdx}:a]adelay=${Math.round(currentOffset * 1000)}|${Math.round(currentOffset * 1000)}[celeb_v]`
+          `[${celebrationVoiceIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[celeb_v]`
         );
         filterSteps.push(
-          `[${celebrationSfxIdx}:a]adelay=${Math.round(currentOffset * 1000)}|${Math.round(currentOffset * 1000)},volume=0.8[celeb_sfx]`
+          `[${celebrationSfxIdx}:a]volume=0.8,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[celeb_sfx]`
         );
         currentOffset += params.celebrationDuration;
       }
 
       // 4. Transition voice
       filterSteps.push(
-        `[${transVoiceIdx}:a]adelay=${Math.round(currentOffset * 1000)}|${Math.round(currentOffset * 1000)}[trans_v]`
+        `[${transVoiceIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[trans_v]`
       );
       currentOffset += params.transDuration;
 
@@ -335,11 +339,11 @@ export class VideoComposer {
 
         // Swoosh as card slides in
         filterSteps.push(
-          `[${sIdx}:a]adelay=${Math.round(currentOffset * 1000)}|${Math.round(currentOffset * 1000)},volume=0.6[swoosh_${i + 1}]`
+          `[${sIdx}:a]volume=0.8,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[swoosh_${i + 1}]`
         );
         // Voice starts slightly after card enters
         filterSteps.push(
-          `[${vIdx}:a]adelay=${Math.round((currentOffset + 0.3) * 1000)}|${Math.round((currentOffset + 0.3) * 1000)}[match_v_${i}]`
+          `[${vIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round((currentOffset + 0.3) * 1000)}:all=1[match_v_${i}]`
         );
 
         currentOffset += matchDur;
@@ -347,7 +351,7 @@ export class VideoComposer {
 
       // 6. Outro voice
       filterSteps.push(
-        `[${outroVoiceIdx}:a]adelay=${Math.round(currentOffset * 1000)}|${Math.round(currentOffset * 1000)}[outro_v]`
+        `[${outroVoiceIdx}:a]volume=2.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${Math.round(currentOffset * 1000)}:all=1[outro_v]`
       );
 
       // Collect all audio labels for amix
@@ -362,7 +366,7 @@ export class VideoComposer {
       mixInputs.push('[outro_v]');
 
       filterSteps.push(
-        `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=2[aout]`
+        `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=2:normalize=0[aout]`
       );
 
       command
@@ -466,8 +470,10 @@ export class VideoComposer {
       }
 
       command
-        .complexFilter(filters.join(';'), [lastVideoStage.replace('[', '').replace(']', '')])
+        .complexFilter(filters.join(';'))
         .outputOptions([
+          `-map ${lastVideoStage}`,
+          '-map 1:a',
           '-c:v libx264',
           '-preset veryfast',
           '-pix_fmt yuv420p',
