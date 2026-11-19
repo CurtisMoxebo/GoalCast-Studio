@@ -125,7 +125,7 @@ export class VideoComposer {
     // Speech 5: Outro
     const outroAudioPath = path.join(workDir, 'speech_outro.wav');
     const outroSpeech = await tts.generateSpeech(
-      'Like and share this video if you find so that more people can win big like you! Don\'t forget to subscribe to get daily predictions.',
+      'Like, share and subscribe to get more daily predictions.',
       { voice, outputFilePath: outroAudioPath }
     );
 
