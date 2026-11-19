@@ -156,6 +156,56 @@ export class OverlayGenerator {
   }
 
   /**
+   * Format a betting prediction into its short version (e.g. BTTS, 1X, Over 2.5, 1)
+   */
+  public formatShortPrediction(code?: string, label?: string): string {
+    const rawCode = (code || '').toUpperCase().trim();
+    const rawLabel = (label || '').trim();
+
+    // 1. Direct short codes
+    if (rawCode === 'BTTS_YES') return 'BTTS';
+    if (rawCode === 'BTTS_NO') return 'BTTS NO';
+    if (['1', '2', 'X', '1X', 'X2', '12'].includes(rawCode)) return rawCode;
+    if (rawCode === '1_DNB' || rawCode === '1 DNB') return '1 DNB';
+    if (rawCode === '2_DNB' || rawCode === '2 DNB') return '2 DNB';
+
+    // 2. Over / Under goal patterns (e.g. OVER_2_5_GOALS -> Over 2.5)
+    const overMatch = rawCode.match(/^OVER_([0-9]+)_([0-9]+)_GOALS$/);
+    if (overMatch) return `Over ${overMatch[1]}.${overMatch[2]}`;
+    const underMatch = rawCode.match(/^UNDER_([0-9]+)_([0-9]+)_GOALS$/);
+    if (underMatch) return `Under ${underMatch[1]}.${underMatch[2]}`;
+
+    // Team Over/Under
+    const homeOver = rawCode.match(/^HOME_OVER_([0-9]+)_([0-9]+)_GOALS$/);
+    if (homeOver) return `Home O ${homeOver[1]}.${homeOver[2]}`;
+    const awayOver = rawCode.match(/^AWAY_OVER_([0-9]+)_([0-9]+)_GOALS$/);
+    if (awayOver) return `Away O ${awayOver[1]}.${awayOver[2]}`;
+
+    // Corners
+    const cornerOver = rawCode.match(/^CORNERS_OVER_([0-9]+)_([0-9]+)$/);
+    if (cornerOver) return `Corners > ${cornerOver[1]}.${cornerOver[2]}`;
+
+    // 3. Fallback from label
+    if (/both teams to score/i.test(rawLabel)) {
+      return /no/i.test(rawLabel) ? 'BTTS NO' : 'BTTS';
+    }
+    const labelCodeMatch = rawLabel.match(/\((1X|X2|12|1 DNB|2 DNB|1|2|X)\)/i);
+    if (labelCodeMatch) return labelCodeMatch[1].toUpperCase();
+
+    const labelOverMatch = rawLabel.match(/Over\s+([0-9]+\.?[0-9]*)/i);
+    if (labelOverMatch) return `Over ${labelOverMatch[1]}`;
+    const labelUnderMatch = rawLabel.match(/Under\s+([0-9]+\.?[0-9]*)/i);
+    if (labelUnderMatch) return `Under ${labelUnderMatch[1]}`;
+
+    if (/to win/i.test(rawLabel)) {
+      if (/home|1\b/i.test(rawLabel)) return '1';
+      if (/away|2\b/i.test(rawLabel)) return '2';
+    }
+
+    return rawCode || rawLabel || 'WON';
+  }
+
+  /**
    * Generate Introduction Table SVG / PNG (1080x1920 vertical canvas)
    * Requirements:
    * - White background with black text
@@ -407,7 +457,7 @@ export class OverlayGenerator {
         const rowY = i * rowHeight;
         const home = this.escapeXml(game.homeTeam);
         const away = this.escapeXml(game.awayTeam);
-        const pred = this.escapeXml(game.selections?.[0]?.label || 'Won');
+        const shortPred = this.formatShortPrediction(game.selections?.[0]?.code, game.selections?.[0]?.label);
 
         // Team line offsets (home on top half, away on bottom half)
         const rowHalf = rowHeight / 2;
@@ -422,47 +472,40 @@ export class OverlayGenerator {
         const badgeHeight = rowHeight - 28;
         const badgeWidth = 268;
 
+        // Check mark icon on the RIGHT of this section
+        const checkRadius = Math.min(24, Math.round(badgeHeight * 0.18));
+        const checkCx = badgeWidth - checkRadius - 16;
+        const checkCy = Math.round(badgeHeight / 2);
+
+        // Winning prediction text: black text with green highlight, and bigger
+        const highlightWidth = checkCx - checkRadius - 22;
+        const highlightHeight = Math.min(88, Math.round(badgeHeight * 0.54));
+        const highlightY = Math.round((badgeHeight - highlightHeight) / 2);
+
+        let predFontSize = Math.min(46, Math.round(highlightHeight * 0.60));
+        if (shortPred.length > 7) predFontSize = Math.min(28, Math.round(highlightHeight * 0.44));
+        else if (shortPred.length > 5) predFontSize = Math.min(34, Math.round(highlightHeight * 0.50));
+
+        const badgeContent = `
+          <!-- Section Container on Right -->
+          <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+
+          <!-- Green Highlight with Bold Black Text (Bigger, Short Version) -->
+          <rect x="14" y="${highlightY}" width="${highlightWidth}" height="${highlightHeight}" rx="12" fill="#22c55e"/>
+          <text x="${14 + highlightWidth / 2}" y="${Math.round(highlightY + highlightHeight / 2 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
+            ${this.escapeXml(shortPred)}
+          </text>
+
+          <!-- Green Check Mark Icon on the RIGHT of this section -->
+          <circle cx="${checkCx}" cy="${checkCy}" r="${checkRadius}" fill="#16a34a"/>
+          <path d="M${checkCx - Math.round(checkRadius * 0.35)} ${checkCy} L${checkCx - Math.round(checkRadius * 0.08)} ${checkCy + Math.round(checkRadius * 0.28)} L${checkCx + Math.round(checkRadius * 0.35)} ${checkCy - Math.round(checkRadius * 0.28)}" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        `;
+
         // Is this the last game row? If not, render a clear divider between games
         const isLastRow = i === displayGames.length - 1;
         const dividerSvg = !isLastRow
           ? `<line x1="20" y1="${rowY + rowHeight}" x2="${tableWidth - 20}" y2="${rowY + rowHeight}" stroke="#cbd5e1" stroke-width="2"/>`
           : '';
-
-        // Render prediction text & green checkmark inside badge
-        const circleCy = Math.round(badgeHeight * 0.34);
-        const circleR = Math.min(24, Math.round(badgeHeight * 0.16));
-        const checkIcon = `
-          <circle cx="${badgeWidth / 2}" cy="${circleCy}" r="${circleR}" fill="#16a34a"/>
-          <path d="M${badgeWidth / 2 - 8} ${circleCy} L${badgeWidth / 2 - 2} ${circleCy + 6} L${badgeWidth / 2 + 8} ${circleCy - 6}" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-        `;
-
-        let predContent = '';
-        if (pred.includes(' - ')) {
-          const parts = pred.split(' - ');
-          const main = parts[0].trim();
-          const sub = parts.slice(1).join(' - ').trim();
-          const mainSize = main.length > 18 ? 16 : 19;
-          const subSize = 22;
-          predContent = `
-            ${checkIcon}
-            <text x="${badgeWidth / 2}" y="${Math.round(badgeHeight * 0.64)}" fill="#15803d" font-size="${mainSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
-              ${main}
-            </text>
-            <text x="${badgeWidth / 2}" y="${Math.round(badgeHeight * 0.83)}" fill="#16a34a" font-size="${subSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
-              ${sub}
-            </text>
-          `;
-        } else {
-          let predFontSize = 23;
-          if (pred.length > 22) predFontSize = 16;
-          else if (pred.length > 16) predFontSize = 19;
-          predContent = `
-            ${checkIcon}
-            <text x="${badgeWidth / 2}" y="${Math.round(badgeHeight * 0.74)}" fill="#15803d" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
-              ${pred}
-            </text>
-          `;
-        }
 
         return `
         <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
@@ -490,10 +533,9 @@ export class OverlayGenerator {
             ${away}
           </text>
 
-          <!-- Winning Prediction Badge on Right (in green with a green check mark) -->
+          <!-- Winning Prediction Section on Right (Black text with green highlight + check mark on right) -->
           <g transform="translate(${tableWidth - (badgeWidth + 18)}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
-            <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f0fdf4" stroke="#86efac" stroke-width="2"/>
-            ${predContent}
+            ${badgeContent}
           </g>
 
           <!-- Clear divider between games -->
@@ -503,7 +545,7 @@ export class OverlayGenerator {
       })
       .join('\n');
 
-    const titleText = '🎉100% SUCCESS - LAST PREDICTIONS HIT!🎉';
+    const titleText = '🎉Congratulations on the previous win🎉';
 
     const svg = `
       <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
@@ -567,12 +609,12 @@ export class OverlayGenerator {
           </filter>
         </defs>
 
-        <!-- Prediction Banner (Under the game section box, black text on white highlight, ONLY the prediction) -->
+        <!-- Prediction Banner (Under the vertically centered game section box, black text on white highlight) -->
         <g filter="url(#predShadow)">
-          <!-- White Highlight Box (Positioned right below padded game box at y=820) -->
-          <rect x="50" y="820" width="980" height="100" rx="26" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <!-- White Highlight Box (Positioned right below centered game box at y=1060) -->
+          <rect x="50" y="1060" width="980" height="100" rx="26" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
           <!-- Black Prediction Text -->
-          <text x="540" y="${Math.round(820 + 50 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="${Math.round(1060 + 50 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${pred}
           </text>
         </g>
@@ -638,39 +680,39 @@ export class OverlayGenerator {
         </defs>
 
         <g filter="url(#cardShadow)">
-          <!-- 1. "MATCH X OF N" Pill - Positioned ON TOP OF the box (y=430 to 490) -->
-          <rect x="360" y="430" width="360" height="60" rx="30" fill="#0369a1" stroke="#38bdf8" stroke-width="2.5"/>
-          <text x="540" y="470" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          <!-- 1. "MATCH X OF N" Pill - Positioned ON TOP OF the vertically centered box (y=670 to 730) -->
+          <rect x="360" y="670" width="360" height="60" rx="30" fill="#0369a1" stroke="#38bdf8" stroke-width="2.5"/>
+          <text x="540" y="710" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             MATCH ${matchIndex} OF ${totalMatches}
           </text>
 
-          <!-- 2. Centered Game Section Box with small top & bottom padding (height 290, y=510 to 800) -->
-          <rect x="50" y="510" width="980" height="290" rx="36" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
+          <!-- 2. Vertically Centered Game Section Box (height 290, y=750 to 1040) -->
+          <rect x="50" y="750" width="980" height="290" rx="36" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
 
           <!-- TEAMS & CENTER MATCH INFO SECTION (No enclosing boxes around teams, extra large logos) -->
           <!-- HOME TEAM (Left, centered at x=220) -->
-          <image href="${homeLogoUri}" x="145" y="546" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="220" y="750" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <image href="${homeLogoUri}" x="145" y="786" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="220" y="990" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${home}
           </text>
 
           <!-- CENTER SECTION (Competition above, Time in middle, Date under) -->
           <!-- Above Time: Competition Name -->
-          <text x="540" y="612" fill="#38bdf8" font-size="26" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="852" fill="#38bdf8" font-size="26" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
             🏆 ${comp}
           </text>
           <!-- Middle: Kickoff Time (e.g. 05:00 PM) -->
-          <text x="540" y="670" fill="#ffffff" font-size="46" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          <text x="540" y="910" fill="#ffffff" font-size="46" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             ${timeAmPm}
           </text>
           <!-- Under Time: Date (Tomorrow / dd/mm/yyyy) -->
-          <text x="540" y="718" fill="#94a3b8" font-size="23" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="958" fill="#94a3b8" font-size="23" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
             ${dateText}
           </text>
 
           <!-- AWAY TEAM (Right, centered at x=860) -->
-          <image href="${awayLogoUri}" x="785" y="546" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="860" y="750" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <image href="${awayLogoUri}" x="785" y="786" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="860" y="990" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${away}
           </text>
         </g>
