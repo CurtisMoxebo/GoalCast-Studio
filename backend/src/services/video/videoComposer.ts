@@ -89,7 +89,7 @@ export class VideoComposer {
 
     // Speech 3: Transition
     const transAudioPath = path.join(workDir, 'speech_transition.wav');
-    const transSpeech = await tts.generateSpeech('Here comes the predictions', {
+    const transSpeech = await tts.generateSpeech('Save this video for later and enjoy!', {
       voice,
       outputFilePath: transAudioPath
     });
@@ -529,7 +529,7 @@ export class VideoComposer {
         currentTime = celebEnd;
       }
 
-      // Transition time (clean view of background video while "Here comes the predictions" is spoken)
+      // Transition time (clean view of background video while "Save this video for later and enjoy!" is spoken)
       currentTime += params.transDuration;
 
       // Match cards sequence (Game section box slides in, then prediction text reveals below it)
