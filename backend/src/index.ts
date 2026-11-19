@@ -32,7 +32,8 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
-if (process.env.NODE_ENV !== 'test') {
+const isTest = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
+if (!isTest) {
   app.listen(port, () => {
     console.log(`[GoalCast Backend] Server running on port ${port}`);
     console.log(`[GoalCast Backend] Health check: http://localhost:${port}/api/health`);
