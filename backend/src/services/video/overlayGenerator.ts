@@ -116,12 +116,12 @@ export class OverlayGenerator {
    * Requirements:
    * - White background with black text
    * - Team logos displayed
-   * - Away team is directly UNDER the home team in each game card
-   * - Clear visual separation between games (individual cards with borders and shadows)
+   * - Away team is directly UNDER the home team in each game row
+   * - No spaces between games; crisp divider lines separate each game
    * - Table height matches content exactly (no extra space at bottom)
-   * - Vertically centered on canvas
-   * - Home and Away team names have same size, font, and color
-   * - Title above table with white highlight and black text: "⚽Best football predictions for {DD/MM/YYYY}⚽" on one line
+   * - Table and title vertically centered on canvas
+   * - Home and Away team names have same size, font, and color (enlarged for readability)
+   * - Title above table with white highlight and black text: "⚽Best football predictions for {DD/MM/YYYY}⚽" on one line (enlarged)
    */
   async generateTableOverlay(
     games: OverlayGameData[],
@@ -132,46 +132,43 @@ export class OverlayGenerator {
     const totalGames = Math.min(games.length, 10);
     const displayGames = games.slice(0, totalGames);
 
-    // Dynamic card heights and gaps based on match count
-    let cardHeight = 136;
-    let cardGap = 16;
-    let logoSize = 42;
-    let nameFontSize = 25;
+    // Dynamic row heights, logo sizes, and font sizes based on match count (larger team names)
+    let rowHeight = 150;
+    let logoSize = 48;
+    let nameFontSize = 30;
 
     if (totalGames >= 9) {
-      cardHeight = 98;
-      cardGap = 8;
-      logoSize = 32;
-      nameFontSize = 20;
-    } else if (totalGames >= 7) {
-      cardHeight = 108;
-      cardGap = 10;
+      rowHeight = 112;
       logoSize = 36;
-      nameFontSize = 22;
+      nameFontSize = 24;
+    } else if (totalGames >= 7) {
+      rowHeight = 124;
+      logoSize = 40;
+      nameFontSize = 26;
     } else if (totalGames >= 5) {
-      cardHeight = 120;
-      cardGap = 12;
-      logoSize = 38;
-      nameFontSize = 23;
+      rowHeight = 138;
+      logoSize = 44;
+      nameFontSize = 28;
     }
 
     const tableWidth = 1000;
     const tableX = Math.round((1080 - tableWidth) / 2); // 40
-    const titleHeight = 78;
-    const gapBetweenTitleAndCards = 24;
+    const titleHeight = 88;
+    const titleFontSize = 38;
+    const gapBetweenTitleAndTable = 24;
 
-    const totalCardsHeight =
-      displayGames.length * cardHeight + (displayGames.length - 1) * cardGap;
-    const combinedHeight = titleHeight + gapBetweenTitleAndCards + totalCardsHeight;
+    // Total table height matches content exactly (no space between games)
+    const totalTableHeight = displayGames.length * rowHeight;
+    const combinedHeight = titleHeight + gapBetweenTitleAndTable + totalTableHeight;
     const startY = Math.round((1920 - combinedHeight) / 2);
 
     const titleY = startY;
-    const cardsStartY = titleY + titleHeight + gapBetweenTitleAndCards;
+    const tableStartY = titleY + titleHeight + gapBetweenTitleAndTable;
 
-    // Render individual match cards with clear separation
-    const cardsSvg = displayGames
+    // Render game rows inside unified white table with dividers
+    const rowsSvg = displayGames
       .map((game, i) => {
-        const cardY = cardsStartY + i * (cardHeight + cardGap);
+        const rowY = i * rowHeight;
         const home = this.escapeXml(game.homeTeam);
         const away = this.escapeXml(game.awayTeam);
         const comp = this.escapeXml(game.competition);
@@ -182,59 +179,66 @@ export class OverlayGenerator {
         });
 
         // Team line offsets (home on top half, away on bottom half)
-        const rowHalf = cardHeight / 2;
-        const homeLogoY = Math.round((rowHalf - logoSize) / 2) + 2;
-        const awayLogoY = Math.round(rowHalf + (rowHalf - logoSize) / 2) - 2;
+        const rowHalf = rowHeight / 2;
+        const homeLogoY = rowY + Math.round((rowHalf - logoSize) / 2) + 2;
+        const awayLogoY = rowY + Math.round(rowHalf + (rowHalf - logoSize) / 2) - 2;
 
         const homeTextBaselineY = Math.round(homeLogoY + logoSize / 2 + nameFontSize * 0.35);
         const awayTextBaselineY = Math.round(awayLogoY + logoSize / 2 + nameFontSize * 0.35);
 
-        const logoX = 92;
-        const nameX = logoX + logoSize + 14;
+        const logoX = 96;
+        const nameX = logoX + logoSize + 16;
+        const badgeHeight = rowHeight - 24;
+
+        // Is this the last game row? If not, render a clear divider between games
+        const isLastRow = i === displayGames.length - 1;
+        const dividerSvg = !isLastRow
+          ? `<line x1="20" y1="${rowY + rowHeight}" x2="${tableWidth - 20}" y2="${rowY + rowHeight}" stroke="#cbd5e1" stroke-width="2"/>`
+          : '';
 
         return `
-        <!-- Match Card ${i + 1} with clear border, white background and shadow separation -->
-        <g filter="url(#cardShadow)" transform="translate(${tableX}, ${cardY})">
-          <!-- White Card Container -->
-          <rect width="${tableWidth}" height="${cardHeight}" rx="20" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
-
+        <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
+        <g>
           <!-- Match Index Circle on Left -->
-          <circle cx="48" cy="${Math.round(cardHeight / 2)}" r="22" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
-          <text x="48" y="${Math.round(cardHeight / 2 + 7)}" fill="#0f172a" font-size="18" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
+          <circle cx="50" cy="${rowY + Math.round(rowHeight / 2)}" r="22" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="50" y="${rowY + Math.round(rowHeight / 2 + 7)}" fill="#0f172a" font-size="19" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
 
-          <!-- Divider between left badge and teams -->
-          <line x1="78" y1="12" x2="78" y2="${cardHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
+          <!-- Vertical Divider between index badge and teams -->
+          <line x1="82" y1="${rowY + 12}" x2="82" y2="${rowY + rowHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
 
           <!-- HOME TEAM (Top Row) -->
           <g transform="translate(${logoX}, ${homeLogoY})">
             ${this.renderTeamCrestSvg(game.homeTeam, logoSize)}
           </g>
-          <text x="${nameX}" y="${homeTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="start">
+          <text x="${nameX}" y="${homeTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
             ${home}
           </text>
 
-          <!-- Subtle Divider between Home & Away inside the card -->
-          <line x1="${logoX}" y1="${Math.round(rowHalf)}" x2="${tableWidth - 180}" y2="${Math.round(rowHalf)}" stroke="#f1f5f9" stroke-width="1.5"/>
+          <!-- Subtle Divider between Home & Away inside the row -->
+          <line x1="${logoX}" y1="${rowY + Math.round(rowHalf)}" x2="${tableWidth - 190}" y2="${rowY + Math.round(rowHalf)}" stroke="#f8fafc" stroke-width="1"/>
 
           <!-- AWAY TEAM (Bottom Row - DIRECTLY UNDER HOME TEAM) -->
           <g transform="translate(${logoX}, ${awayLogoY})">
             ${this.renderTeamCrestSvg(game.awayTeam, logoSize)}
           </g>
           <!-- Same size, font and color as home team -->
-          <text x="${nameX}" y="${awayTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="start">
+          <text x="${nameX}" y="${awayTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
             ${away}
           </text>
 
           <!-- Competition & Kickoff Time Badge on Right -->
-          <g transform="translate(${tableWidth - 170}, ${Math.round((cardHeight - (cardHeight - 24)) / 2)})">
-            <rect width="154" height="${cardHeight - 24}" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
-            <text x="77" y="${Math.round((cardHeight - 24) * 0.44)}" fill="#64748b" font-size="${Math.max(12, nameFontSize - 7)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+          <g transform="translate(${tableWidth - 176}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
+            <rect width="156" height="${badgeHeight}" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+            <text x="78" y="${Math.round(badgeHeight * 0.44)}" fill="#64748b" font-size="${Math.max(12, nameFontSize - 10)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
               ${comp}
             </text>
-            <text x="77" y="${Math.round((cardHeight - 24) * 0.82)}" fill="#0f172a" font-size="${Math.max(16, nameFontSize - 3)}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+            <text x="78" y="${Math.round(badgeHeight * 0.82)}" fill="#0f172a" font-size="${Math.max(16, nameFontSize - 6)}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
               ⏰ ${time}
             </text>
           </g>
+
+          <!-- Clear divider between games -->
+          ${dividerSvg}
         </g>
       `;
       })
@@ -250,18 +254,24 @@ export class OverlayGenerator {
           </filter>
         </defs>
 
-        <!-- 1. TITLE ABOVE THE GAME GROUP: White highlight background + Black text on one line -->
+        <!-- 1. TITLE ABOVE THE GAME GROUP: White highlight background + Black text on one line (Enlarged) -->
         <g filter="url(#cardShadow)" transform="translate(${tableX}, ${titleY})">
           <!-- White Highlight Box -->
-          <rect width="${tableWidth}" height="${titleHeight}" rx="22" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+          <rect width="${tableWidth}" height="${titleHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
           <!-- Black Title Text -->
-          <text x="${tableWidth / 2}" y="52" fill="#000000" font-size="34" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
+          <text x="${tableWidth / 2}" y="${Math.round(titleHeight / 2 + titleFontSize * 0.35)}" fill="#000000" font-size="${titleFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
             ${this.escapeXml(titleText)}
           </text>
         </g>
 
-        <!-- 2. GAME GROUP CARDS: White background + Black text + Away under Home + Clear card separation -->
-        ${cardsSvg}
+        <!-- 2. GAME GROUP TABLE: Single continuous white container, NO spaces between games, crisp divider lines -->
+        <g filter="url(#cardShadow)" transform="translate(${tableX}, ${tableStartY})">
+          <!-- Unified White Table Background matching exact content height -->
+          <rect width="${tableWidth}" height="${totalTableHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+
+          <!-- Match Rows & Dividers -->
+          ${rowsSvg}
+        </g>
       </svg>
     `;
 
