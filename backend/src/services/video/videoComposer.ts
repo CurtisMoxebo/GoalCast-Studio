@@ -65,14 +65,16 @@ export class VideoComposer {
     const voice = input.voiceActor || 'hearth';
     const soundEffects = assetsManager.getSoundEffects();
 
-    // 1. Generate Voice Audio Clips & Measure Timelines
-    notify(15, 'Synthesizing voice actor speech clips with Kokoro TTS');
+    // 1. Generate Voice Audio Clips & Measure Timelines (Speed: 1.2x)
+    notify(15, 'Synthesizing voice actor speech clips with Kokoro TTS (speed 1.2x)');
+    const ttsSpeed = 1.2;
 
     // Speech 1: Intro
     const introText = `best ${input.games.length} predictions for the football games going on on ${formattedDate}`;
     const introAudioPath = path.join(workDir, 'speech_intro.wav');
     const introSpeech = await tts.generateSpeech(introText, {
       voice,
+      speed: ttsSpeed,
       outputFilePath: introAudioPath
     });
 
@@ -83,7 +85,7 @@ export class VideoComposer {
       celebrationAudioPath = path.join(workDir, 'speech_celebration.wav');
       celebrationSpeech = await tts.generateSpeech(
         'Congratulations everyone! Our last prediction was a success! We won big!',
-        { voice, outputFilePath: celebrationAudioPath }
+        { voice, speed: ttsSpeed, outputFilePath: celebrationAudioPath }
       );
     }
 
@@ -91,6 +93,7 @@ export class VideoComposer {
     const transAudioPath = path.join(workDir, 'speech_transition.wav');
     const transSpeech = await tts.generateSpeech('Save this video for later and enjoy!', {
       voice,
+      speed: ttsSpeed,
       outputFilePath: transAudioPath
     });
 
@@ -108,6 +111,7 @@ export class VideoComposer {
       const introAudioPath = path.join(workDir, `speech_match_${i + 1}_intro.wav`);
       const introSpeech = await tts.generateSpeech(introText, {
         voice,
+        speed: ttsSpeed,
         outputFilePath: introAudioPath
       });
       matchIntroSpeeches.push(introSpeech);
@@ -117,6 +121,7 @@ export class VideoComposer {
       const predAudioPath = path.join(workDir, `speech_match_${i + 1}_pred.wav`);
       const predSpeech = await tts.generateSpeech(predText, {
         voice,
+        speed: ttsSpeed,
         outputFilePath: predAudioPath
       });
       matchPredSpeeches.push(predSpeech);
@@ -126,7 +131,7 @@ export class VideoComposer {
     const outroAudioPath = path.join(workDir, 'speech_outro.wav');
     const outroSpeech = await tts.generateSpeech(
       'Like, share and subscribe to get more daily predictions.',
-      { voice, outputFilePath: outroAudioPath }
+      { voice, speed: ttsSpeed, outputFilePath: outroAudioPath }
     );
 
     // 2. Generate Graphic Overlays (PNGs)

@@ -433,10 +433,10 @@ export class OverlayGenerator {
 
         <!-- Prediction Banner (Under the game section box, black text on white highlight, ONLY the prediction) -->
         <g filter="url(#predShadow)">
-          <!-- White Highlight Box (Positioned right below snug game box at y=804) -->
-          <rect x="50" y="804" width="980" height="100" rx="26" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <!-- White Highlight Box (Positioned right below padded game box at y=820) -->
+          <rect x="50" y="820" width="980" height="100" rx="26" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
           <!-- Black Prediction Text -->
-          <text x="540" y="${Math.round(804 + 50 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="${Math.round(820 + 50 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${pred}
           </text>
         </g>
@@ -502,19 +502,19 @@ export class OverlayGenerator {
         </defs>
 
         <g filter="url(#cardShadow)">
-          <!-- 1. "MATCH X OF N" Pill - Positioned ON TOP OF the box (y=440 to 500) -->
-          <rect x="360" y="440" width="360" height="60" rx="30" fill="#0369a1" stroke="#38bdf8" stroke-width="2.5"/>
-          <text x="540" y="480" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          <!-- 1. "MATCH X OF N" Pill - Positioned ON TOP OF the box (y=430 to 490) -->
+          <rect x="360" y="430" width="360" height="60" rx="30" fill="#0369a1" stroke="#38bdf8" stroke-width="2.5"/>
+          <text x="540" y="470" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             MATCH ${matchIndex} OF ${totalMatches}
           </text>
 
-          <!-- 2. Centered Snug Game Section Box (height 256, y=524 to 780 - NO unnecessary dead space under team names) -->
-          <rect x="50" y="524" width="980" height="256" rx="36" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
+          <!-- 2. Centered Game Section Box with small top & bottom padding (height 290, y=510 to 800) -->
+          <rect x="50" y="510" width="980" height="290" rx="36" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
 
           <!-- TEAMS & CENTER MATCH INFO SECTION (No enclosing boxes around teams, extra large logos) -->
           <!-- HOME TEAM (Left, centered at x=220) -->
-          <image href="${homeLogoUri}" x="145" y="548" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="220" y="744" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <image href="${homeLogoUri}" x="145" y="546" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="220" y="750" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${home}
           </text>
 
@@ -524,17 +524,17 @@ export class OverlayGenerator {
             🏆 ${comp}
           </text>
           <!-- Middle: Kickoff Time (e.g. 05:00 PM) -->
-          <text x="540" y="668" fill="#ffffff" font-size="46" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          <text x="540" y="670" fill="#ffffff" font-size="46" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             ${timeAmPm}
           </text>
           <!-- Under Time: Date (Tomorrow / dd/mm/yyyy) -->
-          <text x="540" y="714" fill="#94a3b8" font-size="23" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="718" fill="#94a3b8" font-size="23" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
             ${dateText}
           </text>
 
           <!-- AWAY TEAM (Right, centered at x=860) -->
-          <image href="${awayLogoUri}" x="785" y="548" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="860" y="744" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <image href="${awayLogoUri}" x="785" y="546" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="860" y="750" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${away}
           </text>
         </g>

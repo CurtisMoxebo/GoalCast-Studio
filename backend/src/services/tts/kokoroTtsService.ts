@@ -72,7 +72,7 @@ export class KokoroTTSService implements ITTSService {
       const tts = await this.getTTS();
       const audio = await tts.generate(text, {
         voice: kokoroVoiceId,
-        speed: options.speed || 1.0
+        speed: options.speed || 1.2
       });
 
       // Save to audio file
