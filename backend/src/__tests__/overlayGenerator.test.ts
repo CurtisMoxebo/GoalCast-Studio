@@ -27,7 +27,7 @@ test('Regression: OverlayGenerator generates Intro Table PNG with correct dimens
     }
   ];
 
-  await overlayGenerator.generateTableOverlay(games, 'Friday 20th November 2026', outputPath);
+  await overlayGenerator.generateTableOverlay(games, '2026-11-20', outputPath);
 
   assert.ok(fs.existsSync(outputPath), 'Output PNG must exist on disk');
   const metadata = await sharp(outputPath).metadata();

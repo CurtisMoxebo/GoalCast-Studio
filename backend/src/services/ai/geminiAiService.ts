@@ -113,6 +113,12 @@ Respond ONLY with a valid JSON array of objects adhering strictly to this schema
       }));
     } catch (err: any) {
       console.error('[GeminiAIService] fetchUpcomingGames failed:', err?.message || err);
+      if (err?.status === 503 || err?.status === 429 || err?.message?.includes('high demand') || err?.message?.includes('spikes in demand')) {
+        console.warn('[GeminiAIService] Falling back to mock upcoming games due to temporary Google API demand');
+        const { MockAIService } = require('./mockAiService');
+        const mock = new MockAIService();
+        return mock.fetchUpcomingGames(targetDate, timezone);
+      }
       throw err;
     }
   }
@@ -227,6 +233,12 @@ Return a JSON array of objects with the exact schema:
       return results;
     } catch (err: any) {
       console.error('[GeminiAIService] generatePredictions failed:', err?.message || err);
+      if (err?.status === 503 || err?.status === 429 || err?.message?.includes('high demand') || err?.message?.includes('spikes in demand')) {
+        console.warn('[GeminiAIService] Falling back to heuristic mock predictions due to temporary Google API demand');
+        const { MockAIService } = require('./mockAiService');
+        const mock = new MockAIService();
+        return mock.generatePredictions(games);
+      }
       throw err;
     }
   }

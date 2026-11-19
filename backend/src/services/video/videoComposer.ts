@@ -43,8 +43,7 @@ export class VideoComposer {
       return d.toLocaleDateString('en-US', {
         weekday: 'long',
         day: 'numeric',
-        month: 'long',
-        year: 'numeric'
+        month: 'long'
       });
     } catch {
       return dateStr;
@@ -120,7 +119,7 @@ export class VideoComposer {
     // 2. Generate Graphic Overlays (PNGs)
     notify(45, 'Rendering high-resolution visual cards and graphics');
     const tableIntroPng = path.join(workDir, 'overlay_table_intro.png');
-    await overlayGenerator.generateTableOverlay(input.games, formattedDate, tableIntroPng);
+    await overlayGenerator.generateTableOverlay(input.games, input.targetDate, tableIntroPng);
 
     let celebrationTablePng = '';
     if (input.previousWonGroup && input.previousWonGroup.games.length > 0) {
