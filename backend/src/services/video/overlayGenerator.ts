@@ -113,6 +113,49 @@ export class OverlayGenerator {
   }
 
   /**
+   * Format date display for match card: "Tomorrow" if match is tomorrow, else "DD/MM/YYYY"
+   */
+  private formatGameDateDisplay(kickoffTime: string): string {
+    try {
+      const matchDate = new Date(kickoffTime);
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+      const isTomorrow =
+        matchDate.getFullYear() === tomorrow.getFullYear() &&
+        matchDate.getMonth() === tomorrow.getMonth() &&
+        matchDate.getDate() === tomorrow.getDate();
+
+      if (isTomorrow) {
+        return 'Tomorrow';
+      }
+
+      const day = String(matchDate.getDate()).padStart(2, '0');
+      const month = String(matchDate.getMonth() + 1).padStart(2, '0');
+      const year = matchDate.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return 'Tomorrow';
+    }
+  }
+
+  /**
+   * Format kickoff time to 12-hour AM/PM (e.g. "05:00 PM")
+   */
+  private formatKickoffTimeAmPm(kickoffTime: string): string {
+    try {
+      const matchDate = new Date(kickoffTime);
+      return matchDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return '05:00 PM';
+    }
+  }
+
+  /**
    * Generate Introduction Table SVG / PNG (1080x1920 vertical canvas)
    * Requirements:
    * - White background with black text
@@ -121,7 +164,7 @@ export class OverlayGenerator {
    * - No spaces between games; crisp divider lines separate each game
    * - Table height matches content exactly (no extra space at bottom)
    * - Table and title vertically centered on canvas
-   * - Home and Away team names have same size, font, and color (enlarged for high impact)
+   * - Home and Away team names have same size, font, and color (extra enlarged for high impact)
    * - Title above table with white highlight and black text: "⚽Best football predictions for {DD/MM/YYYY}⚽" on one line (enlarged)
    */
   async generateTableOverlay(
@@ -133,23 +176,23 @@ export class OverlayGenerator {
     const totalGames = Math.min(games.length, 10);
     const displayGames = games.slice(0, totalGames);
 
-    // Dynamic row heights, logo sizes, and font sizes based on match count (larger team names & logos)
-    let rowHeight = 170;
-    let logoSize = 64;
-    let nameFontSize = 36;
+    // Dynamic row heights, logo sizes, and font sizes based on match count (extra enlarged team names & logos)
+    let rowHeight = 194;
+    let logoSize = 80;
+    let nameFontSize = 42;
 
     if (totalGames >= 9) {
-      rowHeight = 122;
-      logoSize = 46;
-      nameFontSize = 26;
-    } else if (totalGames >= 7) {
-      rowHeight = 138;
+      rowHeight = 128;
       logoSize = 52;
-      nameFontSize = 29;
+      nameFontSize = 28;
+    } else if (totalGames >= 7) {
+      rowHeight = 148;
+      logoSize = 62;
+      nameFontSize = 32;
     } else if (totalGames >= 5) {
-      rowHeight = 156;
-      logoSize = 58;
-      nameFontSize = 33;
+      rowHeight = 170;
+      logoSize = 72;
+      nameFontSize = 37;
     }
 
     const tableWidth = 1000;
@@ -197,7 +240,7 @@ export class OverlayGenerator {
         const homeTextBaselineY = Math.round(homeLogoY + logoSize / 2 + nameFontSize * 0.35);
         const awayTextBaselineY = Math.round(awayLogoY + logoSize / 2 + nameFontSize * 0.35);
 
-        const logoX = 96;
+        const logoX = 94;
         const nameX = logoX + logoSize + 18;
         const badgeHeight = rowHeight - 24;
 
@@ -211,8 +254,8 @@ export class OverlayGenerator {
         <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
         <g>
           <!-- Match Index Circle on Left -->
-          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="23" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
-          <text x="48" y="${rowY + Math.round(rowHeight / 2 + 7)}" fill="#0f172a" font-size="20" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
+          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="24" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="48" y="${rowY + Math.round(rowHeight / 2 + 7)}" fill="#0f172a" font-size="21" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
 
           <!-- Vertical Divider between index badge and teams -->
           <line x1="80" y1="${rowY + 12}" x2="80" y2="${rowY + rowHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
@@ -236,10 +279,10 @@ export class OverlayGenerator {
           <!-- Competition & Kickoff Time Badge on Right -->
           <g transform="translate(${tableWidth - 176}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
             <rect width="156" height="${badgeHeight}" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
-            <text x="78" y="${Math.round(badgeHeight * 0.44)}" fill="#64748b" font-size="${Math.max(12, nameFontSize - 10)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+            <text x="78" y="${Math.round(badgeHeight * 0.44)}" fill="#64748b" font-size="${Math.max(13, nameFontSize - 10)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
               ${comp}
             </text>
-            <text x="78" y="${Math.round(badgeHeight * 0.82)}" fill="#0f172a" font-size="${Math.max(16, nameFontSize - 6)}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+            <text x="78" y="${Math.round(badgeHeight * 0.82)}" fill="#0f172a" font-size="${Math.max(17, nameFontSize - 6)}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
               ⏰ ${time}
             </text>
           </g>
@@ -366,41 +409,95 @@ export class OverlayGenerator {
   }
 
   /**
-   * Generate Individual Match Card Overlay (Vertically Centered)
+   * Generate Prediction Overlay (revealed under the game section box)
+   */
+  async generatePredictionOverlay(
+    predictionLabel: string,
+    outputPath: string
+  ): Promise<string> {
+    const pred = this.escapeXml(predictionLabel);
+    let predFontSize = 46;
+    if (pred.length > 25) {
+      predFontSize = 36;
+    } else if (pred.length > 18) {
+      predFontSize = 40;
+    }
+
+    const svg = `
+      <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="predGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#ea580c"/>
+          </linearGradient>
+          <filter id="predShadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.65"/>
+          </filter>
+        </defs>
+
+        <!-- Prediction Banner (Under the game section box, centered at y=980) -->
+        <g filter="url(#predShadow)">
+          <rect x="50" y="980" width="980" height="210" rx="32" fill="url(#predGrad)" stroke="#fbbf24" stroke-width="3"/>
+          <text x="540" y="1035" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="2">
+            🔥 PREDICTION SELECTION 🔥
+          </text>
+          <rect x="85" y="1055" width="910" height="110" rx="20" fill="#000000" fill-opacity="0.38"/>
+          <text x="540" y="1126" fill="#ffffff" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+            ${pred}
+          </text>
+        </g>
+      </svg>
+    `;
+
+    const dir = path.dirname(outputPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    await sharp(Buffer.from(svg)).png().toFile(outputPath);
+    return outputPath;
+  }
+
+  /**
+   * Generate Single Game Section Box Overlay
+   * Requirements:
+   * - No competition name or kickoff time in the section above
+   * - No box around the team names and logo
+   * - Replace VS section between teams with:
+   *   - Above time: competition name
+   *   - Middle: kickoff time (e.g. 05:00 PM)
+   *   - Under time: date in smaller text ("Tomorrow" if tomorrow, else "DD/MM/YYYY")
+   * - No prediction inside this box (revealed separately under this box)
    */
   async generateMatchCardOverlay(
     game: OverlayGameData,
     matchIndex: number,
     totalMatches: number,
-    predictionLabel: string,
-    outputPath: string
+    param4: string,
+    param5?: string
   ): Promise<string> {
+    const outputPath = param5 || param4;
     const home = this.escapeXml(game.homeTeam);
     const away = this.escapeXml(game.awayTeam);
     const comp = this.escapeXml(game.competition);
-    const pred = this.escapeXml(predictionLabel);
-    const time = new Date(game.kickoffTime).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
+    const timeAmPm = this.formatKickoffTimeAmPm(game.kickoffTime);
+    const dateText = this.formatGameDateDisplay(game.kickoffTime);
 
-    // Fetch real team logos for match card showcase
+    // Fetch real team logos for single match showcase (size 114)
+    const logoSize = 114;
     const [homeLogoUri, awayLogoUri] = await Promise.all([
-      teamLogoService.getLogoDataUri(game.homeTeam, game.homeTeamLogo, 90),
-      teamLogoService.getLogoDataUri(game.awayTeam, game.awayTeamLogo, 90)
+      teamLogoService.getLogoDataUri(game.homeTeam, game.homeTeamLogo, logoSize),
+      teamLogoService.getLogoDataUri(game.awayTeam, game.awayTeamLogo, logoSize)
     ]);
+
+    // Adaptive font sizes for team names in the single game section
+    const homeFontSize = home.length > 14 ? 28 : 34;
+    const awayFontSize = away.length > 14 ? 28 : 34;
 
     const svg = `
       <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#0f172a" stop-opacity="0.95"/>
+            <stop offset="0%" stop-color="#0f172a" stop-opacity="0.96"/>
             <stop offset="100%" stop-color="#020617" stop-opacity="0.98"/>
-          </linearGradient>
-          <linearGradient id="predGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#f59e0b"/>
-            <stop offset="100%" stop-color="#ea580c"/>
           </linearGradient>
           <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
             <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.7"/>
@@ -408,54 +505,41 @@ export class OverlayGenerator {
         </defs>
 
         <g filter="url(#cardShadow)">
-          <!-- Centered Card Container (height 1000, vertically centered at 460) -->
-          <rect x="50" y="460" width="980" height="1000" rx="40" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
+          <!-- Centered Game Section Box (height 430, y=520 to 950) -->
+          <rect x="50" y="520" width="980" height="430" rx="36" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
 
-          <!-- Match Badge Pill -->
-          <rect x="360" y="520" width="360" height="64" rx="32" fill="#0369a1"/>
-          <text x="540" y="563" fill="#ffffff" font-size="28" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          <!-- Match Badge Pill at Top (Clean, without competition or kickoff above) -->
+          <rect x="360" y="555" width="360" height="56" rx="28" fill="#0369a1"/>
+          <text x="540" y="593" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             MATCH ${matchIndex} OF ${totalMatches}
           </text>
 
-          <!-- Competition & Kickoff Time -->
-          <text x="540" y="650" fill="#38bdf8" font-size="34" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+          <!-- TEAMS & CENTER MATCH INFO SECTION (No enclosing boxes around teams) -->
+          <!-- HOME TEAM (Left, centered at x=220) -->
+          <image href="${homeLogoUri}" x="163" y="640" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="220" y="795" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+            ${home}
+          </text>
+
+          <!-- CENTER SECTION (Competition above, Time in middle, Date under) -->
+          <!-- Above Time: Competition Name -->
+          <text x="540" y="682" fill="#38bdf8" font-size="25" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
             🏆 ${comp}
           </text>
-          <text x="540" y="700" fill="#94a3b8" font-size="26" font-family="Arial, sans-serif" text-anchor="middle">
-            ⏰ Kickoff: ${time}
+          <!-- Middle: Kickoff Time (e.g. 05:00 PM) -->
+          <text x="540" y="736" fill="#ffffff" font-size="40" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+            ${timeAmPm}
+          </text>
+          <!-- Under Time: Date (Tomorrow / dd/mm/yyyy) -->
+          <text x="540" y="776" fill="#94a3b8" font-size="23" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+            ${dateText}
           </text>
 
-          <!-- Divider -->
-          <line x1="120" y1="740" x2="960" y2="740" stroke="#334155" stroke-width="2"/>
-
-          <!-- Teams Showcase with Real Logos -->
-          <g transform="translate(0, 780)">
-            <!-- Home Team Box -->
-            <rect x="100" y="0" width="380" height="180" rx="24" fill="#1e293b" stroke="#475569" stroke-width="2"/>
-            <image href="${homeLogoUri}" x="245" y="16" width="90" height="90" preserveAspectRatio="xMidYMid meet"/>
-            <text x="290" y="148" fill="#f8fafc" font-size="30" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">${home}</text>
-
-            <!-- VS Badge -->
-            <circle cx="540" cy="90" r="38" fill="#e11d48"/>
-            <text x="540" y="99" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">VS</text>
-
-            <!-- Away Team Box -->
-            <rect x="600" y="0" width="380" height="180" rx="24" fill="#1e293b" stroke="#475569" stroke-width="2"/>
-            <image href="${awayLogoUri}" x="745" y="16" width="90" height="90" preserveAspectRatio="xMidYMid meet"/>
-            <text x="790" y="148" fill="#f8fafc" font-size="30" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">${away}</text>
-          </g>
-
-          <!-- Prediction Showcase Section -->
-          <g transform="translate(100, 1070)">
-            <rect width="880" height="290" rx="28" fill="url(#predGrad)"/>
-            <text x="440" y="70" fill="#ffffff" font-size="28" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="2">
-              🔥 PREDICTION SELECTION 🔥
-            </text>
-            <rect x="50" y="105" width="780" height="135" rx="20" fill="#000000" fill-opacity="0.35"/>
-            <text x="440" y="185" fill="#ffffff" font-size="44" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
-              ${pred}
-            </text>
-          </g>
+          <!-- AWAY TEAM (Right, centered at x=860) -->
+          <image href="${awayLogoUri}" x="803" y="640" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="860" y="795" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+            ${away}
+          </text>
         </g>
       </svg>
     `;

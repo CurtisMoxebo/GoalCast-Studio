@@ -94,19 +94,32 @@ export class VideoComposer {
       outputFilePath: transAudioPath
     });
 
-    // Speech 4: Match Predictions
+    // Speech 4: Match Predictions (Split: Match Announcement + Prediction Reveal)
     notify(30, 'Generating speech for each match prediction');
-    const matchSpeeches: { durationSeconds: number; filePath: string }[] = [];
+    const matchIntroSpeeches: { durationSeconds: number; filePath: string }[] = [];
+    const matchPredSpeeches: { durationSeconds: number; filePath: string }[] = [];
+
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
       const predSpoken = g.selections?.[0]?.spokenText || 'Both teams to score';
-      const matchText = `Match ${i + 1}, ${g.homeTeam} versus ${g.awayTeam}. ${predSpoken} stands out as the strongest outcome.`;
-      const matchAudioPath = path.join(workDir, `speech_match_${i + 1}.wav`);
-      const speech = await tts.generateSpeech(matchText, {
+
+      // 4a. Match Announcement (Spoken as game box slides in)
+      const introText = `Match ${i + 1}, ${g.homeTeam} versus ${g.awayTeam}.`;
+      const introAudioPath = path.join(workDir, `speech_match_${i + 1}_intro.wav`);
+      const introSpeech = await tts.generateSpeech(introText, {
         voice,
-        outputFilePath: matchAudioPath
+        outputFilePath: introAudioPath
       });
-      matchSpeeches.push(speech);
+      matchIntroSpeeches.push(introSpeech);
+
+      // 4b. Prediction Text (Spoken when prediction text reveals on video)
+      const predText = `${predSpoken} stands out as the strongest outcome.`;
+      const predAudioPath = path.join(workDir, `speech_match_${i + 1}_pred.wav`);
+      const predSpeech = await tts.generateSpeech(predText, {
+        voice,
+        outputFilePath: predAudioPath
+      });
+      matchPredSpeeches.push(predSpeech);
     }
 
     // Speech 5: Outro
@@ -130,40 +143,70 @@ export class VideoComposer {
       );
     }
 
+    // Generate Single Game Section Box + Dedicated Prediction Banner for each match
     const matchCardPngs: string[] = [];
+    const matchPredPngs: string[] = [];
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
       const predLabel = g.selections?.[0]?.label || 'Both Teams to Score';
-      const cardPath = path.join(workDir, `overlay_match_${i + 1}.png`);
+      const cardPath = path.join(workDir, `overlay_match_${i + 1}_card.png`);
+      const predPath = path.join(workDir, `overlay_match_${i + 1}_pred.png`);
+
       await overlayGenerator.generateMatchCardOverlay(
         g,
         i + 1,
         input.games.length,
-        predLabel,
         cardPath
       );
       matchCardPngs.push(cardPath);
+
+      await overlayGenerator.generatePredictionOverlay(
+        predLabel,
+        predPath
+      );
+      matchPredPngs.push(predPath);
     }
 
-    // 3. Compute Scene Durations
-    // Scene 1: Intro table (0.5s slide in + introSpeech duration + 0.5s)
+    // 3. Compute Scene Durations & Match Timelines
     const introDuration = Math.max(3.5, introSpeech.durationSeconds + 1.0);
-    // Scene 2: Celebration (if enabled)
     const celebrationDuration = celebrationSpeech
       ? Math.max(4.0, celebrationSpeech.durationSeconds + 1.2)
       : 0;
-    // Scene 3: "Here comes the predictions" transition
     const transDuration = Math.max(2.0, transSpeech.durationSeconds + 0.5);
 
-    // Matches durations
-    const matchDurations = matchSpeeches.map((s) => Math.max(3.8, s.durationSeconds + 1.0));
+    interface MatchSceneTimeline {
+      introAudioPath: string;
+      predAudioPath: string;
+      cardPngPath: string;
+      predPngPath: string;
+      predRevealOffset: number;
+      sceneDuration: number;
+    }
+
+    const matchScenes: MatchSceneTimeline[] = [];
+    for (let i = 0; i < input.games.length; i++) {
+      const introDur = matchIntroSpeeches[i].durationSeconds;
+      const predDur = matchPredSpeeches[i].durationSeconds;
+      const predRevealOffset = Math.max(2.2, 0.35 + introDur + 0.25);
+      const sceneDuration = predRevealOffset + predDur + 1.1;
+
+      matchScenes.push({
+        introAudioPath: matchIntroSpeeches[i].filePath,
+        predAudioPath: matchPredSpeeches[i].filePath,
+        cardPngPath: matchCardPngs[i],
+        predPngPath: matchPredPngs[i],
+        predRevealOffset,
+        sceneDuration
+      });
+    }
+
     const outroDuration = Math.max(4.0, outroSpeech.durationSeconds + 1.0);
 
     const totalDuration =
       introDuration +
       celebrationDuration +
       transDuration +
-      matchDurations.reduce((a, b) => a + b, 0) +
+      matchScenes.reduce((acc, m) => acc + m.sceneDuration, 0) +
       outroDuration;
 
     notify(60, `Timeline prepared. Total duration: ${totalDuration.toFixed(1)}s. Assembling master video.`);
@@ -201,8 +244,7 @@ export class VideoComposer {
       celebrationSfxPath: soundEffects.celebration,
       transAudioPath,
       transDuration,
-      matchAudioPaths: matchSpeeches.map((s) => s.filePath),
-      matchDurations,
+      matchScenes,
       outroAudioPath,
       swooshPath: soundEffects.swoosh,
       bgAudioPath
@@ -218,8 +260,7 @@ export class VideoComposer {
       introDuration,
       celebrationTablePng,
       celebrationDuration,
-      matchCardPngs,
-      matchDurations,
+      matchScenes,
       transDuration,
       outputVideoPath
     });
@@ -254,8 +295,12 @@ export class VideoComposer {
     celebrationSfxPath: string;
     transAudioPath: string;
     transDuration: number;
-    matchAudioPaths: string[];
-    matchDurations: number[];
+    matchScenes: {
+      introAudioPath: string;
+      predAudioPath: string;
+      predRevealOffset: number;
+      sceneDuration: number;
+    }[];
     outroAudioPath: string;
     swooshPath: string;
     bgAudioPath: string;
@@ -284,13 +329,28 @@ export class VideoComposer {
       const transVoiceIdx = inputCount++;
       command.input(params.transAudioPath);
 
-      const matchVoiceIndices: number[] = [];
-      const matchSwooshIndices: number[] = [];
-      for (const mPath of params.matchAudioPaths) {
-        matchVoiceIndices.push(inputCount++);
-        command.input(mPath);
-        matchSwooshIndices.push(inputCount++);
+      interface MatchAudioInputs {
+        cardSwooshIdx: number;
+        introVoiceIdx: number;
+        predSwooshIdx: number;
+        predVoiceIdx: number;
+      }
+
+      const matchInputs: MatchAudioInputs[] = [];
+      for (const m of params.matchScenes) {
+        const cardSwooshIdx = inputCount++;
         command.input(params.swooshPath);
+
+        const introVoiceIdx = inputCount++;
+        command.input(m.introAudioPath);
+
+        const predSwooshIdx = inputCount++;
+        command.input(params.swooshPath);
+
+        const predVoiceIdx = inputCount++;
+        command.input(m.predAudioPath);
+
+        matchInputs.push({ cardSwooshIdx, introVoiceIdx, predSwooshIdx, predVoiceIdx });
       }
 
       const outroVoiceIdx = inputCount++;
@@ -335,25 +395,35 @@ export class VideoComposer {
       );
       currentOffset += params.transDuration;
 
-      // 5. Match voices & swooshes
-      for (let i = 0; i < params.matchAudioPaths.length; i++) {
-        const vIdx = matchVoiceIndices[i];
-        const sIdx = matchSwooshIndices[i];
-        const matchDur = params.matchDurations[i];
+      // 5. Match voices & swooshes (Card enter swoosh -> Intro announcement -> Reveal swoosh -> Prediction announcement)
+      for (let i = 0; i < params.matchScenes.length; i++) {
+        const m = params.matchScenes[i];
+        const mi = matchInputs[i];
 
         const cardSwooshMs = Math.round(currentOffset * 1000);
-        const voiceStartMs = Math.round((currentOffset + 0.3) * 1000);
+        const introVoiceMs = Math.round((currentOffset + 0.35) * 1000);
+        const predRevealTime = currentOffset + m.predRevealOffset;
+        const predSwooshMs = Math.round(predRevealTime * 1000);
+        const predVoiceMs = Math.round((predRevealTime + 0.1) * 1000);
 
         // Swoosh as card slides in
         filterSteps.push(
-          `[${sIdx}:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${cardSwooshMs}|${cardSwooshMs}[swoosh_${i + 1}]`
+          `[${mi.cardSwooshIdx}:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${cardSwooshMs}|${cardSwooshMs}[card_swoosh_${i}]`
         );
-        // Voice starts slightly after card enters
+        // Match announcement voice
         filterSteps.push(
-          `[${vIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${voiceStartMs}|${voiceStartMs}[match_v_${i}]`
+          `[${mi.introVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${introVoiceMs}|${introVoiceMs}[intro_v_${i}]`
+        );
+        // Swoosh as prediction reveals
+        filterSteps.push(
+          `[${mi.predSwooshIdx}:a]volume=1.1,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${predSwooshMs}|${predSwooshMs}[pred_swoosh_${i}]`
+        );
+        // Prediction voice
+        filterSteps.push(
+          `[${mi.predVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${predVoiceMs}|${predVoiceMs}[pred_v_${i}]`
         );
 
-        currentOffset += matchDur;
+        currentOffset += m.sceneDuration;
       }
 
       // 6. Outro voice
@@ -368,8 +438,8 @@ export class VideoComposer {
         mixInputs.push('[celeb_v]', '[celeb_sfx]');
       }
       mixInputs.push('[trans_v]');
-      for (let i = 0; i < params.matchAudioPaths.length; i++) {
-        mixInputs.push(`[swoosh_${i + 1}]`, `[match_v_${i}]`);
+      for (let i = 0; i < params.matchScenes.length; i++) {
+        mixInputs.push(`[card_swoosh_${i}]`, `[intro_v_${i}]`, `[pred_swoosh_${i}]`, `[pred_v_${i}]`);
       }
       mixInputs.push('[outro_v]');
 
@@ -399,8 +469,12 @@ export class VideoComposer {
     introDuration: number;
     celebrationTablePng?: string;
     celebrationDuration: number;
-    matchCardPngs: string[];
-    matchDurations: number[];
+    matchScenes: {
+      cardPngPath: string;
+      predPngPath: string;
+      predRevealOffset: number;
+      sceneDuration: number;
+    }[];
     transDuration: number;
     outputVideoPath: string;
   }): Promise<void> {
@@ -423,10 +497,14 @@ export class VideoComposer {
         command.input(params.celebrationTablePng);
       }
 
-      const matchInputIndices: number[] = [];
-      for (const cardPng of params.matchCardPngs) {
-        matchInputIndices.push(overlayInputIdx++);
-        command.input(cardPng);
+      const matchCardIndices: number[] = [];
+      const matchPredIndices: number[] = [];
+      for (const m of params.matchScenes) {
+        matchCardIndices.push(overlayInputIdx++);
+        command.input(m.cardPngPath);
+
+        matchPredIndices.push(overlayInputIdx++);
+        command.input(m.predPngPath);
       }
 
       // Filter Complex:
@@ -461,18 +539,27 @@ export class VideoComposer {
       // Transition time (clean view of background video while "Here comes the predictions" is spoken)
       currentTime += params.transDuration;
 
-      // Match cards sequence
-      for (let i = 0; i < matchInputIndices.length; i++) {
-        const inputIdx = matchInputIndices[i];
-        const matchDur = params.matchDurations[i];
+      // Match cards sequence (Game section box slides in, then prediction text reveals below it)
+      for (let i = 0; i < params.matchScenes.length; i++) {
+        const m = params.matchScenes[i];
+        const cardInputIdx = matchCardIndices[i];
+        const predInputIdx = matchPredIndices[i];
         const matchStart = currentTime;
-        const matchEnd = matchStart + matchDur;
+        const matchEnd = matchStart + m.sceneDuration;
+        const predRevealTime = matchStart + m.predRevealOffset;
+        const cardStage = `[v_card_${i}]`;
         const nextStage = `[v_match_${i}]`;
 
-        // Card slides in from left (-w to center in 0.35s), holds, then slides out to right (center to W+w in 0.35s)
+        // 1. Single game section box: slides in from left in 0.35s, stays, slides out to right at matchEnd - 0.35s
         filters.push(
-          `${lastVideoStage}[${inputIdx}:v]overlay=x='if(lt(t,${matchStart + 0.35}), -w + (W/2 + w/2)*(t-${matchStart})/0.35, if(gt(t,${matchEnd - 0.35}), (W-w)/2 + (W/2 + w/2)*(t-(${matchEnd-0.35}))/0.35, (W-w)/2))':y='(H-h)/2':enable='between(t,${matchStart},${matchEnd})'${nextStage}`
+          `${lastVideoStage}[${cardInputIdx}:v]overlay=x='if(lt(t,${matchStart + 0.35}), -w + (W/2 + w/2)*(t-${matchStart})/0.35, if(gt(t,${matchEnd - 0.35}), (W-w)/2 + (W/2 + w/2)*(t-(${matchEnd-0.35}))/0.35, (W-w)/2))':y='(H-h)/2':enable='between(t,${matchStart},${matchEnd})'${cardStage}`
         );
+
+        // 2. Prediction text banner: revealed under the game box at predRevealTime, pops up slightly, slides out to right with card
+        filters.push(
+          `${cardStage}[${predInputIdx}:v]overlay=x='if(gt(t,${matchEnd - 0.35}), (W-w)/2 + (W/2 + w/2)*(t-(${matchEnd-0.35}))/0.35, (W-w)/2)':y='if(lt(t,${predRevealTime + 0.25}), (H-h)/2 + 60*(1 - (t-${predRevealTime})/0.25), (H-h)/2)':enable='between(t,${predRevealTime},${matchEnd})'${nextStage}`
+        );
+
         lastVideoStage = nextStage;
         currentTime = matchEnd;
       }

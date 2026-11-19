@@ -85,3 +85,18 @@ test('Regression: OverlayGenerator generates Match Card PNG with prediction high
   // Clean up
   if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
 });
+
+test('Regression: OverlayGenerator generates Prediction Banner PNG under game box', async () => {
+  const tmpDir = path.join(os.tmpdir(), 'goalcast_tests_overlay');
+  const outputPath = path.join(tmpDir, 'test_pred_banner.png');
+
+  await overlayGenerator.generatePredictionOverlay('Both Teams to Score - Yes', outputPath);
+
+  assert.ok(fs.existsSync(outputPath), 'Prediction banner PNG must exist on disk');
+  const metadata = await sharp(outputPath).metadata();
+  assert.equal(metadata.width, 1080);
+  assert.equal(metadata.height, 1920);
+
+  // Clean up
+  if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+});
