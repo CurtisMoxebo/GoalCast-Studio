@@ -37,3 +37,4 @@ tmp/
 temp/
 *preview*.mp4
 test_*.mp4
+backend/assets/logos/cache/

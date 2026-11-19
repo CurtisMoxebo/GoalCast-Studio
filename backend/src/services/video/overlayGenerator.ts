@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
+import { teamLogoService } from './teamLogoService';
 
 export interface OverlayGameData {
   homeTeam: string;
@@ -115,12 +116,12 @@ export class OverlayGenerator {
    * Generate Introduction Table SVG / PNG (1080x1920 vertical canvas)
    * Requirements:
    * - White background with black text
-   * - Team logos displayed
+   * - Real team logos displayed (enlarged & authentic)
    * - Away team is directly UNDER the home team in each game row
    * - No spaces between games; crisp divider lines separate each game
    * - Table height matches content exactly (no extra space at bottom)
    * - Table and title vertically centered on canvas
-   * - Home and Away team names have same size, font, and color (enlarged for readability)
+   * - Home and Away team names have same size, font, and color (enlarged for high impact)
    * - Title above table with white highlight and black text: "⚽Best football predictions for {DD/MM/YYYY}⚽" on one line (enlarged)
    */
   async generateTableOverlay(
@@ -132,23 +133,23 @@ export class OverlayGenerator {
     const totalGames = Math.min(games.length, 10);
     const displayGames = games.slice(0, totalGames);
 
-    // Dynamic row heights, logo sizes, and font sizes based on match count (larger team names)
-    let rowHeight = 150;
-    let logoSize = 48;
-    let nameFontSize = 30;
+    // Dynamic row heights, logo sizes, and font sizes based on match count (larger team names & logos)
+    let rowHeight = 170;
+    let logoSize = 64;
+    let nameFontSize = 36;
 
     if (totalGames >= 9) {
-      rowHeight = 112;
-      logoSize = 36;
-      nameFontSize = 24;
-    } else if (totalGames >= 7) {
-      rowHeight = 124;
-      logoSize = 40;
+      rowHeight = 122;
+      logoSize = 46;
       nameFontSize = 26;
-    } else if (totalGames >= 5) {
+    } else if (totalGames >= 7) {
       rowHeight = 138;
-      logoSize = 44;
-      nameFontSize = 28;
+      logoSize = 52;
+      nameFontSize = 29;
+    } else if (totalGames >= 5) {
+      rowHeight = 156;
+      logoSize = 58;
+      nameFontSize = 33;
     }
 
     const tableWidth = 1000;
@@ -156,6 +157,16 @@ export class OverlayGenerator {
     const titleHeight = 88;
     const titleFontSize = 38;
     const gapBetweenTitleAndTable = 24;
+
+    // Fetch real team logos concurrently
+    const [homeLogos, awayLogos] = await Promise.all([
+      Promise.all(
+        displayGames.map((g) => teamLogoService.getLogoDataUri(g.homeTeam, g.homeTeamLogo, logoSize))
+      ),
+      Promise.all(
+        displayGames.map((g) => teamLogoService.getLogoDataUri(g.awayTeam, g.awayTeamLogo, logoSize))
+      )
+    ]);
 
     // Total table height matches content exactly (no space between games)
     const totalTableHeight = displayGames.length * rowHeight;
@@ -180,14 +191,14 @@ export class OverlayGenerator {
 
         // Team line offsets (home on top half, away on bottom half)
         const rowHalf = rowHeight / 2;
-        const homeLogoY = rowY + Math.round((rowHalf - logoSize) / 2) + 2;
-        const awayLogoY = rowY + Math.round(rowHalf + (rowHalf - logoSize) / 2) - 2;
+        const homeLogoY = rowY + Math.round((rowHalf - logoSize) / 2);
+        const awayLogoY = rowY + Math.round(rowHalf + (rowHalf - logoSize) / 2);
 
         const homeTextBaselineY = Math.round(homeLogoY + logoSize / 2 + nameFontSize * 0.35);
         const awayTextBaselineY = Math.round(awayLogoY + logoSize / 2 + nameFontSize * 0.35);
 
         const logoX = 96;
-        const nameX = logoX + logoSize + 16;
+        const nameX = logoX + logoSize + 18;
         const badgeHeight = rowHeight - 24;
 
         // Is this the last game row? If not, render a clear divider between games
@@ -200,16 +211,14 @@ export class OverlayGenerator {
         <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
         <g>
           <!-- Match Index Circle on Left -->
-          <circle cx="50" cy="${rowY + Math.round(rowHeight / 2)}" r="22" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
-          <text x="50" y="${rowY + Math.round(rowHeight / 2 + 7)}" fill="#0f172a" font-size="19" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
+          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="23" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="48" y="${rowY + Math.round(rowHeight / 2 + 7)}" fill="#0f172a" font-size="20" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
 
           <!-- Vertical Divider between index badge and teams -->
-          <line x1="82" y1="${rowY + 12}" x2="82" y2="${rowY + rowHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
+          <line x1="80" y1="${rowY + 12}" x2="80" y2="${rowY + rowHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
 
-          <!-- HOME TEAM (Top Row) -->
-          <g transform="translate(${logoX}, ${homeLogoY})">
-            ${this.renderTeamCrestSvg(game.homeTeam, logoSize)}
-          </g>
+          <!-- HOME TEAM (Top Row - Real Logo & Enlarged Name) -->
+          <image href="${homeLogos[i]}" x="${logoX}" y="${homeLogoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
           <text x="${nameX}" y="${homeTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
             ${home}
           </text>
@@ -218,9 +227,7 @@ export class OverlayGenerator {
           <line x1="${logoX}" y1="${rowY + Math.round(rowHalf)}" x2="${tableWidth - 190}" y2="${rowY + Math.round(rowHalf)}" stroke="#f8fafc" stroke-width="1"/>
 
           <!-- AWAY TEAM (Bottom Row - DIRECTLY UNDER HOME TEAM) -->
-          <g transform="translate(${logoX}, ${awayLogoY})">
-            ${this.renderTeamCrestSvg(game.awayTeam, logoSize)}
-          </g>
+          <image href="${awayLogos[i]}" x="${logoX}" y="${awayLogoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
           <!-- Same size, font and color as home team -->
           <text x="${nameX}" y="${awayTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
             ${away}
@@ -378,6 +385,12 @@ export class OverlayGenerator {
       hour12: false
     });
 
+    // Fetch real team logos for match card showcase
+    const [homeLogoUri, awayLogoUri] = await Promise.all([
+      teamLogoService.getLogoDataUri(game.homeTeam, game.homeTeamLogo, 90),
+      teamLogoService.getLogoDataUri(game.awayTeam, game.awayTeamLogo, 90)
+    ]);
+
     const svg = `
       <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -415,14 +428,12 @@ export class OverlayGenerator {
           <!-- Divider -->
           <line x1="120" y1="740" x2="960" y2="740" stroke="#334155" stroke-width="2"/>
 
-          <!-- Teams Showcase with Crests -->
+          <!-- Teams Showcase with Real Logos -->
           <g transform="translate(0, 780)">
             <!-- Home Team Box -->
             <rect x="100" y="0" width="380" height="180" rx="24" fill="#1e293b" stroke="#475569" stroke-width="2"/>
-            <g transform="translate(250, 20)">
-              ${this.renderTeamCrestSvg(game.homeTeam, 80)}
-            </g>
-            <text x="290" y="145" fill="#f8fafc" font-size="30" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">${home}</text>
+            <image href="${homeLogoUri}" x="245" y="16" width="90" height="90" preserveAspectRatio="xMidYMid meet"/>
+            <text x="290" y="148" fill="#f8fafc" font-size="30" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">${home}</text>
 
             <!-- VS Badge -->
             <circle cx="540" cy="90" r="38" fill="#e11d48"/>
@@ -430,10 +441,8 @@ export class OverlayGenerator {
 
             <!-- Away Team Box -->
             <rect x="600" y="0" width="380" height="180" rx="24" fill="#1e293b" stroke="#475569" stroke-width="2"/>
-            <g transform="translate(750, 20)">
-              ${this.renderTeamCrestSvg(game.awayTeam, 80)}
-            </g>
-            <text x="790" y="145" fill="#f8fafc" font-size="30" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">${away}</text>
+            <image href="${awayLogoUri}" x="745" y="16" width="90" height="90" preserveAspectRatio="xMidYMid meet"/>
+            <text x="790" y="148" fill="#f8fafc" font-size="30" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">${away}</text>
           </g>
 
           <!-- Prediction Showcase Section -->

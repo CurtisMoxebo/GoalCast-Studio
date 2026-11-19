@@ -78,6 +78,8 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
       {
         homeTeam: 'Real Madrid',
         awayTeam: 'Barcelona',
+        homeTeamLogo: 'https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg',
+        awayTeamLogo: 'https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg',
         competition: 'La Liga',
         kickoffTime: `${targetDate}T20:00:00Z`,
         selections: [
@@ -91,6 +93,8 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
       {
         homeTeam: 'Arsenal',
         awayTeam: 'Chelsea',
+        homeTeamLogo: 'https://upload.wikimedia.org/wikipedia/en/5/53/Arsenal_FC.svg',
+        awayTeamLogo: 'https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg',
         competition: 'Premier League',
         kickoffTime: `${targetDate}T17:30:00Z`,
         selections: [
