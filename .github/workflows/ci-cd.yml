@@ -30,15 +30,41 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Run Unit Tests
+      - name: Run Unit & Regression Tests
         run: npm test
 
       - name: Build TypeScript
         run: npm run build
 
+  mobile-ci:
+    name: Mobile App Test & Typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Mobile Regression Tests
+        run: npm test
+
+      - name: Typecheck React Native Mobile App
+        run: npm run typecheck
+
   build-docker:
     name: Build Backend Docker Image
-    needs: [backend-ci]
+    needs: [backend-ci, mobile-ci]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -72,5 +98,4 @@ jobs:
             exit 0
           fi
           echo "Connecting to Windows Server 2022 to refresh container..."
-          # Deploy commands targeting Docker for Windows
           ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_HOST" "docker compose -f C:\\GoalCast-Studio\\docker-compose.yml pull && docker compose -f C:\\GoalCast-Studio\\docker-compose.yml up -d --build"
