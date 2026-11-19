@@ -332,7 +332,6 @@ export class VideoComposer {
       interface MatchAudioInputs {
         cardSwooshIdx: number;
         introVoiceIdx: number;
-        predSwooshIdx: number;
         predVoiceIdx: number;
       }
 
@@ -344,13 +343,10 @@ export class VideoComposer {
         const introVoiceIdx = inputCount++;
         command.input(m.introAudioPath);
 
-        const predSwooshIdx = inputCount++;
-        command.input(params.swooshPath);
-
         const predVoiceIdx = inputCount++;
         command.input(m.predAudioPath);
 
-        matchInputs.push({ cardSwooshIdx, introVoiceIdx, predSwooshIdx, predVoiceIdx });
+        matchInputs.push({ cardSwooshIdx, introVoiceIdx, predVoiceIdx });
       }
 
       const outroVoiceIdx = inputCount++;
@@ -359,6 +355,7 @@ export class VideoComposer {
       // Compute timeline offsets
       let currentOffset = 0.3; // start intro speech at 0.3s after initial swoosh
       const filterSteps: string[] = [];
+      const wholeSamples = Math.ceil(params.totalDuration * 44100);
 
       // 1. Background music at low volume (volume=0.20)
       filterSteps.push(
@@ -368,10 +365,10 @@ export class VideoComposer {
       // 2. Intro voice & swoosh
       const introMs = Math.round(currentOffset * 1000);
       filterSteps.push(
-        `[1:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${introMs}|${introMs}[intro_v]`
+        `[1:a]volume=1.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${introMs}|${introMs},apad=whole_len=${wholeSamples}[intro_v]`
       );
       filterSteps.push(
-        `[2:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=0|0[swoosh_0]`
+        `[2:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=0|0,apad=whole_len=${wholeSamples}[swoosh_0]`
       );
 
       currentOffset += params.introDuration;
@@ -380,10 +377,10 @@ export class VideoComposer {
       if (celebrationVoiceIdx >= 0) {
         const celebMs = Math.round(currentOffset * 1000);
         filterSteps.push(
-          `[${celebrationVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${celebMs}|${celebMs}[celeb_v]`
+          `[${celebrationVoiceIdx}:a]volume=1.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${celebMs}|${celebMs},apad=whole_len=${wholeSamples}[celeb_v]`
         );
         filterSteps.push(
-          `[${celebrationSfxIdx}:a]volume=1.2,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${celebMs}|${celebMs}[celeb_sfx]`
+          `[${celebrationSfxIdx}:a]volume=1.1,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${celebMs}|${celebMs},apad=whole_len=${wholeSamples}[celeb_sfx]`
         );
         currentOffset += params.celebrationDuration;
       }
@@ -391,11 +388,11 @@ export class VideoComposer {
       // 4. Transition voice
       const transMs = Math.round(currentOffset * 1000);
       filterSteps.push(
-        `[${transVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${transMs}|${transMs}[trans_v]`
+        `[${transVoiceIdx}:a]volume=1.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${transMs}|${transMs},apad=whole_len=${wholeSamples}[trans_v]`
       );
       currentOffset += params.transDuration;
 
-      // 5. Match voices & swooshes (Card enter swoosh -> Intro announcement -> Reveal swoosh -> Prediction announcement)
+      // 5. Match voices & swooshes (Card enter swoosh -> Match intro announcement -> Prediction announcement without reveal swoosh)
       for (let i = 0; i < params.matchScenes.length; i++) {
         const m = params.matchScenes[i];
         const mi = matchInputs[i];
@@ -403,24 +400,19 @@ export class VideoComposer {
         const cardSwooshMs = Math.round(currentOffset * 1000);
         const introVoiceMs = Math.round((currentOffset + 0.35) * 1000);
         const predRevealTime = currentOffset + m.predRevealOffset;
-        const predSwooshMs = Math.round(predRevealTime * 1000);
         const predVoiceMs = Math.round((predRevealTime + 0.1) * 1000);
 
         // Swoosh as card slides in
         filterSteps.push(
-          `[${mi.cardSwooshIdx}:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${cardSwooshMs}|${cardSwooshMs}[card_swoosh_${i}]`
+          `[${mi.cardSwooshIdx}:a]volume=1.0,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${cardSwooshMs}|${cardSwooshMs},apad=whole_len=${wholeSamples}[card_swoosh_${i}]`
         );
         // Match announcement voice
         filterSteps.push(
-          `[${mi.introVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${introVoiceMs}|${introVoiceMs}[intro_v_${i}]`
+          `[${mi.introVoiceIdx}:a]volume=1.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${introVoiceMs}|${introVoiceMs},apad=whole_len=${wholeSamples}[intro_v_${i}]`
         );
-        // Swoosh as prediction reveals
+        // Prediction voice (revealed cleanly without swoosh)
         filterSteps.push(
-          `[${mi.predSwooshIdx}:a]volume=1.1,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${predSwooshMs}|${predSwooshMs}[pred_swoosh_${i}]`
-        );
-        // Prediction voice
-        filterSteps.push(
-          `[${mi.predVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${predVoiceMs}|${predVoiceMs}[pred_v_${i}]`
+          `[${mi.predVoiceIdx}:a]volume=1.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${predVoiceMs}|${predVoiceMs},apad=whole_len=${wholeSamples}[pred_v_${i}]`
         );
 
         currentOffset += m.sceneDuration;
@@ -429,7 +421,7 @@ export class VideoComposer {
       // 6. Outro voice
       const outroMs = Math.round(currentOffset * 1000);
       filterSteps.push(
-        `[${outroVoiceIdx}:a]volume=3.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${outroMs}|${outroMs}[outro_v]`
+        `[${outroVoiceIdx}:a]volume=1.5,aformat=sample_rates=44100:channel_layouts=stereo,adelay=${outroMs}|${outroMs},apad=whole_len=${wholeSamples}[outro_v]`
       );
 
       // Collect all audio labels for amix
@@ -439,12 +431,13 @@ export class VideoComposer {
       }
       mixInputs.push('[trans_v]');
       for (let i = 0; i < params.matchScenes.length; i++) {
-        mixInputs.push(`[card_swoosh_${i}]`, `[intro_v_${i}]`, `[pred_swoosh_${i}]`, `[pred_v_${i}]`);
+        mixInputs.push(`[card_swoosh_${i}]`, `[intro_v_${i}]`, `[pred_v_${i}]`);
       }
       mixInputs.push('[outro_v]');
 
+      // Mix without dropout volume renormalization, normalized with EBU R128 loudnorm for 100% uniform audio
       filterSteps.push(
-        `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=2[aout]`
+        `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=999999,loudnorm=I=-16:TP=-1.5:LRA=11,aformat=sample_rates=44100:channel_layouts=stereo[aout]`
       );
 
       command

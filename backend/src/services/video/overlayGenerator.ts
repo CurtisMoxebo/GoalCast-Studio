@@ -177,22 +177,22 @@ export class OverlayGenerator {
     const displayGames = games.slice(0, totalGames);
 
     // Dynamic row heights, logo sizes, and font sizes based on match count (extra enlarged team names & logos)
-    let rowHeight = 220;
-    let logoSize = 92;
-    let nameFontSize = 48;
+    let rowHeight = 250;
+    let logoSize = 108;
+    let nameFontSize = 56;
 
     if (totalGames >= 9) {
-      rowHeight = 134;
-      logoSize = 56;
-      nameFontSize = 30;
+      rowHeight = 142;
+      logoSize = 64;
+      nameFontSize = 32;
     } else if (totalGames >= 7) {
-      rowHeight = 156;
-      logoSize = 68;
-      nameFontSize = 34;
+      rowHeight = 168;
+      logoSize = 76;
+      nameFontSize = 38;
     } else if (totalGames >= 5) {
-      rowHeight = 184;
-      logoSize = 82;
-      nameFontSize = 42;
+      rowHeight = 200;
+      logoSize = 90;
+      nameFontSize = 46;
     }
 
     const tableWidth = 1000;
@@ -240,8 +240,8 @@ export class OverlayGenerator {
         const homeTextBaselineY = Math.round(homeLogoY + logoSize / 2 + nameFontSize * 0.35);
         const awayTextBaselineY = Math.round(awayLogoY + logoSize / 2 + nameFontSize * 0.35);
 
-        const logoX = 94;
-        const nameX = logoX + logoSize + 20;
+        const logoX = 92;
+        const nameX = logoX + logoSize + 22;
         const badgeHeight = rowHeight - 28;
 
         // Is this the last game row? If not, render a clear divider between games
@@ -254,8 +254,8 @@ export class OverlayGenerator {
         <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
         <g>
           <!-- Match Index Circle on Left -->
-          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="26" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
-          <text x="48" y="${rowY + Math.round(rowHeight / 2 + 8)}" fill="#0f172a" font-size="22" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
+          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="28" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="48" y="${rowY + Math.round(rowHeight / 2 + 8)}" fill="#0f172a" font-size="24" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
 
           <!-- Vertical Divider between index badge and teams -->
           <line x1="80" y1="${rowY + 12}" x2="80" y2="${rowY + rowHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
@@ -267,7 +267,7 @@ export class OverlayGenerator {
           </text>
 
           <!-- Subtle Divider between Home & Away inside the row -->
-          <line x1="${logoX}" y1="${rowY + Math.round(rowHalf)}" x2="${tableWidth - 190}" y2="${rowY + Math.round(rowHalf)}" stroke="#f8fafc" stroke-width="1"/>
+          <line x1="${logoX}" y1="${rowY + Math.round(rowHalf)}" x2="${tableWidth - 205}" y2="${rowY + Math.round(rowHalf)}" stroke="#f1f5f9" stroke-width="1.5"/>
 
           <!-- AWAY TEAM (Bottom Row - DIRECTLY UNDER HOME TEAM) -->
           <image href="${awayLogos[i]}" x="${logoX}" y="${awayLogoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
@@ -277,12 +277,12 @@ export class OverlayGenerator {
           </text>
 
           <!-- Competition & Kickoff Time Badge on Right -->
-          <g transform="translate(${tableWidth - 176}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
-            <rect width="156" height="${badgeHeight}" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
-            <text x="78" y="${Math.round(badgeHeight * 0.44)}" fill="#64748b" font-size="${Math.max(13, nameFontSize - 12)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+          <g transform="translate(${tableWidth - 192}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
+            <rect width="176" height="${badgeHeight}" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+            <text x="88" y="${Math.round(badgeHeight * 0.44)}" fill="#64748b" font-size="${comp.length > 12 ? 20 : (comp.length > 8 ? 23 : 26)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
               ${comp}
             </text>
-            <text x="78" y="${Math.round(badgeHeight * 0.82)}" fill="#0f172a" font-size="${Math.max(18, nameFontSize - 8)}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+            <text x="88" y="${Math.round(badgeHeight * 0.82)}" fill="#0f172a" font-size="30" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
               ⏰ ${time}
             </text>
           </g>
@@ -433,10 +433,10 @@ export class OverlayGenerator {
 
         <!-- Prediction Banner (Under the game section box, black text on white highlight, ONLY the prediction) -->
         <g filter="url(#predShadow)">
-          <!-- White Highlight Box -->
-          <rect x="50" y="964" width="980" height="106" rx="26" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <!-- White Highlight Box (Positioned right below snug game box at y=804) -->
+          <rect x="50" y="804" width="980" height="100" rx="26" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
           <!-- Black Prediction Text -->
-          <text x="540" y="${Math.round(964 + 106 / 2 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="${Math.round(804 + 50 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${pred}
           </text>
         </g>
@@ -455,6 +455,7 @@ export class OverlayGenerator {
    * Requirements:
    * - "MATCH X OF N" pill is positioned ON TOP OF the box
    * - Team logos are significantly bigger (size 150)
+   * - Snug height matching content (no dead/unnecessary space under team names)
    * - No competition name or kickoff time in the section above
    * - No box around the team names and logo
    * - Center section between teams shows:
@@ -507,33 +508,33 @@ export class OverlayGenerator {
             MATCH ${matchIndex} OF ${totalMatches}
           </text>
 
-          <!-- 2. Centered Game Section Box (height 410, y=524 to 934) -->
-          <rect x="50" y="524" width="980" height="410" rx="36" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
+          <!-- 2. Centered Snug Game Section Box (height 256, y=524 to 780 - NO unnecessary dead space under team names) -->
+          <rect x="50" y="524" width="980" height="256" rx="36" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="3"/>
 
           <!-- TEAMS & CENTER MATCH INFO SECTION (No enclosing boxes around teams, extra large logos) -->
           <!-- HOME TEAM (Left, centered at x=220) -->
-          <image href="${homeLogoUri}" x="145" y="554" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="220" y="745" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <image href="${homeLogoUri}" x="145" y="548" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="220" y="744" fill="#ffffff" font-size="${homeFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${home}
           </text>
 
           <!-- CENTER SECTION (Competition above, Time in middle, Date under) -->
           <!-- Above Time: Competition Name -->
-          <text x="540" y="620" fill="#38bdf8" font-size="28" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="612" fill="#38bdf8" font-size="26" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
             🏆 ${comp}
           </text>
           <!-- Middle: Kickoff Time (e.g. 05:00 PM) -->
-          <text x="540" y="680" fill="#ffffff" font-size="46" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          <text x="540" y="668" fill="#ffffff" font-size="46" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             ${timeAmPm}
           </text>
           <!-- Under Time: Date (Tomorrow / dd/mm/yyyy) -->
-          <text x="540" y="728" fill="#94a3b8" font-size="24" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="540" y="714" fill="#94a3b8" font-size="23" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
             ${dateText}
           </text>
 
           <!-- AWAY TEAM (Right, centered at x=860) -->
-          <image href="${awayLogoUri}" x="785" y="554" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
-          <text x="860" y="745" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <image href="${awayLogoUri}" x="785" y="548" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="860" y="744" fill="#ffffff" font-size="${awayFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${away}
           </text>
         </g>
