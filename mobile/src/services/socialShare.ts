@@ -16,13 +16,13 @@ export interface PlatformConfig {
 export const SOCIAL_PLATFORMS: PlatformConfig[] = [
   {
     id: 'facebook',
-    name: 'Facebook Reels',
+    name: 'Facebook',
     color: '#1877F2',
     icon: 'logo-facebook'
   },
   {
     id: 'instagram',
-    name: 'Instagram Reels',
+    name: 'Instagram',
     color: '#833AB4',
     icon: 'logo-instagram'
   },
@@ -34,7 +34,7 @@ export const SOCIAL_PLATFORMS: PlatformConfig[] = [
   },
   {
     id: 'youtube',
-    name: 'YouTube Shorts',
+    name: 'YouTube',
     color: '#FF0000',
     icon: 'logo-youtube'
   }

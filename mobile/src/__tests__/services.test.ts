@@ -13,14 +13,18 @@ test('Mobile Regression: Social platforms configuration', () => {
   assert.ok(ids.includes('tiktok'));
   assert.ok(ids.includes('youtube'));
 
-  // Test colors
+  // Test names & colors
   const fb = SOCIAL_PLATFORMS.find((p) => p.id === 'facebook');
+  assert.equal(fb?.name, 'Facebook');
   assert.equal(fb?.color, '#1877F2');
   const ig = SOCIAL_PLATFORMS.find((p) => p.id === 'instagram');
+  assert.equal(ig?.name, 'Instagram');
   assert.equal(ig?.color, '#833AB4');
   const yt = SOCIAL_PLATFORMS.find((p) => p.id === 'youtube');
+  assert.equal(yt?.name, 'YouTube');
   assert.equal(yt?.color, '#FF0000');
   const tiktok = SOCIAL_PLATFORMS.find((p) => p.id === 'tiktok');
+  assert.equal(tiktok?.name, 'TikTok');
   assert.equal(tiktok?.color, '#000000');
 });
 
