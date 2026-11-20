@@ -339,7 +339,7 @@ export const GamesScreen: React.FC = () => {
       {isLoadingGames ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={THEME.colors.primary} />
-          <Text style={styles.loadingText}>Querying AI for European fixtures...</Text>
+          <Text style={styles.loadingText}>Querying AI for upcoming fixtures...</Text>
         </View>
       ) : fetchError ? (
         <ScrollView
@@ -378,9 +378,9 @@ export const GamesScreen: React.FC = () => {
           }
         >
           <Text style={styles.emptyIcon}>⚽</Text>
-          <Text style={styles.emptyTitle}>No European Matches Scheduled</Text>
+          <Text style={styles.emptyTitle}>No Matches Scheduled</Text>
           <Text style={styles.emptyText}>
-            No official matches found for {displayDateLabel}. Use the right arrow above to check upcoming match days.
+            No matches found for {displayDateLabel}. Use the right arrow above to check upcoming match days.
           </Text>
           <TouchableOpacity
             style={styles.retryBtn}

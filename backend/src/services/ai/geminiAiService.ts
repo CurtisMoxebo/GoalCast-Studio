@@ -41,35 +41,54 @@ export class GeminiAIService implements IAIService {
   }
 
   /**
-   * Fetch upcoming popular European games for targetDate in specified timezone.
+   * Fetch upcoming popular football games for targetDate in specified timezone.
+   * Covers popular European leagues & cups, European continental competitions,
+   * American leagues & cups (MLS, Liga MX, Copa Libertadores), Saudi Pro League & cups,
+   * and international competitions & qualifiers.
    * Instructs the AI to provide direct URLs to fetch team and competition logos.
    */
   async fetchUpcomingGames(targetDate: string, timezone: string): Promise<UpcomingGame[]> {
     const ai = this.getClient();
 
     const prompt = `
-You are a European football (soccer) fixtures expert with comprehensive knowledge of European leagues.
-Return a list of exciting European football match fixtures for the date: "${targetDate}".
+You are a global football (soccer) fixtures expert with comprehensive real-time knowledge of worldwide football leagues, tournaments, and cups.
+Return a curated list of exciting, popular football match fixtures for the date: "${targetDate}".
 The user is located in timezone: "${timezone}".
 
-Focus on top European leagues and competitions:
-- English Premier League
-- Spanish La Liga
-- Italian Serie A
-- German Bundesliga
-- French Ligue 1
-- UEFA Champions League / UEFA Europa League / UEFA Conference League
+Focus on popular fixtures across all major football regions and competitions:
+1. Popular European Leagues & Domestic Cups:
+   - English Premier League, FA Cup, Carabao Cup
+   - Spanish La Liga, Copa del Rey
+   - Italian Serie A, Coppa Italia
+   - German Bundesliga, DFB-Pokal
+   - French Ligue 1, Coupe de France
+   - Portuguese Primeira Liga, Dutch Eredivisie
+2. European Continental Competitions:
+   - UEFA Champions League, UEFA Europa League, UEFA Conference League, UEFA Super Cup
+3. American Leagues & Competitions:
+   - MLS (Major League Soccer), Leagues Cup
+   - Liga MX (Mexico)
+   - CONCACAF Champions Cup
+   - Copa Libertadores, Copa Sudamericana, Copa do Brasil, Argentine Primera División
+4. Saudi Arabia Leagues & Competitions:
+   - Saudi Pro League (e.g. Al Hilal, Al Nassr, Al Ittihad, Al Ahli), King Cup, Saudi Super Cup
+5. International Competitions & Qualifiers:
+   - FIFA World Cup / World Cup Qualifiers
+   - UEFA European Championship (Euros) / Qualifiers / UEFA Nations League
+   - Copa América, CONMEBOL World Cup Qualifiers
+   - AFCON (Africa Cup of Nations)
+   - AFC Asian Cup, CONCACAF Gold Cup, International Friendlies
 
 Instructions:
-1. Always return between 4 and 10 premier European match fixtures for "${targetDate}". Do NOT return an empty array.
-2. For each match, provide top club clashes (e.g. Real Madrid, Barcelona, Manchester City, Arsenal, Liverpool, Chelsea, Bayern Munich, Borussia Dortmund, PSG, Inter Milan, Juventus, AC Milan, etc.).
+1. Always return between 6 and 12 premier/popular match fixtures for "${targetDate}". Do NOT return an empty array.
+2. Select high-profile clashes across the popular European leagues, European cups, American leagues, Saudi Pro League, and international fixtures.
 3. For every match and team, you MUST provide direct public image URLs to fetch their official logo:
    - "id": A clean unique ID string (e.g. "match_${targetDate}_1")
-   - "homeTeam": Full official team name (e.g. "Real Madrid")
-   - "homeTeamLogo": A direct, publicly accessible HTTPS PNG or JPG image URL to fetch the home team's crest (use direct PNG links like FotMob "https://images.fotmob.com/image_resources/logo/teamlogo/{id}.png" or official club PNG logos)
-   - "awayTeam": Full official team name (e.g. "Barcelona")
+   - "homeTeam": Full official team name (e.g. "Real Madrid", "Al Nassr", "Inter Miami", "Brazil")
+   - "homeTeamLogo": A direct, publicly accessible HTTPS PNG or JPG image URL to fetch the home team's crest (use direct PNG links like FotMob "https://images.fotmob.com/image_resources/logo/teamlogo/{id}.png" or official club/federation PNG logos)
+   - "awayTeam": Full official team name (e.g. "Barcelona", "Al Hilal", "LA Galaxy", "Argentina")
    - "awayTeamLogo": A direct, publicly accessible HTTPS PNG or JPG image URL to fetch the away team's crest
-   - "competition": Full competition name (e.g. "La Liga")
+   - "competition": Full competition name (e.g. "La Liga", "Saudi Pro League", "MLS", "UEFA Champions League")
    - "competitionLogo": A direct, publicly accessible HTTPS PNG image URL to fetch the competition logo (e.g. "https://images.fotmob.com/image_resources/logo/leaguelogo/{id}.png")
    - "kickoffTime": Estimated ISO 8601 string for kickoff time in UTC or local timezone (e.g. "${targetDate}T19:00:00Z")
 
