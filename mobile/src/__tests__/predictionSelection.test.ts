@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { formatOrdinalDate } from '../utils/dateUtils';
+import { getConflictingCodes } from '../utils/predictionUtils';
 
 interface Selection {
   code: string;
@@ -34,26 +35,6 @@ function addSelectionToGame(
   };
 }
 
-const GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5];
-const TEAM_GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5];
-const CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5];
-const TEAM_CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5];
-
-const EXCLUSIVE_GROUPS: string[][] = [
-  ['1', 'X', '2'],
-  ['1X', 'X2', '12'],
-  ['1 DNB', '2 DNB'],
-  ['BTTS_YES', 'BTTS_NO'],
-  ['FIRST_GOAL_HOME', 'FIRST_GOAL_AWAY'],
-  ['LAST_GOAL_HOME', 'LAST_GOAL_AWAY'],
-  ...GOAL_TOTALS.map((val) => [`OVER_${val}_GOALS`, `UNDER_${val}_GOALS`]),
-  ...TEAM_GOAL_TOTALS.map((val) => [`HOME_OVER_${val}_GOALS`, `HOME_UNDER_${val}_GOALS`]),
-  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`]),
-  ...CORNER_TOTALS.map((val) => [`OVER_${val}_CORNERS`, `UNDER_${val}_CORNERS`]),
-  ...TEAM_CORNER_TOTALS.map((val) => [`HOME_OVER_${val}_CORNERS`, `HOME_UNDER_${val}_CORNERS`]),
-  ...TEAM_CORNER_TOTALS.map((val) => [`AWAY_OVER_${val}_CORNERS`, `AWAY_UNDER_${val}_CORNERS`])
-];
-
 function toggleExclusiveSelection(
   current: string[],
   code: string,
@@ -63,15 +44,12 @@ function toggleExclusiveSelection(
     return { success: true, selected: current.filter((c) => c !== code) };
   }
 
-  const group = EXCLUSIVE_GROUPS.find((g) => g.includes(code));
-  if (group) {
-    const existing = group.find((c) => current.includes(c));
-    if (existing) {
-      return {
-        success: true,
-        selected: current.map((c) => (c === existing ? code : c))
-      };
-    }
+  const conflicts = getConflictingCodes(code, current);
+  if (conflicts.length > 0) {
+    return {
+      success: true,
+      selected: current.filter((c) => !conflicts.includes(c)).concat(code)
+    };
   }
 
   if (current.length >= maxPerGame) {
@@ -290,3 +268,59 @@ test('Mobile Regression: Corners section over/under tables row-level mutual excl
   assert.equal(step5.success, true);
   assert.deepEqual(step5.selected, ['UNDER_9.5_CORNERS']);
 });
+
+test('Mobile Regression: Column-level exclusivity across all Over/Under tables', () => {
+  let selected: string[] = [];
+
+  // 1. Total Goals Table - Over column
+  // Select Over 0.5 Goals
+  const gOver1 = toggleExclusiveSelection(selected, 'OVER_0.5_GOALS');
+  assert.equal(gOver1.success, true);
+  assert.deepEqual(gOver1.selected, ['OVER_0.5_GOALS']);
+
+  // Tap Over 2.5 Goals -> replaces Over 0.5 Goals in the same column!
+  const gOver2 = toggleExclusiveSelection(gOver1.selected, 'OVER_2.5_GOALS');
+  assert.equal(gOver2.success, true);
+  assert.deepEqual(gOver2.selected, ['OVER_2.5_GOALS']);
+
+  // Tap Over 3.5 Goals -> replaces Over 2.5 Goals
+  const gOver3 = toggleExclusiveSelection(gOver2.selected, 'OVER_3.5_GOALS');
+  assert.equal(gOver3.success, true);
+  assert.deepEqual(gOver3.selected, ['OVER_3.5_GOALS']);
+
+  // 2. Total Goals Table - Under column
+  // Select Under 1.5 Goals alongside Over 3.5 (2 selections max per match)
+  const gUnder1 = toggleExclusiveSelection(gOver3.selected, 'UNDER_1.5_GOALS');
+  assert.equal(gUnder1.success, true);
+  assert.deepEqual(gUnder1.selected, ['OVER_3.5_GOALS', 'UNDER_1.5_GOALS']);
+
+  // Tap Under 3.5 Goals -> row conflict with Over 3.5 AND column conflict with Under 1.5
+  // Swapping column Under 1.5 -> Under 3.5, and Under 3.5 also conflicts with Over 3.5 on row
+  const gUnder2 = toggleExclusiveSelection(gUnder1.selected, 'UNDER_2.5_GOALS');
+  assert.equal(gUnder2.success, true);
+  assert.deepEqual(gUnder2.selected, ['OVER_3.5_GOALS', 'UNDER_2.5_GOALS']);
+
+  // Clear selections
+  selected = [];
+
+  // 3. Total Corners Table - Over column
+  const cOver1 = toggleExclusiveSelection(selected, 'OVER_8.5_CORNERS');
+  assert.equal(cOver1.success, true);
+  assert.deepEqual(cOver1.selected, ['OVER_8.5_CORNERS']);
+
+  // Tap Over 10.5 Corners -> replaces Over 8.5 Corners
+  const cOver2 = toggleExclusiveSelection(cOver1.selected, 'OVER_10.5_CORNERS');
+  assert.equal(cOver2.success, true);
+  assert.deepEqual(cOver2.selected, ['OVER_10.5_CORNERS']);
+
+  // 4. Away Team Corners Table - Under column
+  const acUnder1 = toggleExclusiveSelection(cOver2.selected, 'AWAY_UNDER_4.5_CORNERS');
+  assert.equal(acUnder1.success, true);
+  assert.deepEqual(acUnder1.selected, ['OVER_10.5_CORNERS', 'AWAY_UNDER_4.5_CORNERS']);
+
+  // Tap Away Under 6.5 Corners -> replaces Away Under 4.5 Corners in that column
+  const acUnder2 = toggleExclusiveSelection(acUnder1.selected, 'AWAY_UNDER_6.5_CORNERS');
+  assert.equal(acUnder2.success, true);
+  assert.deepEqual(acUnder2.selected, ['OVER_10.5_CORNERS', 'AWAY_UNDER_6.5_CORNERS']);
+});
+

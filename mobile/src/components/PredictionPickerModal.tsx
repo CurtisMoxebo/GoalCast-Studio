@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import { THEME } from '../constants/theme';
 import { UpcomingGame, PredictionSelection, BettingOption } from '../types';
+import { getConflictingCodes } from '../utils/predictionUtils';
+
+export { getConflictingCodes };
 
 interface PredictionPickerModalProps {
   visible: boolean;
@@ -25,36 +28,6 @@ const TEAM_GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5];
 const CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5];
 const TEAM_CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5];
 
-// Mutually exclusive button groups: only one can be selected at a time per group / row
-const EXCLUSIVE_GROUPS: string[][] = [
-  // RESULT Markets
-  ['1', 'X', '2'],              // [Home Win | Draw | Away Win]
-  ['1X', 'X2', '12'],           // [Home or Draw | Away or Draw | Home or Away]
-  ['1 DNB', '2 DNB'],           // [Home Draw No Bet | Away Draw No Bet]
-
-  // GOALS Markets: Binary
-  ['BTTS_YES', 'BTTS_NO'],                      // [Yes | No]
-  ['FIRST_GOAL_HOME', 'FIRST_GOAL_AWAY'],        // [Home | Away]
-  ['LAST_GOAL_HOME', 'LAST_GOAL_AWAY'],          // [Home | Away]
-
-  // Total Goals Over / Under rows (one selection per row)
-  ...GOAL_TOTALS.map((val) => [`OVER_${val}_GOALS`, `UNDER_${val}_GOALS`]),
-
-  // Home Goals Over / Under rows (one selection per row)
-  ...TEAM_GOAL_TOTALS.map((val) => [`HOME_OVER_${val}_GOALS`, `HOME_UNDER_${val}_GOALS`]),
-
-  // Away Goals Over / Under rows (one selection per row)
-  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`]),
-
-  // Total Corners Over / Under rows (one selection per row)
-  ...CORNER_TOTALS.map((val) => [`OVER_${val}_CORNERS`, `UNDER_${val}_CORNERS`]),
-
-  // Home Corners Over / Under rows (one selection per row)
-  ...TEAM_CORNER_TOTALS.map((val) => [`HOME_OVER_${val}_CORNERS`, `HOME_UNDER_${val}_CORNERS`]),
-
-  // Away Corners Over / Under rows (one selection per row)
-  ...TEAM_CORNER_TOTALS.map((val) => [`AWAY_OVER_${val}_CORNERS`, `AWAY_UNDER_${val}_CORNERS`])
-];
 
 const RESULT_FALLBACKS: Record<string, { label: string; spokenTemplate: string }> = {
   '1': { label: 'Home Win', spokenTemplate: '{homeTeam} to win' },
@@ -202,16 +175,13 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
       return;
     }
 
-    // Check if code belongs to a mutually exclusive group
-    const group = EXCLUSIVE_GROUPS.find((g) => g.includes(code));
-    if (group) {
-      const existingInGroup = group.find((c) => selectedCodes.includes(c));
-      if (existingInGroup) {
-        // Replace existing selection in this group without changing total count
-        const next = selectedCodes.map((c) => (c === existingInGroup ? code : c));
-        updateSelectionsAndSave(next);
-        return;
-      }
+    // Find any conflicting selections (column-level in tables, or group-level in binary/result markets)
+    const conflicts = getConflictingCodes(code, selectedCodes);
+    if (conflicts.length > 0) {
+      // Replace conflicting selection(s) without increasing total count
+      const next = selectedCodes.filter((c) => !conflicts.includes(c)).concat(code);
+      updateSelectionsAndSave(next);
+      return;
     }
 
     // Not replacing an existing in-group selection; check 2-selection limit
