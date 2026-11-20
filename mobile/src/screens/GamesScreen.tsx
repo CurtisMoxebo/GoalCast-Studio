@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  ScrollView
+  ScrollView,
+  BackHandler
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
@@ -122,6 +123,23 @@ export const GamesScreen: React.FC = () => {
   useEffect(() => {
     loadGamesForDate(selectedDate, true);
   }, [selectedDate]);
+
+  // Handle device back action to cancel selection mode if active
+  useEffect(() => {
+    if (!isSelectionMode) return;
+
+    const onBackPress = () => {
+      setIsSelectionMode(false);
+      setSelectedGameIdsForAi([]);
+      return true; // Prevents default back navigation / exiting the app
+    };
+
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => {
+      backSubscription.remove();
+    };
+  }, [isSelectionMode]);
 
   const loadGamesForDate = async (dateStr: string, showLoadingIndicator = true) => {
     if (showLoadingIndicator) {
