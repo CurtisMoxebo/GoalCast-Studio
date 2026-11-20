@@ -12,10 +12,6 @@ import {
   formatSpokenPrediction,
   BETTING_OPTIONS
 } from '../../constants/bettingRules';
-import {
-  resolveTeamLogoUrl,
-  resolveCompetitionLogoUrl
-} from '../../constants/logoCatalog';
 
 export class GeminiAIService implements IAIService {
   public readonly providerName = 'gemini';
@@ -45,15 +41,16 @@ export class GeminiAIService implements IAIService {
   }
 
   /**
-   * Fetch upcoming popular European games for targetDate in specified timezone
+   * Fetch upcoming popular European games for targetDate in specified timezone.
+   * Instructs the AI to provide direct URLs to fetch team and competition logos.
    */
   async fetchUpcomingGames(targetDate: string, timezone: string): Promise<UpcomingGame[]> {
     const ai = this.getClient();
 
     const prompt = `
-You are a top European football (soccer) fixtures expert with live match data.
+You are a European football (soccer) fixtures expert with live match data.
 Find all interesting official European football matches scheduled for the date: "${targetDate}".
-The user is in timezone: "${timezone}".
+The user is located in timezone: "${timezone}".
 
 Focus on top European leagues and competitions:
 - English Premier League
@@ -68,20 +65,26 @@ Instructions:
 1. Return real official scheduled matches occurring on "${targetDate}".
 2. If there are NO top European football matches scheduled on "${targetDate}", return an empty JSON array: []
 3. Do NOT invent fake or placeholder teams.
-4. For each game, provide:
-   - "id": A clean unique slug (e.g. "epl_20261121_ars_che")
-   - "homeTeam": Full team name (e.g. "Arsenal")
-   - "awayTeam": Full team name (e.g. "Chelsea")
+4. For every team and match, you MUST provide the direct URL to fetch its official logo:
+   - "id": A clean unique ID string (e.g. "match_${targetDate}_1")
+   - "homeTeam": Full official team name (e.g. "Arsenal")
+   - "homeTeamLogo": A direct, publicly accessible HTTPS image URL to fetch the home team's logo (prefer direct PNG or JPG URL, e.g. from FotMob CDN, Wikimedia Commons, or club CDN)
+   - "awayTeam": Full official team name (e.g. "Chelsea")
+   - "awayTeamLogo": A direct, publicly accessible HTTPS image URL to fetch the away team's logo
    - "competition": Full competition name (e.g. "Premier League")
-   - "kickoffTime": Estimated ISO 8601 string for kickoff time in UTC or local timezone (e.g. "${targetDate}T15:00:00Z")
+   - "competitionLogo": A direct, publicly accessible HTTPS image URL to fetch the competition logo
+   - "kickoffTime": Estimated ISO 8601 string for kickoff time in UTC or local timezone
 
 Respond ONLY with a valid JSON array adhering strictly to this schema:
 [
   {
-    "id": "epl_20261121_ars_che",
+    "id": "match_1",
     "homeTeam": "Arsenal",
+    "homeTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/9825.png",
     "awayTeam": "Chelsea",
+    "awayTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/8455.png",
     "competition": "Premier League",
+    "competitionLogo": "https://images.fotmob.com/image_resources/logo/leaguelogo/47.png",
     "kickoffTime": "${targetDate}T15:00:00Z"
   }
 ]
@@ -116,6 +119,17 @@ Respond ONLY with a valid JSON array adhering strictly to this schema:
         return mock.fetchUpcomingGames(targetDate, timezone);
       }
 
+      // Helper to ensure Wikimedia SVGs have a PNG thumbnail render for React Native Image support
+      const formatLogoUrl = (url: any): string => {
+        if (!url || typeof url !== 'string' || !url.startsWith('http')) return '';
+        if (url.includes('upload.wikimedia.org') && url.endsWith('.svg')) {
+          const parts = url.split('/');
+          const filename = parts[parts.length - 1];
+          return url.replace('upload.wikimedia.org/wikipedia/', 'upload.wikimedia.org/wikipedia/thumb/') + `/240px-${filename}.png`;
+        }
+        return url;
+      };
+
       return parsed.map((item: any, index: number) => {
         const homeTeam = String(item.homeTeam || 'Home Team').trim();
         const awayTeam = String(item.awayTeam || 'Away Team').trim();
@@ -124,11 +138,11 @@ Respond ONLY with a valid JSON array adhering strictly to this schema:
         return {
           id: item.id || `game_${targetDate}_${index}_${Date.now()}`,
           homeTeam,
-          homeTeamLogo: resolveTeamLogoUrl(homeTeam, item.homeTeamLogo),
+          homeTeamLogo: formatLogoUrl(item.homeTeamLogo),
           awayTeam,
-          awayTeamLogo: resolveTeamLogoUrl(awayTeam, item.awayTeamLogo),
+          awayTeamLogo: formatLogoUrl(item.awayTeamLogo),
           competition,
-          competitionLogo: resolveCompetitionLogoUrl(competition, item.competitionLogo),
+          competitionLogo: formatLogoUrl(item.competitionLogo),
           kickoffTime: item.kickoffTime || `${targetDate}T15:00:00Z`
         };
       });
