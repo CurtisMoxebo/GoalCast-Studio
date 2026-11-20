@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SectionList,
+  FlatList,
   TextInput,
   Image,
   StyleSheet,
@@ -24,7 +24,7 @@ import {
   canGoBackDate
 } from '../utils/dateUtils';
 import { filterGamesBySearchQuery, groupGamesByCompetition } from '../utils/gameUtils';
-import { GameCard } from '../components/GameCard';
+import { CompetitionCard } from '../components/CompetitionCard';
 import { PredictionPickerModal } from '../components/PredictionPickerModal';
 import { VideoSettingsWizard } from '../components/VideoSettingsWizard';
 import { PreviewModal } from '../components/PreviewModal';
@@ -473,11 +473,10 @@ export const GamesScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       ) : (
-        <SectionList
-          sections={sections}
+        <FlatList
+          data={sections}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -486,36 +485,15 @@ export const GamesScreen: React.FC = () => {
               colors={[THEME.colors.primary]}
             />
           }
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                {section.logo ? (
-                  <Image
-                    source={{ uri: section.logo }}
-                    style={styles.sectionLogo}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <Text style={styles.sectionTrophy}>🏆</Text>
-                )}
-                <Text style={styles.sectionTitle} numberOfLines={1}>
-                  {section.title}
-                </Text>
-              </View>
-              <View style={styles.sectionBadge}>
-                <Text style={styles.sectionBadgeText}>{section.data.length}</Text>
-              </View>
-            </View>
-          )}
           renderItem={({ item }) => (
-            <GameCard
-              game={item}
-              selections={gameSelections[item.id] || []}
-              isSelectedForAi={selectedGameIdsForAi.includes(item.id)}
+            <CompetitionCard
+              section={item}
+              gameSelections={gameSelections}
+              selectedGameIdsForAi={selectedGameIdsForAi}
               selectionModeEnabled={isSelectionMode}
-              onToggleSelectForAi={() => handleToggleSelectForAi(item.id)}
-              onOpenPicker={() => setActiveGameForPicker(item)}
-              onRemoveSelection={(code) => handleRemoveSelection(item.id, code)}
+              onToggleSelectForAi={handleToggleSelectForAi}
+              onOpenPicker={setActiveGameForPicker}
+              onRemoveSelection={handleRemoveSelection}
             />
           )}
         />

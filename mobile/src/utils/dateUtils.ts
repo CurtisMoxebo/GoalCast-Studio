@@ -66,12 +66,39 @@ function getDayOrdinal(day: number): string {
 }
 
 /**
- * Format kickoff time in user timezone
+ * Format kickoff time in user timezone (24h)
  */
 export function formatKickoffTime(isoString: string): string {
   try {
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch {
+    return '--:--';
+  }
+}
+
+/**
+ * Format match date as MM/DD/YY matching score card layout (e.g. "11/21/26")
+ */
+export function formatMatchDate(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const y = String(d.getFullYear()).slice(-2);
+    return `${m}/${day}/${y}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Format match time as 12-hour h:mm A (e.g. "2:00 PM")
+ */
+export function formatMatchTime(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   } catch {
     return '--:--';
   }
