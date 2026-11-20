@@ -445,11 +445,10 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   backArrowBtn: {
-    padding: 6,
-    borderRadius: 10,
-    backgroundColor: '#0f172a',
-    borderWidth: 1.5,
-    borderColor: '#1e293b'
+    padding: 2,
+    marginRight: 2,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   title: {
     fontSize: 22,
