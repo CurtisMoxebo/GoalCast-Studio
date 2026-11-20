@@ -20,6 +20,24 @@ interface PredictionPickerModalProps {
   onConfirm: (selections: PredictionSelection[]) => void;
 }
 
+// Mutually exclusive button groups: only one can be selected at a time per group
+const EXCLUSIVE_GROUPS: string[][] = [
+  ['1', 'X', '2'],              // [Home Win | Draw | Away Win]
+  ['1X', 'X2', '12'],           // [Home or Draw | Away or Draw | Home or Away]
+  ['1 DNB', '2 DNB']            // [Home Draw No Bet | Away Draw No Bet]
+];
+
+const RESULT_FALLBACKS: Record<string, { label: string; spokenTemplate: string }> = {
+  '1': { label: 'Home Win', spokenTemplate: '{homeTeam} to win' },
+  'X': { label: 'Draw', spokenTemplate: 'A draw between {homeTeam} and {awayTeam}' },
+  '2': { label: 'Away Win', spokenTemplate: '{awayTeam} to win' },
+  '1X': { label: 'Home or Draw', spokenTemplate: '{homeTeam} to win or draw' },
+  'X2': { label: 'Away or Draw', spokenTemplate: '{awayTeam} to win or draw' },
+  '12': { label: 'Home or Away', spokenTemplate: 'Either team to win' },
+  '1 DNB': { label: 'Home Draw No Bet', spokenTemplate: '{homeTeam} draw no bet' },
+  '2 DNB': { label: 'Away Draw No Bet', spokenTemplate: '{awayTeam} draw no bet' }
+};
+
 export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   visible,
   game,
@@ -43,28 +61,52 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   if (!game) return null;
 
   const toggleSelection = (code: string) => {
+    // If already selected, deselect it
     if (selectedCodes.includes(code)) {
       setSelectedCodes(selectedCodes.filter((c) => c !== code));
-    } else {
-      if (selectedCodes.length >= 2) {
-        Alert.alert(
-          'Maximum Reached',
-          'You can make at most 2 betting predictions per match. Please deselect one first.'
-        );
+      return;
+    }
+
+    // Check if code belongs to a mutually exclusive group
+    const group = EXCLUSIVE_GROUPS.find((g) => g.includes(code));
+    if (group) {
+      const existingInGroup = group.find((c) => selectedCodes.includes(c));
+      if (existingInGroup) {
+        // Replace existing selection in this group without changing total count
+        setSelectedCodes(selectedCodes.map((c) => (c === existingInGroup ? code : c)));
         return;
       }
-      setSelectedCodes([...selectedCodes, code]);
     }
+
+    // Not replacing an existing in-group selection; check 2-selection limit
+    if (selectedCodes.length >= 2) {
+      Alert.alert(
+        'Maximum Reached',
+        'You can make at most 2 betting predictions per match. Please deselect one first.'
+      );
+      return;
+    }
+
+    setSelectedCodes([...selectedCodes, code]);
   };
 
   const handleConfirm = () => {
     const finalSelections: PredictionSelection[] = selectedCodes.map((code) => {
       const opt = availableOptions.find((o) => o.code === code);
+      const fallback = RESULT_FALLBACKS[code];
+      const label = opt?.label || fallback?.label || code;
+      const category = opt?.category || (code in RESULT_FALLBACKS ? 'RESULT' : activeTab);
+
+      let spokenText = opt?.spokenTemplate || fallback?.spokenTemplate || label;
+      spokenText = spokenText
+        .replace('{homeTeam}', game.homeTeam)
+        .replace('{awayTeam}', game.awayTeam);
+
       return {
         code,
-        label: opt?.label || code,
-        category: opt?.category || activeTab,
-        spokenText: opt?.label || code
+        label,
+        category,
+        spokenText
       };
     });
     onConfirm(finalSelections);
@@ -115,29 +157,140 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
             })}
           </View>
 
-          {/* Options Grid */}
+          {/* Options Content */}
           <ScrollView style={styles.optionsList} contentContainerStyle={styles.optionsListContent}>
-            {filteredOptions.map((opt) => {
-              const isSelected = selectedCodes.includes(opt.code);
-              return (
-                <TouchableOpacity
-                  key={opt.code}
-                  style={[styles.optionCard, isSelected && styles.optionCardSelected]}
-                  onPress={() => toggleSelection(opt.code)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionInfo}>
-                    <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
-                      {opt.label}
-                    </Text>
-                    <Text style={styles.optionCode}>{opt.code}</Text>
+            {activeTab === 'RESULT' ? (
+              <View style={styles.resultGroupsContainer}>
+                {/* 1. Match Result (1X2) - 3 Buttons: [Home Win | Draw | Away Win] */}
+                <View style={styles.groupSection}>
+                  <Text style={styles.groupSectionTitle}>Match Result</Text>
+                  <View style={styles.segmentedRow}>
+                    {[
+                      { code: '1', title: 'Home Win', subtitle: game.homeTeam },
+                      { code: 'X', title: 'Draw', subtitle: 'Draw' },
+                      { code: '2', title: 'Away Win', subtitle: game.awayTeam }
+                    ].map((item) => {
+                      const isSelected = selectedCodes.includes(item.code);
+                      return (
+                        <TouchableOpacity
+                          key={item.code}
+                          style={[styles.segmentBtn, isSelected && styles.segmentBtnSelected]}
+                          onPress={() => toggleSelection(item.code)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[styles.segmentTitle, isSelected && styles.segmentTitleSelected]}
+                            numberOfLines={2}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text
+                            style={[styles.segmentSubtitle, isSelected && styles.segmentSubtitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.subtitle}
+                          </Text>
+                          {isSelected && <View style={styles.segmentActiveDot} />}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+
+                {/* 2. Double Chance - 3 Buttons: [Home or Draw | Away or Draw | Home or Away] */}
+                <View style={styles.groupSection}>
+                  <Text style={styles.groupSectionTitle}>Double Chance</Text>
+                  <View style={styles.segmentedRow}>
+                    {[
+                      { code: '1X', title: 'Home or Draw', codeBadge: '1X' },
+                      { code: 'X2', title: 'Away or Draw', codeBadge: 'X2' },
+                      { code: '12', title: 'Home or Away', codeBadge: '12' }
+                    ].map((item) => {
+                      const isSelected = selectedCodes.includes(item.code);
+                      return (
+                        <TouchableOpacity
+                          key={item.code}
+                          style={[styles.segmentBtn, isSelected && styles.segmentBtnSelected]}
+                          onPress={() => toggleSelection(item.code)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[styles.segmentTitle, isSelected && styles.segmentTitleSelected]}
+                            numberOfLines={2}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text
+                            style={[styles.segmentSubtitle, isSelected && styles.segmentSubtitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.codeBadge}
+                          </Text>
+                          {isSelected && <View style={styles.segmentActiveDot} />}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                </TouchableOpacity>
-              );
-            })}
+                </View>
+
+                {/* 3. Draw No Bet - 2 Buttons: [Home Draw No Bet | Away Draw No Bet] */}
+                <View style={styles.groupSection}>
+                  <Text style={styles.groupSectionTitle}>Draw No Bet (DNB)</Text>
+                  <View style={styles.segmentedRow}>
+                    {[
+                      { code: '1 DNB', title: 'Home Draw No Bet', subtitle: `${game.homeTeam}` },
+                      { code: '2 DNB', title: 'Away Draw No Bet', subtitle: `${game.awayTeam}` }
+                    ].map((item) => {
+                      const isSelected = selectedCodes.includes(item.code);
+                      return (
+                        <TouchableOpacity
+                          key={item.code}
+                          style={[styles.segmentBtn, isSelected && styles.segmentBtnSelected]}
+                          onPress={() => toggleSelection(item.code)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[styles.segmentTitle, isSelected && styles.segmentTitleSelected]}
+                            numberOfLines={2}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text
+                            style={[styles.segmentSubtitle, isSelected && styles.segmentSubtitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.subtitle}
+                          </Text>
+                          {isSelected && <View style={styles.segmentActiveDot} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSelected = selectedCodes.includes(opt.code);
+                return (
+                  <TouchableOpacity
+                    key={opt.code}
+                    style={[styles.optionCard, isSelected && styles.optionCardSelected]}
+                    onPress={() => toggleSelection(opt.code)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionInfo}>
+                      <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
+                        {opt.label}
+                      </Text>
+                      <Text style={styles.optionCode}>{opt.code}</Text>
+                    </View>
+                    <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </ScrollView>
 
           {/* Footer Actions */}
@@ -246,6 +399,69 @@ const styles = StyleSheet.create({
   },
   optionsListContent: {
     paddingBottom: 20
+  },
+  resultGroupsContainer: {
+    paddingBottom: 8
+  },
+  groupSection: {
+    marginBottom: 16
+  },
+  groupSectionTitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8
+  },
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  segmentBtn: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderWidth: 1.5,
+    borderColor: '#1e293b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 64,
+    position: 'relative'
+  },
+  segmentBtnSelected: {
+    backgroundColor: '#0c4a6e',
+    borderColor: THEME.colors.primary
+  },
+  segmentTitle: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 3
+  },
+  segmentTitleSelected: {
+    color: '#ffffff'
+  },
+  segmentSubtitle: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center'
+  },
+  segmentSubtitleSelected: {
+    color: '#7dd3fc'
+  },
+  segmentActiveDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: THEME.colors.accentGreen
   },
   optionCard: {
     flexDirection: 'row',

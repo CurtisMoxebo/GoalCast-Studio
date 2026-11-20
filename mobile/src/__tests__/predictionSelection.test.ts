@@ -34,6 +34,43 @@ function addSelectionToGame(
   };
 }
 
+const EXCLUSIVE_GROUPS: string[][] = [
+  ['1', 'X', '2'],
+  ['1X', 'X2', '12'],
+  ['1 DNB', '2 DNB']
+];
+
+function toggleExclusiveSelection(
+  current: string[],
+  code: string,
+  maxPerGame = 2
+): { success: boolean; selected: string[]; error?: string } {
+  if (current.includes(code)) {
+    return { success: true, selected: current.filter((c) => c !== code) };
+  }
+
+  const group = EXCLUSIVE_GROUPS.find((g) => g.includes(code));
+  if (group) {
+    const existing = group.find((c) => current.includes(c));
+    if (existing) {
+      return {
+        success: true,
+        selected: current.map((c) => (c === existing ? code : c))
+      };
+    }
+  }
+
+  if (current.length >= maxPerGame) {
+    return {
+      success: false,
+      selected: current,
+      error: `Maximum of ${maxPerGame} selections allowed per match`
+    };
+  }
+
+  return { success: true, selected: [...current, code] };
+}
+
 function validateVideoJobPayload(payload: {
   games: any[];
   thumbnailTimestamp: number;
@@ -125,4 +162,49 @@ test('Mobile Regression: Validate video job constraints', () => {
   });
   assert.equal(rValid.valid, true);
   assert.equal(rValid.errors.length, 0);
+});
+
+test('Mobile Regression: Mutually exclusive button groups [1|X|2], [1X|X2|12], [1 DNB|2 DNB]', () => {
+  let selected: string[] = [];
+
+  // Group 1: [Home Win (1) | Draw (X) | Away Win (2)]
+  const step1 = toggleExclusiveSelection(selected, '1');
+  assert.equal(step1.success, true);
+  assert.deepEqual(step1.selected, ['1']);
+
+  // Tapping 'X' swaps '1' -> only 1 can be selected at a time in this group
+  const step2 = toggleExclusiveSelection(step1.selected, 'X');
+  assert.equal(step2.success, true);
+  assert.deepEqual(step2.selected, ['X']);
+
+  // Group 2: [Home or Draw (1X) | Away or Draw (X2) | Home or Away (12)]
+  // User selects '1X' alongside 'X' (total 2 selections)
+  const step3 = toggleExclusiveSelection(step2.selected, '1X');
+  assert.equal(step3.success, true);
+  assert.deepEqual(step3.selected, ['X', '1X']);
+
+  // User taps 'X2' in Group 2 -> swaps '1X' to 'X2' without exceeding max 2
+  const step4 = toggleExclusiveSelection(step3.selected, 'X2');
+  assert.equal(step4.success, true);
+  assert.deepEqual(step4.selected, ['X', 'X2']);
+
+  // User tries to select from Group 3 [1 DNB | 2 DNB] while having 2 selections -> rejected
+  const step5 = toggleExclusiveSelection(step4.selected, '1 DNB');
+  assert.equal(step5.success, false);
+  assert.ok(step5.error?.includes('Maximum of 2 selections'));
+
+  // Deselect 'X'
+  const step6 = toggleExclusiveSelection(step4.selected, 'X');
+  assert.equal(step6.success, true);
+  assert.deepEqual(step6.selected, ['X2']);
+
+  // Group 3: [Home Draw No Bet (1 DNB) | Away Draw No Bet (2 DNB)]
+  const step7 = toggleExclusiveSelection(step6.selected, '1 DNB');
+  assert.equal(step7.success, true);
+  assert.deepEqual(step7.selected, ['X2', '1 DNB']);
+
+  // Tapping '2 DNB' swaps '1 DNB' -> only 1 can be selected at a time in Group 3
+  const step8 = toggleExclusiveSelection(step7.selected, '2 DNB');
+  assert.equal(step8.success, true);
+  assert.deepEqual(step8.selected, ['X2', '2 DNB']);
 });
