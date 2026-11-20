@@ -275,37 +275,48 @@ export async function shareToSocialMedia(
         if (platform === 'facebook') {
           const fbExtras = buildFacebookShareExtras(payload, contentUri);
           try {
-            // Attempt 1: Direct Facebook Reel Action (Meta standard implicit intent)
+            // Attempt 1: Direct Facebook Reel Action targeting com.facebook.katana explicitly with video/*
             await IntentLauncher.startActivityAsync('com.facebook.reels.SHARE_TO_REEL', {
-              type: 'video/mp4',
+              type: 'video/*',
               data: contentUri,
+              packageName: 'com.facebook.katana',
               flags: 1, // Intent.FLAG_GRANT_READ_URI_PERMISSION
               extra: fbExtras
             });
             return true;
           } catch (fbErr1) {
-            console.warn('[SocialShare] Facebook implicit SHARE_TO_REEL attempt 1 failed:', fbErr1);
+            console.warn('[SocialShare] Facebook package SHARE_TO_REEL attempt 1 failed:', fbErr1);
             try {
-              // Attempt 2: Direct Facebook Reel Action targeting com.facebook.katana package explicitly
+              // Attempt 2: Direct Facebook Reel Action (implicit intent fallback)
               await IntentLauncher.startActivityAsync('com.facebook.reels.SHARE_TO_REEL', {
-                type: 'video/mp4',
+                type: 'video/*',
                 data: contentUri,
-                packageName: 'com.facebook.katana',
                 flags: 1,
                 extra: fbExtras
               });
               return true;
             } catch (fbErr2) {
-              console.warn('[SocialShare] Facebook package SHARE_TO_REEL attempt 2 failed:', fbErr2);
-              // Attempt 3: ACTION_SEND directly to Facebook composer
-              await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-                type: 'video/mp4',
-                data: contentUri,
-                packageName: 'com.facebook.katana',
-                flags: 1,
-                extra: fbExtras
-              });
-              return true;
+              console.warn('[SocialShare] Facebook implicit SHARE_TO_REEL attempt 2 failed:', fbErr2);
+              try {
+                // Attempt 3: ACTION_SEND directly to Facebook composer (without data uri parameter)
+                await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+                  type: 'video/*',
+                  packageName: 'com.facebook.katana',
+                  flags: 1,
+                  extra: fbExtras
+                });
+                return true;
+              } catch (fbErr3) {
+                console.warn('[SocialShare] Facebook ACTION_SEND attempt 3 failed:', fbErr3);
+                // Attempt 4: ACTION_SEND to Facebook Lite
+                await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+                  type: 'video/*',
+                  packageName: 'com.facebook.lite',
+                  flags: 1,
+                  extra: fbExtras
+                });
+                return true;
+              }
             }
           }
         } else if (platform === 'instagram') {
@@ -325,8 +336,7 @@ export async function shareToSocialMedia(
             try {
               // Attempt 2: Explicit ACTION_SEND to Instagram post composer
               await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-                type: 'video/mp4',
-                data: contentUri,
+                type: 'video/*',
                 packageName: 'com.instagram.android',
                 flags: 1,
                 extra: igExtras
@@ -336,8 +346,7 @@ export async function shareToSocialMedia(
               console.warn('[SocialShare] Instagram ACTION_SEND attempt 2 failed:', igErr2);
               // Attempt 3: ACTION_SEND without hardcoded packageName in case of alternate Instagram build
               await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-                type: 'video/mp4',
-                data: contentUri,
+                type: 'video/*',
                 flags: 1,
                 extra: igExtras
               });
@@ -347,10 +356,9 @@ export async function shareToSocialMedia(
         } else if (platform === 'tiktok') {
           const tiktokExtras = buildTikTokShareExtras(payload, contentUri);
           try {
-            // Attempt 1: Main global TikTok app package (com.zhiliaoapp.musically)
+            // Attempt 1: Main global TikTok app package (com.zhiliaoapp.musically) via ACTION_SEND
             await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-              type: 'video/mp4',
-              data: contentUri,
+              type: 'video/*',
               packageName: 'com.zhiliaoapp.musically',
               flags: 1,
               extra: tiktokExtras
@@ -359,10 +367,9 @@ export async function shareToSocialMedia(
           } catch (ttErr1) {
             console.warn('[SocialShare] TikTok musical.ly attempt 1 failed:', ttErr1);
             try {
-              // Attempt 2: Regional TikTok package (com.ss.android.ugc.trill)
+              // Attempt 2: Regional TikTok package (com.ss.android.ugc.trill) via ACTION_SEND
               await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-                type: 'video/mp4',
-                data: contentUri,
+                type: 'video/*',
                 packageName: 'com.ss.android.ugc.trill',
                 flags: 1,
                 extra: tiktokExtras
@@ -370,24 +377,34 @@ export async function shareToSocialMedia(
               return true;
             } catch (ttErr2) {
               console.warn('[SocialShare] TikTok trill attempt 2 failed:', ttErr2);
-              // Attempt 3: Sister TikTok package (com.ss.android.ugc.aweme)
-              await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-                type: 'video/mp4',
-                data: contentUri,
-                packageName: 'com.ss.android.ugc.aweme',
-                flags: 1,
-                extra: tiktokExtras
-              });
-              return true;
+              try {
+                // Attempt 3: TikTok Lite package (com.zhiliaoapp.musically.go)
+                await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+                  type: 'video/*',
+                  packageName: 'com.zhiliaoapp.musically.go',
+                  flags: 1,
+                  extra: tiktokExtras
+                });
+                return true;
+              } catch (ttErr3) {
+                console.warn('[SocialShare] TikTok go attempt 3 failed:', ttErr3);
+                // Attempt 4: Sister TikTok package (com.ss.android.ugc.aweme)
+                await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+                  type: 'video/*',
+                  packageName: 'com.ss.android.ugc.aweme',
+                  flags: 1,
+                  extra: tiktokExtras
+                });
+                return true;
+              }
             }
           }
         } else if (platform === 'youtube') {
           const ytExtras = buildYouTubeShareExtras(payload, contentUri);
           try {
-            // Attempt 1: Direct YouTube app targeting com.google.android.youtube with video/mp4
+            // Attempt 1: Direct YouTube app targeting com.google.android.youtube with video/*
             await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-              type: 'video/mp4',
-              data: contentUri,
+              type: 'video/*',
               packageName: 'com.google.android.youtube',
               flags: 1,
               extra: ytExtras
@@ -396,10 +413,9 @@ export async function shareToSocialMedia(
           } catch (ytErr1) {
             console.warn('[SocialShare] YouTube attempt 1 failed:', ytErr1);
             try {
-              // Attempt 2: YouTube app with generic video/* MIME type
+              // Attempt 2: Direct YouTube app with video/mp4 MIME type
               await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-                type: 'video/*',
-                data: contentUri,
+                type: 'video/mp4',
                 packageName: 'com.google.android.youtube',
                 flags: 1,
                 extra: ytExtras
@@ -407,10 +423,9 @@ export async function shareToSocialMedia(
               return true;
             } catch (ytErr2) {
               console.warn('[SocialShare] YouTube attempt 2 failed:', ytErr2);
-              // Attempt 3: Fallback YouTube TV/Vanced or generic video upload handler
+              // Attempt 3: Fallback generic video upload handler
               await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-                type: 'video/mp4',
-                data: contentUri,
+                type: 'video/*',
                 flags: 1,
                 extra: ytExtras
               });

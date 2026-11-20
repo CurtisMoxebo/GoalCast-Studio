@@ -125,20 +125,40 @@ jobs:
           tags: goalcast-backend:${{ github.sha }}
 
   deploy:
-    name: Deploy to Windows Server 2022 (Docker for Windows)
+    name: Deploy to Windows Server 2022 (Docker)
     needs: [build-docker]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
+    defaults:
+      run:
+        shell: powershell
     steps:
-      - name: Deploy to Remote Windows Server
-        env:
-          SERVER_HOST: ${{ secrets.DEPLOY_SERVER_HOST }}
-          SERVER_USER: ${{ secrets.DEPLOY_SERVER_USER }}
-          SERVER_SSH_KEY: ${{ secrets.DEPLOY_SERVER_KEY }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load Server Environment File
         run: |
-          if [ -z "$SERVER_HOST" ]; then
-            echo "DEPLOY_SERVER_HOST secret is not configured yet. Skipping remote deployment step."
-            exit 0
-          fi
-          echo "Connecting to Windows Server 2022 to refresh container..."
-          ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_HOST" "docker compose -f C:\\GoalCast-Studio\\docker-compose.yml pull && docker compose -f C:\\GoalCast-Studio\\docker-compose.yml up -d --build"
+          if (Test-Path "C:\actions-runner\GoalCast-Studio\production.env") {
+            Write-Host "Loading environment from C:\actions-runner\GoalCast-Studio\production.env..."
+            Copy-Item -Path "C:\actions-runner\GoalCast-Studio\production.env" -Destination ".env" -Force
+            Copy-Item -Path "C:\actions-runner\GoalCast-Studio\production.env" -Destination "backend\.env" -Force
+          } elseif (Test-Path "C:\actions-runner\GoalCast-Studio\.env") {
+            Write-Host "Loading environment from C:\actions-runner\GoalCast-Studio\.env..."
+            Copy-Item -Path "C:\actions-runner\GoalCast-Studio\.env" -Destination ".env" -Force
+            Copy-Item -Path "C:\actions-runner\GoalCast-Studio\.env" -Destination "backend\.env" -Force
+          } elseif (Test-Path ".env") {
+            Write-Host "Using existing workspace .env file..."
+          } else {
+            Write-Error "CRITICAL: No environment file found on server! Please create C:\actions-runner\GoalCast-Studio\production.env with your GEMINI_API_KEY."
+            exit 1
+          }
+
+      - name: Deploy with Docker Compose
+        run: |
+          Write-Host "Deploying Docker containers..."
+          docker compose down --remove-orphans
+          docker compose up -d --build
+          Write-Host "Waiting for database to initialize..."
+          Start-Sleep -Seconds 8
+          docker compose exec -T backend npx prisma db push --skip-generate
+          docker compose ps
