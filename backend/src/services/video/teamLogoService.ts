@@ -3,73 +3,6 @@ import path from 'path';
 import sharp from 'sharp';
 import { GoogleGenAI } from '@google/genai';
 
-// Mapping normalized team names to local logo filenames in backend/assets/logos
-const LOCAL_LOGO_MAP: Record<string, string> = {
-  'real madrid': 'real-madrid.png',
-  'real madrid cf': 'real-madrid.png',
-  'barcelona': 'barcelona.png',
-  'fc barcelona': 'barcelona.png',
-  'arsenal': 'arsenal.png',
-  'arsenal fc': 'arsenal.png',
-  'chelsea': 'chelsea.png',
-  'chelsea fc': 'chelsea.png',
-  'liverpool': 'liverpool.png',
-  'liverpool fc': 'liverpool.png',
-  'manchester city': 'manchester-city.png',
-  'man city': 'manchester-city.png',
-  'man city fc': 'manchester-city.png',
-  'manchester united': 'manchester-united.png',
-  'man united': 'manchester-united.png',
-  'man utd': 'manchester-united.png',
-  'bayern munich': 'bayern-munich.png',
-  'bayern': 'bayern-munich.png',
-  'fc bayern': 'bayern-munich.png',
-  'borussia dortmund': 'borussia-dortmund.png',
-  'dortmund': 'borussia-dortmund.png',
-  'bvb': 'borussia-dortmund.png',
-  'paris saint-germain': 'paris-saint-germain.png',
-  'paris sg': 'paris-saint-germain.png',
-  'psg': 'paris-saint-germain.png',
-  'inter milan': 'inter-milan.png',
-  'inter': 'inter-milan.png',
-  'internazionale': 'inter-milan.png',
-  'ac milan': 'ac-milan.png',
-  'milan': 'ac-milan.png',
-  'juventus': 'juventus.png',
-  'juve': 'juventus.png',
-  'atletico madrid': 'atletico-madrid.png',
-  'atletico': 'atletico-madrid.png',
-  'tottenham': 'tottenham.png',
-  'tottenham hotspur': 'tottenham.png',
-  'spurs': 'tottenham.png',
-  'al-hilal': 'al-hilal.png',
-  'al hilal': 'al-hilal.png',
-  'al-nassr': 'al-nassr.png',
-  'al nassr': 'al-nassr.png',
-  'inter miami': 'inter-miami.png',
-  'inter miami cf': 'inter-miami.png',
-  'bayer leverkusen': 'bayer-leverkusen.png',
-  'leverkusen': 'bayer-leverkusen.png'
-};
-
-// Known reliable online URLs for clubs not yet bundled locally
-const KNOWN_ONLINE_LOGOS: Record<string, string> = {
-  'aston villa': 'https://upload.wikimedia.org/wikipedia/en/9/9f/Aston_Villa_logo.svg',
-  'newcastle': 'https://upload.wikimedia.org/wikipedia/en/5/56/Newcastle_United_Logo.svg',
-  'newcastle united': 'https://upload.wikimedia.org/wikipedia/en/5/56/Newcastle_United_Logo.svg',
-  'sporting cp': 'https://upload.wikimedia.org/wikipedia/en/e/e1/Sporting_Clube_de_Portugal_%28Logo%29.svg',
-  'sporting lisbon': 'https://upload.wikimedia.org/wikipedia/en/e/e1/Sporting_Clube_de_Portugal_%28Logo%29.svg',
-  'benfica': 'https://upload.wikimedia.org/wikipedia/en/a/a2/SL_Benfica_logo.svg',
-  'ajax': 'https://upload.wikimedia.org/wikipedia/en/7/79/Ajax_Amsterdam.svg',
-  'feyenoord': 'https://upload.wikimedia.org/wikipedia/en/e/e3/Feyenoord_logo.svg',
-  'porto': 'https://upload.wikimedia.org/wikipedia/en/f/f1/FC_Porto.svg',
-  'fc porto': 'https://upload.wikimedia.org/wikipedia/en/f/f1/FC_Porto.svg',
-  'roma': 'https://upload.wikimedia.org/wikipedia/en/f/f7/AS_Roma_logo_%282017%29.svg',
-  'as roma': 'https://upload.wikimedia.org/wikipedia/en/f/f7/AS_Roma_logo_%282017%29.svg',
-  'napoli': 'https://upload.wikimedia.org/wikipedia/commons/2/28/S.S.C._Napoli_logo.svg',
-  'ssc napoli': 'https://upload.wikimedia.org/wikipedia/commons/2/28/S.S.C._Napoli_logo.svg'
-};
-
 export class TeamLogoService {
   private localLogosDir: string;
   private cacheDir: string;
@@ -90,7 +23,7 @@ export class TeamLogoService {
   }
 
   /**
-   * Normalize team name for dictionary matching
+   * Normalize team name for cache keys
    */
   private normalizeTeamName(name: string): string {
     return (name || '')
@@ -196,34 +129,18 @@ export class TeamLogoService {
     }
 
     try {
-      // 1. Check local bundled files first
-      const localFilename = LOCAL_LOGO_MAP[normalized];
-      if (localFilename) {
-        const localPath = path.join(this.localLogosDir, localFilename);
-        if (fs.existsSync(localPath)) {
-          const pngBuf = await sharp(localPath)
-            .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-            .png()
-            .toBuffer();
-          const uri = `data:image/png;base64,${pngBuf.toString('base64')}`;
-          this.memoryCache.set(cacheKey, uri);
-          return uri;
-        }
-      }
-
-      // 2. Determine target URL
+      // 1. Determine target URL (from customUrl provided by AI or query AI directly)
       let targetUrl: string | undefined = customUrl && (customUrl.startsWith('http://') || customUrl.startsWith('https://'))
         ? customUrl
-        : KNOWN_ONLINE_LOGOS[normalized];
+        : undefined;
 
-      // 3. If no URL and not local, query Gemini for the logo URL
+      // 2. If no custom URL was provided, query Gemini for the logo URL
       if (!targetUrl) {
         targetUrl = (await this.queryGeminiForLogoUrl(teamName)) || undefined;
       }
 
-      // 4. If we have a URL, fetch and rasterize
+      // 3. If we have a URL, fetch and rasterize
       if (targetUrl) {
-        // Check disk cache for this URL
         const safeFilename = Buffer.from(targetUrl).toString('base64url').slice(0, 48) + '.png';
         const cachedPath = path.join(this.cacheDir, safeFilename);
 
