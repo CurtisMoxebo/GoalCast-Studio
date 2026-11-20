@@ -124,10 +124,10 @@ export const GameCard: React.FC<GameCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: THEME.colors.cardBackground,
-    borderRadius: THEME.borderRadius.lg,
-    padding: 16,
-    marginBottom: 14,
-    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
     borderColor: THEME.colors.cardBorder,
     position: 'relative'
   },
@@ -137,12 +137,12 @@ const styles = StyleSheet.create({
   },
   aiCheckboxTopRight: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
     borderColor: THEME.colors.textMuted,
     justifyContent: 'center',
     alignItems: 'center',
@@ -155,73 +155,74 @@ const styles = StyleSheet.create({
   },
   aiCheckboxCheck: {
     color: '#000000',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold'
   },
   teamsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4
+    paddingVertical: 2
   },
   teamColumn: {
     flex: 1,
     alignItems: 'center'
   },
   teamLogo: {
-    width: 48,
-    height: 48,
-    marginBottom: 6
+    width: 34,
+    height: 34,
+    marginBottom: 4
   },
   teamLogoPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#1e293b',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6
+    marginBottom: 4
   },
   teamInitials: {
     color: THEME.colors.primary,
     fontWeight: 'bold',
-    fontSize: 16
+    fontSize: 12
   },
   teamName: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '600',
     color: THEME.colors.textPrimary,
-    textAlign: 'center'
+    textAlign: 'center',
+    lineHeight: 16
   },
   timeCenterContainer: {
-    width: 70,
+    width: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4
+    paddingHorizontal: 2
   },
   timeCenterBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
     backgroundColor: '#1e293b',
     borderWidth: 1,
     borderColor: '#334155',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 58
+    minWidth: 50
   },
   timeCenterText: {
     color: THEME.colors.primary,
-    fontSize: 13,
-    fontWeight: 'bold',
-    letterSpacing: 0.5
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3
   },
   selectionsArea: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderColor: '#1e293b'
   },
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     flex: 1,
-    marginRight: 10
+    marginRight: 8
   },
   predictionBadge: {
     flexDirection: 'row',
@@ -237,44 +238,44 @@ const styles = StyleSheet.create({
     backgroundColor: '#0c4a6e',
     borderColor: THEME.colors.primary,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 6,
-    marginBottom: 4
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: 4,
+    marginBottom: 2
   },
   badgeLabel: {
     color: '#e0f2fe',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
-    maxWidth: 120
+    maxWidth: 110
   },
   badgeRemove: {
-    marginLeft: 6,
+    marginLeft: 4,
     padding: 2
   },
   badgeRemoveText: {
     color: '#f87171',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold'
   },
   noSelectionsText: {
-    fontSize: 12,
+    fontSize: 11,
     color: THEME.colors.textMuted,
     fontStyle: 'italic',
     flex: 1
   },
   predictBtn: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: THEME.colors.primary
   },
   predictBtnText: {
     color: THEME.colors.primary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold'
   }
 });
