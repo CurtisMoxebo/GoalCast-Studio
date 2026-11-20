@@ -34,10 +34,19 @@ function addSelectionToGame(
   };
 }
 
+const GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5];
+const TEAM_GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5];
+
 const EXCLUSIVE_GROUPS: string[][] = [
   ['1', 'X', '2'],
   ['1X', 'X2', '12'],
-  ['1 DNB', '2 DNB']
+  ['1 DNB', '2 DNB'],
+  ['BTTS_YES', 'BTTS_NO'],
+  ['FIRST_GOAL_HOME', 'FIRST_GOAL_AWAY'],
+  ['LAST_GOAL_HOME', 'LAST_GOAL_AWAY'],
+  ...GOAL_TOTALS.map((val) => [`OVER_${val}_GOALS`, `UNDER_${val}_GOALS`]),
+  ...TEAM_GOAL_TOTALS.map((val) => [`HOME_OVER_${val}_GOALS`, `HOME_UNDER_${val}_GOALS`]),
+  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`])
 ];
 
 function toggleExclusiveSelection(
@@ -207,4 +216,43 @@ test('Mobile Regression: Mutually exclusive button groups [1|X|2], [1X|X2|12], [
   const step8 = toggleExclusiveSelection(step7.selected, '2 DNB');
   assert.equal(step8.success, true);
   assert.deepEqual(step8.selected, ['X2', '2 DNB']);
+});
+
+test('Mobile Regression: Goals section mutually exclusive groups and over/under table rows', () => {
+  let selected: string[] = [];
+
+  // 1. Both Teams to Score: [BTTS_YES | BTTS_NO]
+  const btts1 = toggleExclusiveSelection(selected, 'BTTS_YES');
+  assert.equal(btts1.success, true);
+  assert.deepEqual(btts1.selected, ['BTTS_YES']);
+
+  // Tapping BTTS_NO swaps BTTS_YES
+  const btts2 = toggleExclusiveSelection(btts1.selected, 'BTTS_NO');
+  assert.equal(btts2.success, true);
+  assert.deepEqual(btts2.selected, ['BTTS_NO']);
+
+  // 2. Total Goals Over/Under: selecting Over 2.5 on row 2.5
+  const ou1 = toggleExclusiveSelection(btts2.selected, 'OVER_2.5_GOALS');
+  assert.equal(ou1.success, true);
+  assert.deepEqual(ou1.selected, ['BTTS_NO', 'OVER_2.5_GOALS']);
+
+  // Tapping Under 2.5 on the same row swaps Over 2.5 to Under 2.5 without exceeding max 2
+  const ou2 = toggleExclusiveSelection(ou1.selected, 'UNDER_2.5_GOALS');
+  assert.equal(ou2.success, true);
+  assert.deepEqual(ou2.selected, ['BTTS_NO', 'UNDER_2.5_GOALS']);
+
+  // Deselect BTTS
+  const clearBtts = toggleExclusiveSelection(ou2.selected, 'BTTS_NO');
+  assert.equal(clearBtts.success, true);
+  assert.deepEqual(clearBtts.selected, ['UNDER_2.5_GOALS']);
+
+  // 3. Home Team Goals Over/Under row 1.5
+  const homeOu1 = toggleExclusiveSelection(clearBtts.selected, 'HOME_OVER_1.5_GOALS');
+  assert.equal(homeOu1.success, true);
+  assert.deepEqual(homeOu1.selected, ['UNDER_2.5_GOALS', 'HOME_OVER_1.5_GOALS']);
+
+  // Swapping to Home Under 1.5 on that row
+  const homeOu2 = toggleExclusiveSelection(homeOu1.selected, 'HOME_UNDER_1.5_GOALS');
+  assert.equal(homeOu2.success, true);
+  assert.deepEqual(homeOu2.selected, ['UNDER_2.5_GOALS', 'HOME_UNDER_1.5_GOALS']);
 });

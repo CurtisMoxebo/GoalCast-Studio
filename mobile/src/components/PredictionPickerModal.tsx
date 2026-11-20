@@ -20,11 +20,29 @@ interface PredictionPickerModalProps {
   onConfirm: (selections: PredictionSelection[]) => void;
 }
 
-// Mutually exclusive button groups: only one can be selected at a time per group
+const GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5];
+const TEAM_GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5];
+
+// Mutually exclusive button groups: only one can be selected at a time per group / row
 const EXCLUSIVE_GROUPS: string[][] = [
+  // RESULT Markets
   ['1', 'X', '2'],              // [Home Win | Draw | Away Win]
   ['1X', 'X2', '12'],           // [Home or Draw | Away or Draw | Home or Away]
-  ['1 DNB', '2 DNB']            // [Home Draw No Bet | Away Draw No Bet]
+  ['1 DNB', '2 DNB'],           // [Home Draw No Bet | Away Draw No Bet]
+
+  // GOALS Markets: Binary
+  ['BTTS_YES', 'BTTS_NO'],                      // [Yes | No]
+  ['FIRST_GOAL_HOME', 'FIRST_GOAL_AWAY'],        // [Home | Away]
+  ['LAST_GOAL_HOME', 'LAST_GOAL_AWAY'],          // [Home | Away]
+
+  // Total Goals Over / Under rows (one selection per row)
+  ...GOAL_TOTALS.map((val) => [`OVER_${val}_GOALS`, `UNDER_${val}_GOALS`]),
+
+  // Home Goals Over / Under rows (one selection per row)
+  ...TEAM_GOAL_TOTALS.map((val) => [`HOME_OVER_${val}_GOALS`, `HOME_UNDER_${val}_GOALS`]),
+
+  // Away Goals Over / Under rows (one selection per row)
+  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`])
 ];
 
 const RESULT_FALLBACKS: Record<string, { label: string; spokenTemplate: string }> = {
@@ -37,6 +55,45 @@ const RESULT_FALLBACKS: Record<string, { label: string; spokenTemplate: string }
   '1 DNB': { label: 'Home Draw No Bet', spokenTemplate: '{homeTeam} draw no bet' },
   '2 DNB': { label: 'Away Draw No Bet', spokenTemplate: '{awayTeam} draw no bet' }
 };
+
+const GOALS_FALLBACKS: Record<string, { label: string; spokenTemplate: string }> = {
+  BTTS_YES: { label: 'Both Teams to Score - Yes', spokenTemplate: 'Both teams to score' },
+  BTTS_NO: { label: 'Both Teams to Score - No', spokenTemplate: 'Both teams not to score' },
+  FIRST_GOAL_HOME: { label: 'Home to Score First', spokenTemplate: '{homeTeam} to score first' },
+  FIRST_GOAL_AWAY: { label: 'Away to Score First', spokenTemplate: '{awayTeam} to score first' },
+  LAST_GOAL_HOME: { label: 'Home to Score Last', spokenTemplate: '{homeTeam} to score last' },
+  LAST_GOAL_AWAY: { label: 'Away to Score Last', spokenTemplate: '{awayTeam} to score last' }
+};
+
+for (const val of GOAL_TOTALS) {
+  GOALS_FALLBACKS[`OVER_${val}_GOALS`] = {
+    label: `Total Goals Over ${val}`,
+    spokenTemplate: `Over ${val} total goals`
+  };
+  GOALS_FALLBACKS[`UNDER_${val}_GOALS`] = {
+    label: `Total Goals Under ${val}`,
+    spokenTemplate: `Under ${val} total goals`
+  };
+}
+
+for (const val of TEAM_GOAL_TOTALS) {
+  GOALS_FALLBACKS[`HOME_OVER_${val}_GOALS`] = {
+    label: `Home Team Over ${val} Goals`,
+    spokenTemplate: `{homeTeam} over ${val} goals`
+  };
+  GOALS_FALLBACKS[`HOME_UNDER_${val}_GOALS`] = {
+    label: `Home Team Under ${val} Goals`,
+    spokenTemplate: `{homeTeam} under ${val} goals`
+  };
+  GOALS_FALLBACKS[`AWAY_OVER_${val}_GOALS`] = {
+    label: `Away Team Over ${val} Goals`,
+    spokenTemplate: `{awayTeam} over ${val} goals`
+  };
+  GOALS_FALLBACKS[`AWAY_UNDER_${val}_GOALS`] = {
+    label: `Away Team Under ${val} Goals`,
+    spokenTemplate: `{awayTeam} under ${val} goals`
+  };
+}
 
 export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   visible,
@@ -63,11 +120,18 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   const buildSelections = (codes: string[]): PredictionSelection[] => {
     return codes.map((code) => {
       const opt = availableOptions.find((o) => o.code === code);
-      const fallback = RESULT_FALLBACKS[code];
-      const label = opt?.label || fallback?.label || code;
-      const category = opt?.category || (code in RESULT_FALLBACKS ? 'RESULT' : activeTab);
+      const resFallback = RESULT_FALLBACKS[code];
+      const goalFallback = GOALS_FALLBACKS[code];
+      const label = opt?.label || resFallback?.label || goalFallback?.label || code;
+      const category: 'RESULT' | 'GOALS' | 'CORNERS' =
+        opt?.category ||
+        (code in RESULT_FALLBACKS
+          ? 'RESULT'
+          : code in GOALS_FALLBACKS
+          ? 'GOALS'
+          : activeTab);
 
-      let spokenText = opt?.spokenTemplate || fallback?.spokenTemplate || label;
+      let spokenText = opt?.spokenTemplate || resFallback?.spokenTemplate || goalFallback?.spokenTemplate || label;
       spokenText = spokenText
         .replace('{homeTeam}', game.homeTeam)
         .replace('{awayTeam}', game.awayTeam);
@@ -120,6 +184,58 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   };
 
   const filteredOptions = availableOptions.filter((opt) => opt.category === activeTab);
+
+  const renderOverUnderTable = (
+    title: string,
+    totals: number[],
+    prefix: string,
+    suffix: string = '_GOALS'
+  ) => (
+    <View style={styles.groupSection}>
+      <Text style={styles.groupSectionTitle}>{title}</Text>
+      <View style={styles.tableHeaderRow}>
+        <View style={styles.tableHeaderCol}>
+          <Text style={styles.tableHeaderTextOver}>OVER ↑</Text>
+        </View>
+        <View style={styles.tableHeaderCol}>
+          <Text style={styles.tableHeaderTextUnder}>UNDER ↓</Text>
+        </View>
+      </View>
+
+      {totals.map((val) => {
+        const overCode = `${prefix}OVER_${val}${suffix}`;
+        const underCode = `${prefix}UNDER_${val}${suffix}`;
+        const isOverSelected = selectedCodes.includes(overCode);
+        const isUnderSelected = selectedCodes.includes(underCode);
+
+        return (
+          <View key={val} style={styles.tableRow}>
+            <TouchableOpacity
+              style={[styles.tableCellBtn, isOverSelected && styles.tableCellBtnSelected]}
+              onPress={() => toggleSelection(overCode)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tableCellText, isOverSelected && styles.tableCellTextSelected]}>
+                {val}
+              </Text>
+              {isOverSelected && <View style={styles.tableCellActiveDot} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tableCellBtn, isUnderSelected && styles.tableCellBtnSelected]}
+              onPress={() => toggleSelection(underCode)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tableCellText, isUnderSelected && styles.tableCellTextSelected]}>
+                {val}
+              </Text>
+              {isUnderSelected && <View style={styles.tableCellActiveDot} />}
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+    </View>
+  );
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
@@ -273,6 +389,122 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
                     })}
                   </View>
                 </View>
+              </View>
+            ) : activeTab === 'GOALS' ? (
+              <View style={styles.resultGroupsContainer}>
+                {/* 1. Both Teams to Score (BTTS) - 2 Buttons: [Yes | No] */}
+                <View style={styles.groupSection}>
+                  <Text style={styles.groupSectionTitle}>Both Teams to Score (BTTS)</Text>
+                  <View style={styles.segmentedRow}>
+                    {[
+                      { code: 'BTTS_YES', title: 'Yes', subtitle: 'Both score' },
+                      { code: 'BTTS_NO', title: 'No', subtitle: 'Clean sheet' }
+                    ].map((item) => {
+                      const isSelected = selectedCodes.includes(item.code);
+                      return (
+                        <TouchableOpacity
+                          key={item.code}
+                          style={[styles.segmentBtn, isSelected && styles.segmentBtnSelected]}
+                          onPress={() => toggleSelection(item.code)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[styles.segmentTitle, isSelected && styles.segmentTitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text
+                            style={[styles.segmentSubtitle, isSelected && styles.segmentSubtitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.subtitle}
+                          </Text>
+                          {isSelected && <View style={styles.segmentActiveDot} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* 2. Team to Score First - 2 Buttons: [Home | Away] */}
+                <View style={styles.groupSection}>
+                  <Text style={styles.groupSectionTitle}>Team to Score First</Text>
+                  <View style={styles.segmentedRow}>
+                    {[
+                      { code: 'FIRST_GOAL_HOME', title: 'Home', subtitle: game.homeTeam },
+                      { code: 'FIRST_GOAL_AWAY', title: 'Away', subtitle: game.awayTeam }
+                    ].map((item) => {
+                      const isSelected = selectedCodes.includes(item.code);
+                      return (
+                        <TouchableOpacity
+                          key={item.code}
+                          style={[styles.segmentBtn, isSelected && styles.segmentBtnSelected]}
+                          onPress={() => toggleSelection(item.code)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[styles.segmentTitle, isSelected && styles.segmentTitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text
+                            style={[styles.segmentSubtitle, isSelected && styles.segmentSubtitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.subtitle}
+                          </Text>
+                          {isSelected && <View style={styles.segmentActiveDot} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* 3. Team to Score Last - 2 Buttons: [Home | Away] */}
+                <View style={styles.groupSection}>
+                  <Text style={styles.groupSectionTitle}>Team to Score Last</Text>
+                  <View style={styles.segmentedRow}>
+                    {[
+                      { code: 'LAST_GOAL_HOME', title: 'Home', subtitle: game.homeTeam },
+                      { code: 'LAST_GOAL_AWAY', title: 'Away', subtitle: game.awayTeam }
+                    ].map((item) => {
+                      const isSelected = selectedCodes.includes(item.code);
+                      return (
+                        <TouchableOpacity
+                          key={item.code}
+                          style={[styles.segmentBtn, isSelected && styles.segmentBtnSelected]}
+                          onPress={() => toggleSelection(item.code)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[styles.segmentTitle, isSelected && styles.segmentTitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.title}
+                          </Text>
+                          <Text
+                            style={[styles.segmentSubtitle, isSelected && styles.segmentSubtitleSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.subtitle}
+                          </Text>
+                          {isSelected && <View style={styles.segmentActiveDot} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* 4. Total Goals Over / Under Table */}
+                {renderOverUnderTable('Total Goals (Over / Under)', GOAL_TOTALS, '')}
+
+                {/* 5. Home Team Goals Over / Under Table */}
+                {renderOverUnderTable(`${game.homeTeam} Goals (Over / Under)`, TEAM_GOAL_TOTALS, 'HOME_')}
+
+                {/* 6. Away Team Goals Over / Under Table */}
+                {renderOverUnderTable(`${game.awayTeam} Goals (Over / Under)`, TEAM_GOAL_TOTALS, 'AWAY_')}
               </View>
             ) : (
               filteredOptions.map((opt) => {
@@ -456,6 +688,67 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: THEME.colors.accentGreen
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+    paddingHorizontal: 2
+  },
+  tableHeaderCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4
+  },
+  tableHeaderTextOver: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  tableHeaderTextUnder: {
+    color: '#f87171',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  tableRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6
+  },
+  tableCellBtn: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#1e293b',
+    position: 'relative'
+  },
+  tableCellBtnSelected: {
+    backgroundColor: '#0c4a6e',
+    borderColor: THEME.colors.primary
+  },
+  tableCellText: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+  tableCellTextSelected: {
+    color: '#38bdf8'
+  },
+  tableCellActiveDot: {
+    position: 'absolute',
+    top: 5,
+    right: 8,
     width: 6,
     height: 6,
     borderRadius: 3,
