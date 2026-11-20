@@ -25,6 +25,7 @@ import {
   canGoBackDate
 } from '../utils/dateUtils';
 import { filterGamesBySearchQuery, groupGamesByCompetition } from '../utils/gameUtils';
+import { triggerHaptic } from '../utils/haptics';
 import { CompetitionCard } from '../components/CompetitionCard';
 import { PredictionPickerModal } from '../components/PredictionPickerModal';
 import { VideoSettingsWizard } from '../components/VideoSettingsWizard';
@@ -47,6 +48,25 @@ export const GamesScreen: React.FC = () => {
   // Predictions map: gameId -> PredictionSelection[]
   const [gameSelections, setGameSelections] = useState<Record<string, PredictionSelection[]>>({});
 
+  // Filter to show only games with predictions
+  const [showOnlyPredicted, setShowOnlyPredicted] = useState(false);
+
+  // Total games with at least one prediction
+  const gamesWithPredictions = useMemo(() => {
+    return Object.keys(gameSelections).filter(
+      (gId) => (gameSelections[gId] || []).length > 0
+    );
+  }, [gameSelections]);
+
+  const hasAnyPredictions = gamesWithPredictions.length > 0;
+
+  // Auto-disable showOnlyPredicted if all predictions are cleared
+  useEffect(() => {
+    if (!hasAnyPredictions && showOnlyPredicted) {
+      setShowOnlyPredicted(false);
+    }
+  }, [hasAnyPredictions, showOnlyPredicted]);
+
   // Selection mode for AI prediction batching
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedGameIdsForAi, setSelectedGameIdsForAi] = useState<string[]>([]);
@@ -58,10 +78,14 @@ export const GamesScreen: React.FC = () => {
   // Active game for modal picker
   const [activeGameForPicker, setActiveGameForPicker] = useState<UpcomingGame | null>(null);
 
-  // Filter games based on search query
+  // Filter games based on predictions filter and search query
   const filteredGames = useMemo(() => {
-    return filterGamesBySearchQuery(games, searchQuery);
-  }, [games, searchQuery]);
+    let list = games;
+    if (showOnlyPredicted) {
+      list = list.filter((g) => (gameSelections[g.id] || []).length > 0);
+    }
+    return filterGamesBySearchQuery(list, searchQuery);
+  }, [games, searchQuery, showOnlyPredicted, gameSelections]);
 
   // Group filtered games into sections by competition
   const sections = useMemo(() => {
@@ -131,6 +155,7 @@ export const GamesScreen: React.FC = () => {
       setSelectedDate(getPreviousDayString(selectedDate));
       setSelectedGameIdsForAi([]);
       setIsSelectionMode(false);
+      setShowOnlyPredicted(false);
       setSearchQuery('');
     }
   };
@@ -139,11 +164,13 @@ export const GamesScreen: React.FC = () => {
     setSelectedDate(getNextDayString(selectedDate));
     setSelectedGameIdsForAi([]);
     setIsSelectionMode(false);
+    setShowOnlyPredicted(false);
     setSearchQuery('');
   };
 
   // Long press on a game enables selection mode and selects this game
   const handleLongPressGame = (gameId: string) => {
+    triggerHaptic();
     setIsSelectionMode(true);
     setSelectedGameIdsForAi((prev) => {
       if (prev.includes(gameId)) {
@@ -226,11 +253,6 @@ export const GamesScreen: React.FC = () => {
       [activeGameForPicker.id]: selections
     });
   };
-
-  // Total games with at least one prediction
-  const gamesWithPredictions = Object.keys(gameSelections).filter(
-    (gId) => (gameSelections[gId] || []).length > 0
-  );
 
   const handleNextToWizard = () => {
     if (gamesWithPredictions.length === 0) {
@@ -392,8 +414,8 @@ export const GamesScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* AI Predict Action (Only visible when selection mode is enabled via long-press) */}
-        {isSelectionMode && (
+        {/* Right Section: When selecting, show Cancel + AI; otherwise show Filter Predicted button */}
+        {isSelectionMode ? (
           <View style={styles.selectionSection}>
             <TouchableOpacity
               style={styles.cancelSelectionBtn}
@@ -420,6 +442,55 @@ export const GamesScreen: React.FC = () => {
                 <Text style={styles.aiPredictBtnText}>
                   ✨ AI ({selectedGameIdsForAi.length})
                 </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.selectionSection}>
+            <TouchableOpacity
+              style={[
+                styles.filterPredictedBtn,
+                showOnlyPredicted && styles.filterPredictedBtnActive,
+                !hasAnyPredictions && styles.filterPredictedBtnDisabled
+              ]}
+              onPress={() => {
+                if (hasAnyPredictions) {
+                  setShowOnlyPredicted(!showOnlyPredicted);
+                }
+              }}
+              onLongPress={() => {
+                triggerHaptic();
+                setIsSelectionMode(true);
+              }}
+              delayLongPress={300}
+              activeOpacity={hasAnyPredictions ? 0.7 : 0.9}
+            >
+              <Text style={styles.filterPredictedIcon}>🎯</Text>
+              <Text
+                style={[
+                  styles.filterPredictedText,
+                  showOnlyPredicted && styles.filterPredictedTextActive,
+                  !hasAnyPredictions && styles.filterPredictedTextDisabled
+                ]}
+              >
+                {showOnlyPredicted ? 'Predicted' : 'Predicted'}
+              </Text>
+              {hasAnyPredictions && (
+                <View
+                  style={[
+                    styles.filterPredictedBadge,
+                    showOnlyPredicted && styles.filterPredictedBadgeActive
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterPredictedBadgeText,
+                      showOnlyPredicted && styles.filterPredictedBadgeTextActive
+                    ]}
+                  >
+                    {gamesWithPredictions.length}
+                  </Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
@@ -494,18 +565,42 @@ export const GamesScreen: React.FC = () => {
             />
           }
         >
-          <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyTitle}>No Matches Found</Text>
-          <Text style={styles.emptyText}>
-            No fixtures matching "{searchQuery}". Try searching for another team or league.
-          </Text>
-          <TouchableOpacity
-            style={styles.retryBtn}
-            onPress={() => setSearchQuery('')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.retryBtnText}>✕ Clear Search</Text>
-          </TouchableOpacity>
+          {showOnlyPredicted ? (
+            <>
+              <Text style={styles.emptyIcon}>🎯</Text>
+              <Text style={styles.emptyTitle}>No Predictions Found</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery.length > 0
+                  ? `No predictions match "${searchQuery}".`
+                  : 'No matches have predictions yet for this date.'}
+              </Text>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => {
+                  setShowOnlyPredicted(false);
+                  setSearchQuery('');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.retryBtnText}>Show All Fixtures</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyIcon}>🔍</Text>
+              <Text style={styles.emptyTitle}>No Matches Found</Text>
+              <Text style={styles.emptyText}>
+                No fixtures matching "{searchQuery}". Try searching for another team or league.
+              </Text>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => setSearchQuery('')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.retryBtnText}>✕ Clear Search</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
       ) : (
         <FlatList
@@ -746,6 +841,60 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
     fontWeight: 'bold'
+  },
+  filterPredictedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#1e293b',
+    gap: 6
+  },
+  filterPredictedBtnActive: {
+    backgroundColor: '#0369a1',
+    borderColor: THEME.colors.primary
+  },
+  filterPredictedBtnDisabled: {
+    backgroundColor: '#090e1a',
+    borderColor: '#141d2e',
+    opacity: 0.4
+  },
+  filterPredictedIcon: {
+    fontSize: 13
+  },
+  filterPredictedText: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  filterPredictedTextActive: {
+    color: '#ffffff'
+  },
+  filterPredictedTextDisabled: {
+    color: '#475569'
+  },
+  filterPredictedBadge: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  filterPredictedBadgeActive: {
+    backgroundColor: '#0284c7',
+    borderColor: '#7dd3fc'
+  },
+  filterPredictedBadgeText: {
+    color: THEME.colors.primary,
+    fontSize: 10,
+    fontWeight: 'bold'
+  },
+  filterPredictedBadgeTextActive: {
+    color: '#ffffff'
   },
   modeBtn: {
     backgroundColor: '#1e293b',
