@@ -128,7 +128,7 @@ jobs:
     name: Deploy to Windows Server 2022 (Docker)
     needs: [build-docker]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: self-hosted
     defaults:
       run:
         shell: powershell
