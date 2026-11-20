@@ -29,24 +29,18 @@ export const GameCard: React.FC<GameCardProps> = ({
 
   return (
     <View style={[styles.card, isSelectedForAi && styles.cardSelectedForAi]}>
-      {/* Top Bar: Kickoff Time & Selection Mode */}
-      <View style={styles.topBar}>
-        <View style={styles.timeBadge}>
-          <Text style={styles.timeText}>⏰ {kickoff}</Text>
-        </View>
+      {/* Selection mode checkbox in top-right */}
+      {selectionModeEnabled && (
+        <TouchableOpacity
+          style={[styles.aiCheckboxTopRight, isSelectedForAi && styles.aiCheckboxActive]}
+          onPress={onToggleSelectForAi}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {isSelectedForAi && <Text style={styles.aiCheckboxCheck}>✓</Text>}
+        </TouchableOpacity>
+      )}
 
-        {/* Selection mode checkbox */}
-        {selectionModeEnabled && (
-          <TouchableOpacity
-            style={[styles.aiCheckbox, isSelectedForAi && styles.aiCheckboxActive]}
-            onPress={onToggleSelectForAi}
-          >
-            {isSelectedForAi && <Text style={styles.aiCheckboxCheck}>✓</Text>}
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Teams Section */}
+      {/* Teams Section with Kickoff Time in place of VS */}
       <View style={styles.teamsRow}>
         {/* Home Team */}
         <View style={styles.teamColumn}>
@@ -67,10 +61,10 @@ export const GameCard: React.FC<GameCardProps> = ({
           </Text>
         </View>
 
-        {/* VS Divider */}
-        <View style={styles.vsContainer}>
-          <View style={styles.vsCircle}>
-            <Text style={styles.vsText}>VS</Text>
+        {/* Kickoff Time in place of VS */}
+        <View style={styles.timeCenterContainer}>
+          <View style={styles.timeCenterBadge}>
+            <Text style={styles.timeCenterText}>{kickoff}</Text>
           </View>
         </View>
 
@@ -134,38 +128,26 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1.5,
-    borderColor: THEME.colors.cardBorder
+    borderColor: THEME.colors.cardBorder,
+    position: 'relative'
   },
   cardSelectedForAi: {
     borderColor: THEME.colors.primary,
     backgroundColor: '#0c2438'
   },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  timeBadge: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8
-  },
-  timeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.primary
-  },
-  aiCheckbox: {
+  aiCheckboxTopRight: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
     width: 24,
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: THEME.colors.textMuted,
-    marginLeft: 10,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    zIndex: 10,
+    backgroundColor: '#1e293b'
   },
   aiCheckboxActive: {
     backgroundColor: THEME.colors.accentGreen,
@@ -180,7 +162,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8
+    paddingVertical: 4
   },
   teamColumn: {
     flex: 1,
@@ -211,22 +193,28 @@ const styles = StyleSheet.create({
     color: THEME.colors.textPrimary,
     textAlign: 'center'
   },
-  vsContainer: {
-    width: 50,
-    alignItems: 'center'
-  },
-  vsCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e11d48',
+  timeCenterContainer: {
+    width: 70,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center'
+    paddingHorizontal: 4
   },
-  vsText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '900'
+  timeCenterBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 58
+  },
+  timeCenterText: {
+    color: THEME.colors.primary,
+    fontSize: 13,
+    fontWeight: 'bold',
+    letterSpacing: 0.5
   },
   selectionsArea: {
     flexDirection: 'row',
