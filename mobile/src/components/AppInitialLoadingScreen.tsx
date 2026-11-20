@@ -9,6 +9,7 @@ import {
   Dimensions
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { THEME } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
@@ -39,6 +40,9 @@ export const AppInitialLoadingScreen: React.FC<AppInitialLoadingScreenProps> = (
   const [stageIndex, setStageIndex] = useState(0);
 
   useEffect(() => {
+    // Hide native splash once React component has mounted
+    SplashScreen.hideAsync().catch(() => {});
+
     // 1. Entrance zoom for logo
     Animated.spring(scaleAnim, {
       toValue: 1,

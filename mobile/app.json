@@ -6,6 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#020617",
+    "primaryColor": "#10b981",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -13,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "backgroundColor": "#020617",
       "splash": {
         "image": "./assets/splash-icon.png",
         "resizeMode": "contain",
@@ -20,6 +23,7 @@
       }
     },
     "android": {
+      "backgroundColor": "#020617",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#020617"
@@ -31,6 +35,19 @@
       }
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#020617",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#020617",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ],
       "expo-asset",
       "expo-font",
       "expo-video"

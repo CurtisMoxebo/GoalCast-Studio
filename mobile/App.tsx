@@ -15,6 +15,10 @@ import { GamesScreen } from './src/screens/GamesScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AppInitialLoadingScreen } from './src/components/AppInitialLoadingScreen';
+import * as SplashScreen from 'expo-splash-screen';
+
+// Keep the native splash screen visible while JS bundle initializes
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 interface ErrorBoundaryProps {
   children: ReactNode;
