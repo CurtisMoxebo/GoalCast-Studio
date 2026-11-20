@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { THEME } from '../constants/theme';
 import { UpcomingGame, PredictionSelection } from '../types';
@@ -24,17 +24,21 @@ export const GameCard: React.FC<GameCardProps> = ({
   onRemoveSelection
 }) => {
   const kickoff = formatKickoffTime(game.kickoffTime);
+  const [homeLogoError, setHomeLogoError] = useState(false);
+  const [awayLogoError, setAwayLogoError] = useState(false);
+  const [compLogoError, setCompLogoError] = useState(false);
 
   return (
     <View style={[styles.card, isSelectedForAi && styles.cardSelectedForAi]}>
       {/* Top Bar: Competition & Kickoff Time */}
       <View style={styles.topBar}>
         <View style={styles.compContainer}>
-          {game.competitionLogo ? (
+          {game.competitionLogo && !compLogoError ? (
             <Image
               source={{ uri: game.competitionLogo }}
               style={styles.compLogo}
               resizeMode="contain"
+              onError={() => setCompLogoError(true)}
             />
           ) : (
             <Text style={styles.compIcon}>🏆</Text>
@@ -63,8 +67,13 @@ export const GameCard: React.FC<GameCardProps> = ({
       <View style={styles.teamsRow}>
         {/* Home Team */}
         <View style={styles.teamColumn}>
-          {game.homeTeamLogo ? (
-            <Image source={{ uri: game.homeTeamLogo }} style={styles.teamLogo} resizeMode="contain" />
+          {game.homeTeamLogo && !homeLogoError ? (
+            <Image
+              source={{ uri: game.homeTeamLogo }}
+              style={styles.teamLogo}
+              resizeMode="contain"
+              onError={() => setHomeLogoError(true)}
+            />
           ) : (
             <View style={styles.teamLogoPlaceholder}>
               <Text style={styles.teamInitials}>{game.homeTeam.substring(0, 2).toUpperCase()}</Text>
@@ -84,8 +93,13 @@ export const GameCard: React.FC<GameCardProps> = ({
 
         {/* Away Team */}
         <View style={styles.teamColumn}>
-          {game.awayTeamLogo ? (
-            <Image source={{ uri: game.awayTeamLogo }} style={styles.teamLogo} resizeMode="contain" />
+          {game.awayTeamLogo && !awayLogoError ? (
+            <Image
+              source={{ uri: game.awayTeamLogo }}
+              style={styles.teamLogo}
+              resizeMode="contain"
+              onError={() => setAwayLogoError(true)}
+            />
           ) : (
             <View style={styles.teamLogoPlaceholder}>
               <Text style={styles.teamInitials}>{game.awayTeam.substring(0, 2).toUpperCase()}</Text>

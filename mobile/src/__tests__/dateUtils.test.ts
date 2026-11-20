@@ -6,7 +6,11 @@ import {
   isAllowedFutureDate,
   formatOrdinalDate,
   getSelectableFutureDates,
-  formatDateToISO
+  formatDateToISO,
+  formatNavDisplayDate,
+  getNextDayString,
+  getPreviousDayString,
+  canGoBackDate
 } from '../utils/dateUtils';
 
 test('Mobile Regression: getUserTimezone returns non-empty string', () => {
@@ -60,4 +64,18 @@ test('Mobile Regression: getSelectableFutureDates starts strictly tomorrow', () 
   for (const item of dates) {
     assert.equal(isAllowedFutureDate(item.dateStr), true);
   }
+});
+
+test('Mobile Regression: Date Navigation helpers', () => {
+  const tomorrow = getTomorrowDateString();
+  assert.equal(canGoBackDate(tomorrow), false, 'Cannot go back from tomorrow');
+  assert.equal(formatNavDisplayDate(tomorrow), 'Tomorrow');
+
+  const dayAfter = getNextDayString(tomorrow);
+  assert.equal(canGoBackDate(dayAfter), true, 'Can go back from day after tomorrow');
+  assert.equal(getPreviousDayString(dayAfter), tomorrow);
+
+  const display = formatNavDisplayDate(dayAfter);
+  assert.notEqual(display, 'Tomorrow');
+  assert.match(display, /^[A-Z][a-z]{2}\s[A-Z][a-z]{2}\s\d+$/);
 });

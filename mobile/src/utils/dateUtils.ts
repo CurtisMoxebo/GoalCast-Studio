@@ -78,6 +78,54 @@ export function formatKickoffTime(isoString: string): string {
 }
 
 /**
+ * Format date for top date navigation selector.
+ * If targetDate is tomorrow, returns "Tomorrow".
+ * If not tomorrow, returns formatted date like "Sat Nov 21".
+ */
+export function formatNavDisplayDate(dateStr: string): string {
+  const tomorrow = getTomorrowDateString();
+  if (dateStr === tomorrow) {
+    return 'Tomorrow';
+  }
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const day = d.getDate();
+    return `${weekday} ${month} ${day}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * Returns the next day date string (YYYY-MM-DD)
+ */
+export function getNextDayString(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return formatDateToISO(d);
+}
+
+/**
+ * Returns the previous day date string (YYYY-MM-DD)
+ */
+export function getPreviousDayString(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return formatDateToISO(d);
+}
+
+/**
+ * Check if user is allowed to navigate backward.
+ * Strictly blocked if target date is tomorrow or earlier (cannot go to current or past days).
+ */
+export function canGoBackDate(dateStr: string): boolean {
+  const tomorrow = getTomorrowDateString();
+  return dateStr > tomorrow;
+}
+
+/**
  * Generate upcoming selectable dates starting from tomorrow up to 7 days ahead
  */
 export function getSelectableFutureDates(numDays = 7): { dateStr: string; label: string }[] {

@@ -7,24 +7,34 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView
 } from 'react-native';
 import { THEME } from '../constants/theme';
 import { UpcomingGame, PredictionSelection, BettingOption, MediaAsset, VoiceOption, VideoSettings } from '../types';
 import { mobileApi } from '../services/api';
-import { getUserTimezone, getSelectableFutureDates } from '../utils/dateUtils';
+import {
+  getUserTimezone,
+  getTomorrowDateString,
+  formatNavDisplayDate,
+  getNextDayString,
+  getPreviousDayString,
+  canGoBackDate
+} from '../utils/dateUtils';
 import { GameCard } from '../components/GameCard';
 import { PredictionPickerModal } from '../components/PredictionPickerModal';
 import { VideoSettingsWizard } from '../components/VideoSettingsWizard';
 import { PreviewModal } from '../components/PreviewModal';
 
 export const GamesScreen: React.FC = () => {
-  const futureDates = getSelectableFutureDates(7);
   const userTimezone = getUserTimezone();
 
-  const [selectedDate, setSelectedDate] = useState(futureDates[0].dateStr);
+  // Selected date state: defaults strictly to tomorrow
+  const [selectedDate, setSelectedDate] = useState<string>(getTomorrowDateString());
   const [games, setGames] = useState<UpcomingGame[]>([]);
   const [isLoadingGames, setIsLoadingGames] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Predictions map: gameId -> PredictionSelection[]
   const [gameSelections, setGameSelections] = useState<Record<string, PredictionSelection[]>>({});
@@ -68,20 +78,46 @@ export const GamesScreen: React.FC = () => {
 
   // Fetch games whenever selectedDate changes
   useEffect(() => {
-    loadGamesForDate(selectedDate);
+    loadGamesForDate(selectedDate, true);
   }, [selectedDate]);
 
-  const loadGamesForDate = async (dateStr: string) => {
-    setIsLoadingGames(true);
+  const loadGamesForDate = async (dateStr: string, showLoadingIndicator = true) => {
+    if (showLoadingIndicator) {
+      setIsLoadingGames(true);
+    }
+    setFetchError(null);
+
     try {
       const fetched = await mobileApi.fetchGames(dateStr, userTimezone);
       setGames(fetched);
     } catch (err: any) {
-      Alert.alert('Load Error', err?.message || 'Could not load games');
+      setFetchError(err?.message || 'Could not load matches from server');
       setGames([]);
     } finally {
       setIsLoadingGames(false);
     }
+  };
+
+  const handlePullToRefresh = async () => {
+    setIsRefreshing(true);
+    await loadGamesForDate(selectedDate, false);
+    setIsRefreshing(false);
+  };
+
+  // Date Navigation
+  const isLeftArrowBlocked = !canGoBackDate(selectedDate);
+  const displayDateLabel = formatNavDisplayDate(selectedDate);
+
+  const handlePreviousDay = () => {
+    if (canGoBackDate(selectedDate)) {
+      setSelectedDate(getPreviousDayString(selectedDate));
+      setSelectedGameIdsForAi([]);
+    }
+  };
+
+  const handleNextDay = () => {
+    setSelectedDate(getNextDayString(selectedDate));
+    setSelectedGameIdsForAi([]);
   };
 
   const handleToggleSelectForAi = (gameId: string) => {
@@ -228,7 +264,7 @@ export const GamesScreen: React.FC = () => {
             setIsWizardActive(false);
           }}
           onAccepted={() => {
-            // Keep preview modal open so user can share to FB, IG, TikTok, YT Shorts
+            // Keep preview modal open so user can share
           }}
         />
       </View>
@@ -237,77 +273,137 @@ export const GamesScreen: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      {/* Date Selector Header: strictly next day onwards */}
-      <View style={styles.dateSelectorContainer}>
-        <Text style={styles.dateLabel}>Select Date (Next Day Onwards):</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-          {futureDates.map((item) => {
-            const isSelected = selectedDate === item.dateStr;
-            return (
-              <TouchableOpacity
-                key={item.dateStr}
-                style={[styles.dateChip, isSelected && styles.dateChipActive]}
-                onPress={() => setSelectedDate(item.dateStr)}
-              >
-                <Text style={[styles.dateChipText, isSelected && styles.dateChipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* AI & Multi-select Control Bar */}
-      <View style={styles.controlsBar}>
-        <TouchableOpacity
-          style={[styles.modeBtn, isSelectionMode && styles.modeBtnActive]}
-          onPress={() => {
-            setIsSelectionMode(!isSelectionMode);
-            setSelectedGameIdsForAi([]);
-          }}
-        >
-          <Text style={[styles.modeBtnText, isSelectionMode && styles.modeBtnTextActive]}>
-            {isSelectionMode ? 'Cancel Selection' : '☑ Enable Selection'}
-          </Text>
-        </TouchableOpacity>
-
-        {isSelectionMode && (
+      {/* Top Controls Row: Date Navigation on Left, Selection Controls on Right */}
+      <View style={styles.topControlsRow}>
+        {/* Left: Date Change Section with Left/Right Arrows */}
+        <View style={styles.dateNavSection}>
           <TouchableOpacity
-            style={[styles.aiPredictBtn, isGeneratingAi && styles.aiPredictBtnDisabled]}
-            onPress={handleRunAiPrediction}
-            disabled={isGeneratingAi}
+            style={[styles.arrowButton, isLeftArrowBlocked && styles.arrowButtonDisabled]}
+            onPress={handlePreviousDay}
+            disabled={isLeftArrowBlocked}
+            activeOpacity={0.7}
           >
-            {isGeneratingAi ? (
-              <ActivityIndicator color="#020617" size="small" />
-            ) : (
-              <Text style={styles.aiPredictBtnText}>
-                ✨ AI Predict ({selectedGameIdsForAi.length})
-              </Text>
-            )}
+            <Text style={[styles.arrowText, isLeftArrowBlocked && styles.arrowTextDisabled]}>◀</Text>
           </TouchableOpacity>
-        )}
+
+          <View style={styles.dateBadge}>
+            <Text style={styles.dateBadgeText}>{displayDateLabel}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.arrowButton}
+            onPress={handleNextDay}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.arrowText}>▶</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Right: Enable Selection & AI Predict */}
+        <View style={styles.selectionSection}>
+          <TouchableOpacity
+            style={[styles.modeBtn, isSelectionMode && styles.modeBtnActive]}
+            onPress={() => {
+              setIsSelectionMode(!isSelectionMode);
+              setSelectedGameIdsForAi([]);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.modeBtnText, isSelectionMode && styles.modeBtnTextActive]}>
+              {isSelectionMode ? 'Cancel' : '☑ Enable Selection'}
+            </Text>
+          </TouchableOpacity>
+
+          {isSelectionMode && (
+            <TouchableOpacity
+              style={[
+                styles.aiPredictBtn,
+                (isGeneratingAi || selectedGameIdsForAi.length === 0) && styles.aiPredictBtnDisabled
+              ]}
+              onPress={handleRunAiPrediction}
+              disabled={isGeneratingAi || selectedGameIdsForAi.length === 0}
+            >
+              {isGeneratingAi ? (
+                <ActivityIndicator color="#020617" size="small" />
+              ) : (
+                <Text style={styles.aiPredictBtnText}>
+                  ✨ AI ({selectedGameIdsForAi.length})
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* Games List or Loading */}
+      {/* Main Content: Loading, Error, Empty List, or FlatList */}
       {isLoadingGames ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={THEME.colors.primary} />
-          <Text style={styles.loadingText}>Fetching scheduled fixtures...</Text>
+          <Text style={styles.loadingText}>Querying AI for European fixtures...</Text>
         </View>
-      ) : games.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyIcon}>⚽</Text>
-          <Text style={styles.emptyText}>No matches found for this date.</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => loadGamesForDate(selectedDate)}>
-            <Text style={styles.retryBtnText}>Reload Fixtures</Text>
+      ) : fetchError ? (
+        <ScrollView
+          contentContainerStyle={styles.centerContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handlePullToRefresh}
+              tintColor={THEME.colors.primary}
+              colors={[THEME.colors.primary]}
+            />
+          }
+        >
+          <Text style={styles.errorIcon}>⚠️</Text>
+          <Text style={styles.errorTitle}>Error Loading Matches</Text>
+          <Text style={styles.errorDetails}>{fetchError}</Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => loadGamesForDate(selectedDate, true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryBtnText}>🔄 Retry Query</Text>
           </TouchableOpacity>
-        </View>
+          <Text style={styles.pullHint}>Or pull down to refresh</Text>
+        </ScrollView>
+      ) : games.length === 0 ? (
+        <ScrollView
+          contentContainerStyle={styles.centerContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handlePullToRefresh}
+              tintColor={THEME.colors.primary}
+              colors={[THEME.colors.primary]}
+            />
+          }
+        >
+          <Text style={styles.emptyIcon}>⚽</Text>
+          <Text style={styles.emptyTitle}>No European Matches Scheduled</Text>
+          <Text style={styles.emptyText}>
+            No official matches found for {displayDateLabel}. Use the right arrow above to check upcoming match days.
+          </Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => loadGamesForDate(selectedDate, true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryBtnText}>🔄 Refresh Fixtures</Text>
+          </TouchableOpacity>
+          <Text style={styles.pullHint}>Or pull down to refresh</Text>
+        </ScrollView>
       ) : (
         <FlatList
           data={games}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handlePullToRefresh}
+              tintColor={THEME.colors.primary}
+              colors={[THEME.colors.primary]}
+            />
+          }
           renderItem={({ item }) => (
             <GameCard
               game={item}
@@ -355,64 +451,77 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: THEME.colors.background
   },
-  dateSelectorContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
+  topControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#0a0f1d',
     borderBottomWidth: 1,
     borderColor: THEME.colors.cardBorder
   },
-  dateLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: THEME.colors.textSecondary,
-    marginBottom: 8
+  dateNavSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0
   },
-  dateScroll: {
-    flexDirection: 'row'
-  },
-  dateChip: {
+  arrowButton: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    marginRight: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'transparent'
+    borderColor: '#334155'
   },
-  dateChipActive: {
-    backgroundColor: THEME.colors.primary,
-    borderColor: THEME.colors.primary
+  arrowButtonDisabled: {
+    backgroundColor: '#0f172a',
+    borderColor: '#1e293b',
+    opacity: 0.35
   },
-  dateChipText: {
+  arrowText: {
+    color: THEME.colors.primary,
     fontSize: 13,
-    fontWeight: '600',
-    color: THEME.colors.textSecondary
-  },
-  dateChipTextActive: {
-    color: '#020617',
     fontWeight: 'bold'
   },
-  controlsBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  arrowTextDisabled: {
+    color: THEME.colors.textMuted
+  },
+  dateBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#0a0f1d'
+    justifyContent: 'center',
+    minWidth: 92
+  },
+  dateBadgeText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center'
+  },
+  selectionSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
   },
   modeBtn: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155'
   },
   modeBtnActive: {
-    backgroundColor: '#334155'
+    backgroundColor: '#334155',
+    borderColor: '#f87171'
   },
   modeBtnText: {
     color: THEME.colors.primary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 'bold'
   },
   modeBtnTextActive: {
@@ -420,16 +529,16 @@ const styles = StyleSheet.create({
   },
   aiPredictBtn: {
     backgroundColor: THEME.colors.accentGold,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8
   },
   aiPredictBtnDisabled: {
-    opacity: 0.6
+    opacity: 0.4
   },
   aiPredictBtnText: {
     color: '#020617',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900'
   },
   listContent: {
@@ -445,21 +554,55 @@ const styles = StyleSheet.create({
   loadingText: {
     color: THEME.colors.textSecondary,
     marginTop: 12,
-    fontSize: 14
+    fontSize: 14,
+    textAlign: 'center'
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: 12
+  },
+  errorTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  errorDetails: {
+    color: '#f87171',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+    maxWidth: 320
   },
   emptyIcon: {
     fontSize: 48,
     marginBottom: 12
   },
+  emptyTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
   emptyText: {
     color: THEME.colors.textSecondary,
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
-    marginBottom: 16
+    marginBottom: 20,
+    lineHeight: 20,
+    maxWidth: 300
+  },
+  pullHint: {
+    color: THEME.colors.textMuted,
+    fontSize: 12,
+    marginTop: 16
   },
   retryBtn: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,

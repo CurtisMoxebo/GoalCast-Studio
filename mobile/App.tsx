@@ -1,6 +1,16 @@
 import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  Platform,
+  StatusBar as RNStatusBar
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { THEME } from './src/constants/theme';
 import { GamesScreen } from './src/screens/GamesScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
@@ -58,61 +68,64 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<Tab>('GAMES');
 
   return (
-    <ErrorBoundary>
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="light" />
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <SafeAreaView style={styles.container}>
+          <StatusBar style="light" />
 
-        {/* Main Screen Content */}
-        <View style={styles.content}>
-          {currentTab === 'GAMES' && <GamesScreen />}
-          {currentTab === 'HISTORY' && <HistoryScreen />}
-          {currentTab === 'SETTINGS' && <SettingsScreen />}
-        </View>
+          {/* Main Screen Content */}
+          <View style={styles.content}>
+            {currentTab === 'GAMES' && <GamesScreen />}
+            {currentTab === 'HISTORY' && <HistoryScreen />}
+            {currentTab === 'SETTINGS' && <SettingsScreen />}
+          </View>
 
-        {/* Bottom Tab Bar (3 Tabs) */}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => setCurrentTab('GAMES')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.tabIcon}>⚽</Text>
-            <Text style={[styles.tabLabel, currentTab === 'GAMES' && styles.tabLabelActive]}>
-              Games
-            </Text>
-          </TouchableOpacity>
+          {/* Bottom Tab Bar (3 Tabs) */}
+          <View style={styles.tabBar}>
+            <TouchableOpacity
+              style={styles.tabItem}
+              onPress={() => setCurrentTab('GAMES')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.tabIcon}>⚽</Text>
+              <Text style={[styles.tabLabel, currentTab === 'GAMES' && styles.tabLabelActive]}>
+                Games
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => setCurrentTab('HISTORY')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.tabIcon}>📜</Text>
-            <Text style={[styles.tabLabel, currentTab === 'HISTORY' && styles.tabLabelActive]}>
-              History
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tabItem}
+              onPress={() => setCurrentTab('HISTORY')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.tabIcon}>📜</Text>
+              <Text style={[styles.tabLabel, currentTab === 'HISTORY' && styles.tabLabelActive]}>
+                History
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => setCurrentTab('SETTINGS')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.tabIcon}>⚙️</Text>
-            <Text style={[styles.tabLabel, currentTab === 'SETTINGS' && styles.tabLabelActive]}>
-              Settings
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </ErrorBoundary>
+            <TouchableOpacity
+              style={styles.tabItem}
+              onPress={() => setCurrentTab('SETTINGS')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.tabIcon}>⚙️</Text>
+              <Text style={[styles.tabLabel, currentTab === 'SETTINGS' && styles.tabLabelActive]}>
+                Settings
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background
+    backgroundColor: THEME.colors.background,
+    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 0
   },
   content: {
     flex: 1
