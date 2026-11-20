@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOCIAL_PLATFORMS, formatThumbnailTimestamp } from '../services/socialShare';
+import {
+  SOCIAL_PLATFORMS,
+  formatThumbnailTimestamp,
+  buildFacebookShareExtras,
+  buildInstagramShareExtras,
+  buildTikTokShareExtras,
+  buildYouTubeShareExtras
+} from '../services/socialShare';
 import { MobileApiService } from '../services/api';
 import { sessionStore } from '../services/sessionStore';
 import { UpcomingGame, HistoryItem } from '../types';
@@ -34,6 +41,116 @@ test('Mobile Regression: formatThumbnailTimestamp formats seconds into MM:SS', (
   assert.equal(formatThumbnailTimestamp(15.7), '00:15');
   assert.equal(formatThumbnailTimestamp(65), '01:05');
   assert.equal(formatThumbnailTimestamp(undefined), '00:03');
+});
+
+test('Mobile Regression: buildFacebookShareExtras includes description and thumbnail timeframe', () => {
+  const contentUri = 'content://com.goalcast.provider/video.mp4';
+  const extras = buildFacebookShareExtras(
+    {
+      videoUri: 'file:///path/to/video.mp4',
+      description: 'Football predictions for 22nd Nov ⚽ #predictions',
+      thumbnailTimestamp: 5.5
+    },
+    contentUri
+  );
+
+  // Application ID & Stream
+  assert.equal(extras['com.facebook.platform.extra.APPLICATION_ID'], '966242223397117');
+  assert.equal(extras['android.intent.extra.STREAM'], contentUri);
+
+  // Description / Caption across all keys
+  assert.equal(extras['android.intent.extra.TEXT'], 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras.caption, 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras.description, 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras['com.facebook.platform.extra.CAPTION'], 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras['com.facebook.platform.extra.DESCRIPTION'], 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras['com.facebook.platform.extra.TEXT'], 'Football predictions for 22nd Nov ⚽ #predictions');
+
+  // Thumbnail time frame (formatted string, seconds, milliseconds)
+  assert.equal(extras.thumbnail_time, '00:05');
+  assert.equal(extras.thumbnail_timestamp, 5.5);
+  assert.equal(extras.thumbnail_timestamp_ms, 5500);
+  assert.equal(extras.video_cover_time, 5.5);
+  assert.equal(extras.cover_time, '00:05');
+  assert.equal(extras.cover_timestamp, 5.5);
+  assert.equal(extras['com.facebook.platform.extra.THUMBNAIL_TIME'], '00:05');
+  assert.equal(extras['com.facebook.platform.extra.THUMBNAIL_TIMESTAMP'], 5.5);
+  assert.equal(extras['com.facebook.platform.extra.COVER_TIME'], '00:05');
+  assert.equal(extras['com.facebook.platform.extra.VIDEO_COVER_TIMESTAMP'], 5.5);
+});
+
+test('Mobile Regression: buildInstagramShareExtras includes description and thumbnail timeframe', () => {
+  const contentUri = 'content://com.goalcast.provider/video.mp4';
+  const extras = buildInstagramShareExtras(
+    {
+      videoUri: 'file:///path/to/video.mp4',
+      description: 'Football predictions for 22nd Nov ⚽ #predictions',
+      thumbnailTimestamp: 4.0
+    },
+    contentUri
+  );
+
+  // Application ID & Stream
+  assert.equal(extras['com.instagram.platform.extra.APPLICATION_ID'], '966242223397117');
+  assert.equal(extras['android.intent.extra.STREAM'], contentUri);
+
+  // Description / Caption across all keys
+  assert.equal(extras['android.intent.extra.TEXT'], 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras.caption, 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras.description, 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras['com.instagram.platform.extra.CAPTION'], 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras['com.instagram.platform.extra.DESCRIPTION'], 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras['com.instagram.platform.extra.TEXT'], 'Football predictions for 22nd Nov ⚽ #predictions');
+
+  // Thumbnail time frame
+  assert.equal(extras.thumbnail_time, '00:04');
+  assert.equal(extras.thumbnail_timestamp, 4.0);
+  assert.equal(extras.thumbnail_timestamp_ms, 4000);
+  assert.equal(extras.cover_time, '00:04');
+  assert.equal(extras['com.instagram.platform.extra.THUMBNAIL_TIME'], '00:04');
+  assert.equal(extras['com.instagram.platform.extra.THUMBNAIL_TIMESTAMP'], 4.0);
+});
+
+test('Mobile Regression: buildTikTokShareExtras includes description and thumbnail timeframe', () => {
+  const contentUri = 'content://com.goalcast.provider/video.mp4';
+  const extras = buildTikTokShareExtras(
+    {
+      videoUri: 'file:///path/to/video.mp4',
+      description: 'Football predictions for 22nd Nov ⚽ #predictions',
+      thumbnailTimestamp: 6.2
+    },
+    contentUri
+  );
+
+  assert.equal(extras['android.intent.extra.STREAM'], contentUri);
+  assert.equal(extras['android.intent.extra.TEXT'], 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras.caption, 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras.description, 'Football predictions for 22nd Nov ⚽ #predictions');
+  assert.equal(extras.title, 'Football predictions for 22nd Nov ⚽ #predictions');
+
+  assert.equal(extras.thumbnail_time, '00:06');
+  assert.equal(extras.thumbnail_timestamp, 6.2);
+  assert.equal(extras.thumbnail_timestamp_ms, 6200);
+  assert.equal(extras.cover_time, '00:06');
+});
+
+test('Mobile Regression: buildYouTubeShareExtras formats #Shorts in title and description with timeframe', () => {
+  const contentUri = 'content://com.goalcast.provider/video.mp4';
+  const extras = buildYouTubeShareExtras(
+    {
+      videoUri: 'file:///path/to/video.mp4',
+      description: 'Premier League Matchday Picks ⚽🔥\n#football #predictions',
+      thumbnailTimestamp: 3.0
+    },
+    contentUri
+  );
+
+  assert.equal(extras['android.intent.extra.STREAM'], contentUri);
+  assert.ok(extras['android.intent.extra.TITLE'].includes('#Shorts'));
+  assert.ok(extras['android.intent.extra.TEXT'].includes('#Shorts'));
+  assert.equal(extras.thumbnail_time, '00:03');
+  assert.equal(extras.thumbnail_timestamp, 3.0);
+  assert.equal(extras.thumbnail_timestamp_ms, 3000);
 });
 
 test('Mobile Regression: MobileApiService URL builder methods', () => {

@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
+import { getPreviousHitGameGroup } from '../services/predictions/previousHitService';
 
 const router = Router();
 
@@ -222,6 +223,8 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
     videoJobManager.createJob(jobId);
 
     // Run asynchronously or await
+    const previousWonGroup = params.previousWonGroup || (await getPreviousHitGameGroup()) || undefined;
+
     const result = await videoComposer.renderVideo({
       jobId,
       targetDate,
@@ -230,7 +233,7 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
       backgroundAudio,
       voiceActor,
       thumbnailTimestamp,
-      previousWonGroup: params.previousWonGroup,
+      previousWonGroup,
       onProgress: (percent, step) => {
         videoJobManager.updateProgress(jobId, percent, step);
       }

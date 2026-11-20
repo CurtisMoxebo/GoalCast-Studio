@@ -11,14 +11,20 @@ import {
   Dimensions
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
 import * as FileSystem from 'expo-file-system/legacy';
 import { mobileApi } from '../services/api';
 import { deviceStorage } from '../services/deviceStorage';
 import { sessionStore } from '../services/sessionStore';
-import { shareToSocialMedia, SOCIAL_PLATFORMS, SocialPlatform } from '../services/socialShare';
+import {
+  shareToSocialMedia,
+  sharePredictionVideo,
+  SOCIAL_PLATFORMS,
+  SocialPlatform
+} from '../services/socialShare';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const SOCIAL_ICONS: Record<SocialPlatform, any> = {
   facebook: require('../../assets/icons/facebook.png'),
@@ -34,12 +40,14 @@ const VideoPlayerComponent: React.FC<{ videoUri: string }> = ({ videoUri }) => {
   });
 
   return (
-    <VideoView
-      player={player}
-      style={styles.videoPlayer}
-      nativeControls={true}
-      contentFit="contain"
-    />
+    <View style={styles.videoPlayerWrapper}>
+      <VideoView
+        player={player}
+        style={styles.videoPlayer}
+        nativeControls={true}
+        contentFit="contain"
+      />
+    </View>
   );
 };
 
@@ -186,6 +194,48 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
+  // General Share Handler (Native Share Sheet with video & description)
+  const handleGeneralShare = async () => {
+    if (!localVideoUri) return;
+    try {
+      await sharePredictionVideo({
+        videoUri: localVideoUri,
+        description,
+        thumbnailTimestamp
+      });
+    } catch (err: any) {
+      console.warn('[PreviewModal] Error sharing video:', err);
+    }
+  };
+
+  // Download Video Handler
+  const handleDownloadVideo = async () => {
+    if (!localVideoUri) return;
+    try {
+      const { Platform, ToastAndroid, Alert } = await import('react-native');
+      const Sharing = await import('expo-sharing');
+      const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+
+      if (Platform.OS === 'android') {
+        try {
+          ToastAndroid.show('Video ready! Save or choose download location.', ToastAndroid.SHORT);
+        } catch {}
+      }
+
+      if (isAvailable) {
+        await Sharing.shareAsync(localVideoUri, {
+          mimeType: 'video/mp4',
+          dialogTitle: 'Download / Save Video',
+          UTI: 'public.movie'
+        });
+      } else {
+        Alert.alert('Video Downloaded', 'The video is saved on your device storage.');
+      }
+    } catch (err: any) {
+      console.warn('[PreviewModal] Error downloading video:', err);
+    }
+  };
+
   // Social Share Handler
   const handleShare = async (platform: SocialPlatform) => {
     if (!localVideoUri) return;
@@ -199,11 +249,41 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleCancelPress}>
       <View style={styles.container}>
-        {/* Header */}
+        {/* Header with Return Home, Download Icon, and General Share Icon */}
         <View style={styles.header}>
-          <Text style={styles.title}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={isAccepted ? onCancelled : handleCancelPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="home-outline" size={24} color={THEME.colors.textPrimary} />
+          </TouchableOpacity>
+
+          <Text style={styles.title} numberOfLines={1}>
             {isRendering ? 'Generating Video...' : isAccepted ? 'Ready to Share! 🚀' : 'Video Preview 🎬'}
           </Text>
+
+          {localVideoUri && !isRendering ? (
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={handleDownloadVideo}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="download-outline" size={24} color={THEME.colors.primary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={handleGeneralShare}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="share-social-outline" size={24} color={THEME.colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.headerIconBtn} />
+          )}
         </View>
 
         {/* Content Area */}
@@ -221,33 +301,49 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             {/* Video Player */}
             <VideoPlayerComponent videoUri={localVideoUri} />
 
-            {/* Post-Accept View: 4 Branded Social Share Buttons */}
+            {/* Post-Accept View: 4 Direct Social Media Buttons at the bottom */}
             {isAccepted ? (
               <View style={styles.socialShareArea}>
-                <Text style={styles.socialTitle}>Select Platform to Post Video:</Text>
-                <View style={styles.socialButtonsGrid}>
-                  {SOCIAL_PLATFORMS.map((platform) => (
-                    <TouchableOpacity
-                      key={platform.id}
-                      style={[styles.socialButton, { backgroundColor: platform.color }]}
-                      onPress={() => handleShare(platform.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Image
-                        source={SOCIAL_ICONS[platform.id]}
-                        style={styles.socialIconImage}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.socialButtonText}>
-                        {platform.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <View style={styles.socialDockRow}>
+                  {SOCIAL_PLATFORMS.map((platform) => {
+                    const tagLabel =
+                      platform.id === 'youtube'
+                        ? 'Shorts'
+                        : platform.id === 'tiktok'
+                        ? 'Video'
+                        : 'Reel';
+                    const isDark = platform.id === 'tiktok';
 
-                <TouchableOpacity style={styles.doneBtn} onPress={onCancelled}>
-                  <Text style={styles.doneBtnText}>Done</Text>
-                </TouchableOpacity>
+                    return (
+                      <TouchableOpacity
+                        key={platform.id}
+                        style={styles.socialDockItem}
+                        onPress={() => handleShare(platform.id)}
+                        activeOpacity={0.75}
+                      >
+                        <View
+                          style={[
+                            styles.socialDockIconWrap,
+                            { backgroundColor: platform.color },
+                            isDark && styles.socialDockIconDark
+                          ]}
+                        >
+                          <Image
+                            source={SOCIAL_ICONS[platform.id]}
+                            style={styles.socialDockIconImage}
+                            resizeMode="contain"
+                          />
+                        </View>
+                        <Text style={styles.socialDockLabel} numberOfLines={1}>
+                          {platform.name}
+                        </Text>
+                        <View style={styles.socialTagBadge}>
+                          <Text style={styles.socialTagText}>{tagLabel}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             ) : (
               /* Pre-Accept Actions: Accept, Modify, Cancel */
@@ -302,16 +398,33 @@ const styles = StyleSheet.create({
     paddingTop: 40
   },
   header: {
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderColor: THEME.colors.cardBorder
   },
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
   title: {
-    fontSize: 22,
+    flex: 1,
+    fontSize: 19,
     fontWeight: 'bold',
     color: THEME.colors.textPrimary,
-    textAlign: 'center'
+    textAlign: 'center',
+    marginHorizontal: 8
   },
   loadingContainer: {
     flex: 1,
@@ -347,14 +460,23 @@ const styles = StyleSheet.create({
   playerContainer: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingBottom: 20
+    paddingBottom: 24
+  },
+  videoPlayerWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12
   },
   videoPlayer: {
-    width: width,
-    height: width * 1.35,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#000000',
-    borderRadius: 16,
-    marginTop: 10
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#1e293b'
   },
   decisionActions: {
     flexDirection: 'row',
@@ -403,58 +525,63 @@ const styles = StyleSheet.create({
     fontSize: 15
   },
   socialShareArea: {
-    paddingHorizontal: 20,
-    paddingTop: 16
+    backgroundColor: '#0f172a',
+    marginHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#1e293b'
   },
-  socialTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: THEME.colors.textPrimary,
-    marginBottom: 14,
-    textAlign: 'center'
-  },
-  socialButtonsGrid: {
+  socialDockRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 4
   },
-  socialButton: {
-    width: '48%',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    flexDirection: 'row',
+  socialDockItem: {
+    width: '23%',
+    alignItems: 'center'
+  },
+  socialDockIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: 6,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 4
   },
-  socialIconImage: {
-    width: 22,
-    height: 22,
-    borderRadius: 5
+  socialDockIconDark: {
+    borderWidth: 1.5,
+    borderColor: '#334155'
   },
-  socialButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700'
+  socialDockIconImage: {
+    width: 26,
+    height: 26
   },
-  doneBtn: {
-    backgroundColor: '#1e293b',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 4
+  socialDockLabel: {
+    color: THEME.colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center'
   },
-  doneBtnText: {
+  socialTagBadge: {
+    marginTop: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    backgroundColor: '#1e293b'
+  },
+  socialTagText: {
     color: THEME.colors.textSecondary,
-    fontSize: 14,
-    fontWeight: 'bold'
+    fontSize: 9,
+    fontWeight: '600'
   },
   errorText: {
     color: '#f87171',

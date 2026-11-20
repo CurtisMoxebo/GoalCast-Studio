@@ -11,7 +11,8 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  BackHandler
+  BackHandler,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
@@ -284,7 +285,6 @@ export const GamesScreen: React.FC = () => {
       setGameSelections(updatedMap);
       setIsSelectionMode(false);
       setSelectedGameIdsForAi([]);
-      Alert.alert('AI Success', 'AI predictions generated based on last 5 games statistics!');
     } catch (err: any) {
       Alert.alert('AI Error', err?.message || 'Failed to generate AI predictions');
     } finally {
@@ -708,6 +708,28 @@ export const GamesScreen: React.FC = () => {
         onClose={() => setActiveGameForPicker(null)}
         onConfirm={handleConfirmModalSelections}
       />
+
+      {/* AI Loading Overlay */}
+      <Modal
+        visible={isGeneratingAi}
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent={true}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.aiLoadingOverlay}>
+          <View style={styles.aiLoadingCard}>
+            <View style={styles.aiLoadingIconContainer}>
+              <Ionicons name="sparkles" size={30} color={THEME.colors.primary} />
+            </View>
+            <ActivityIndicator size="large" color={THEME.colors.primary} style={styles.aiLoadingSpinner} />
+            <Text style={styles.aiLoadingTitle}>Generating AI Predictions</Text>
+            <Text style={styles.aiLoadingSubtitle}>
+              Analyzing team stats and statistical betting models...
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1089,5 +1111,55 @@ const styles = StyleSheet.create({
     color: '#020617',
     fontSize: 14,
     fontWeight: '900'
+  },
+  aiLoadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(2, 6, 23, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24
+  },
+  aiLoadingCard: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#0f172a',
+    borderRadius: 16,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12
+  },
+  aiLoadingIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)'
+  },
+  aiLoadingSpinner: {
+    marginVertical: 14
+  },
+  aiLoadingTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 6
+  },
+  aiLoadingSubtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18
   }
 });

@@ -4,6 +4,10 @@ import { MockAIService } from './mockAiService';
 
 let aiInstance: IAIService | null = null;
 
+export function setAIServiceInstance(instance: IAIService | null): void {
+  aiInstance = instance;
+}
+
 export function getAIService(): IAIService {
   if (aiInstance) return aiInstance;
 

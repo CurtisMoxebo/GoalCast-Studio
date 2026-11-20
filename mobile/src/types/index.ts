@@ -62,6 +62,7 @@ export interface HistoryItem {
   status: 'ACCEPTED' | 'PREVIEW' | 'CANCELLED' | 'DELETED';
   targetDate: string;
   description: string;
+  thumbnailTimestamp?: number;
   createdAt: string;
   localVideoPath?: string;
   games: {

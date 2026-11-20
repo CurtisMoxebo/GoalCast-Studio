@@ -9,6 +9,7 @@ import {
 } from '../constants/bettingRules';
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
+import { getPreviousHitGameGroup } from '../services/predictions/previousHitService';
 
 const router = Router();
 
@@ -170,72 +171,11 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    // Check for previous prediction group to see if it won (cached in DB or evaluate with AI)
-    let previousWonGroup: { games: any[] } | undefined = undefined;
+    // Check for previous hit prediction group with status ACCEPTED (or evaluate with AI)
+    let previousWonGroup: { games: any[] } | undefined = (await getPreviousHitGameGroup()) || undefined;
     let savedGroupId = jobId;
 
     try {
-      const lastGroup = await prisma.predictionGroup.findFirst({
-        where: { status: 'ACCEPTED' },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          games: {
-            include: { selections: true }
-          }
-        }
-      });
-
-      if (lastGroup) {
-        let isHit = lastGroup.isHit;
-
-        // If never checked before, check with AI now and persist result
-        if (isHit === null) {
-          const ai = getAIService();
-          const validatable = lastGroup.games.map((g) => ({
-            homeTeam: g.homeTeam,
-            awayTeam: g.awayTeam,
-            kickoffTime: g.kickoffTime.toISOString(),
-            selections: g.selections.map((s) => ({
-              code: s.code,
-              label: s.label,
-              category: s.category
-            }))
-          }));
-
-          const validation = await ai.validatePreviousPredictions(validatable);
-          isHit = validation.isHit;
-
-          // Save to database
-          await prisma.predictionGroup.update({
-            where: { id: lastGroup.id },
-            data: {
-              isHit: validation.isHit,
-              validationNotes: validation.notes,
-              validationCheckedAt: new Date()
-            }
-          });
-        }
-
-        if (isHit === true) {
-          previousWonGroup = {
-            games: lastGroup.games.map((g) => ({
-              homeTeam: g.homeTeam,
-              homeTeamLogo: g.homeTeamLogo || undefined,
-              awayTeam: g.awayTeam,
-              awayTeamLogo: g.awayTeamLogo || undefined,
-              competition: g.competition,
-              competitionLogo: g.competitionLogo || undefined,
-              kickoffTime: g.kickoffTime.toISOString(),
-              selections: g.selections.map((s) => ({
-                code: s.code,
-                label: s.label,
-                spokenText: s.spokenText
-              }))
-            }))
-          };
-        }
-      }
-
       // Save this new prediction group with PREVIEW status
       const created = await prisma.predictionGroup.create({
         data: {

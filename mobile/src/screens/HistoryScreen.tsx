@@ -304,7 +304,8 @@ export const HistoryScreen: React.FC = () => {
 
       await sharePredictionVideo({
         videoUri: targetUri,
-        description
+        description,
+        thumbnailTimestamp: item.thumbnailTimestamp
       });
     } catch (err: any) {
       console.warn('[HistoryScreen] Error sharing video:', err);

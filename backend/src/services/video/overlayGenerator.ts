@@ -239,7 +239,7 @@ export class OverlayGenerator {
         <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
         <g>
           <!-- Match Index Circle on Left -->
-          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="28" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="28" fill="#f1f5f9" fill-opacity="0.80" stroke="#cbd5e1" stroke-width="1.5"/>
           <text x="48" y="${rowY + Math.round(rowHeight / 2 + 8)}" fill="#0f172a" font-size="24" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
 
           <!-- Vertical Divider between index badge and teams -->
@@ -263,7 +263,7 @@ export class OverlayGenerator {
 
           <!-- Competition & Kickoff Time Badge on Right -->
           <g transform="translate(${tableWidth - 192}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
-            <rect width="176" height="${badgeHeight}" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+            <rect width="176" height="${badgeHeight}" rx="14" fill="#f8fafc" fill-opacity="0.80" stroke="#e2e8f0" stroke-width="1.5"/>
             <text x="88" y="${Math.round(badgeHeight * 0.44)}" fill="#64748b" font-size="${comp.length > 12 ? 20 : (comp.length > 8 ? 23 : 26)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
               ${comp}
             </text>
@@ -292,7 +292,7 @@ export class OverlayGenerator {
         <!-- 1. TITLE ABOVE THE GAME GROUP: White highlight background + Black text on one line (Enlarged) -->
         <g filter="url(#cardShadow)" transform="translate(${tableX}, ${titleY})">
           <!-- White Highlight Box -->
-          <rect width="${tableWidth}" height="${titleHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <rect width="${tableWidth}" height="${titleHeight}" rx="24" fill="#ffffff" fill-opacity="0.80" stroke="#cbd5e1" stroke-width="2.5"/>
           <!-- Black Title Text -->
           <text x="${tableWidth / 2}" y="${Math.round(titleHeight / 2 + titleFontSize * 0.35)}" fill="#000000" font-size="${titleFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
             ${this.escapeXml(titleText)}
@@ -302,7 +302,7 @@ export class OverlayGenerator {
         <!-- 2. GAME GROUP TABLE: Single continuous white container, NO spaces between games, crisp divider lines -->
         <g filter="url(#cardShadow)" transform="translate(${tableX}, ${tableStartY})">
           <!-- Unified White Table Background matching exact content height -->
-          <rect width="${tableWidth}" height="${totalTableHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <rect width="${tableWidth}" height="${totalTableHeight}" rx="24" fill="#ffffff" fill-opacity="0.80" stroke="#cbd5e1" stroke-width="2.5"/>
 
           <!-- Match Rows & Dividers -->
           ${rowsSvg}
@@ -454,7 +454,7 @@ export class OverlayGenerator {
 
         const badgeContent = `
           <!-- Section Container on Right -->
-          <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+          <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f8fafc" fill-opacity="0.80" stroke="#e2e8f0" stroke-width="1.5"/>
 
           <!-- Green Highlight with Bold Black Text (Short Version) -->
           <rect x="14" y="${highlightY}" width="${highlightWidth}" height="${highlightHeight}" rx="12" fill="#22c55e"/>
@@ -477,7 +477,7 @@ export class OverlayGenerator {
         <!-- Game Row ${i + 1} (No outer gap, separated by divider) -->
         <g>
           <!-- Match Index Circle on Left -->
-          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="28" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="28" fill="#f1f5f9" fill-opacity="0.80" stroke="#cbd5e1" stroke-width="1.5"/>
           <text x="48" y="${rowY + Math.round(rowHeight / 2 + 8)}" fill="#0f172a" font-size="24" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
 
           <!-- Vertical Divider between index badge and teams -->
@@ -524,7 +524,7 @@ export class OverlayGenerator {
         <!-- 1. TITLE ABOVE THE WINNING GROUP: White highlight background + Black text on one line -->
         <g filter="url(#celebCardShadow)" transform="translate(${tableX}, ${titleY})">
           <!-- White Highlight Box -->
-          <rect width="${tableWidth}" height="${titleHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <rect width="${tableWidth}" height="${titleHeight}" rx="24" fill="#ffffff" fill-opacity="0.80" stroke="#cbd5e1" stroke-width="2.5"/>
           <!-- Black Title Text -->
           <text x="${tableWidth / 2}" y="${Math.round(titleHeight / 2 + titleFontSize * 0.35)}" fill="#000000" font-size="${titleFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
             ${titleText}
@@ -534,7 +534,7 @@ export class OverlayGenerator {
         <!-- 2. GAME WINNING TABLE: Same white container as regular table, NO spaces between games, crisp divider lines -->
         <g filter="url(#celebCardShadow)" transform="translate(${tableX}, ${tableStartY})">
           <!-- Unified White Table Background matching exact content height -->
-          <rect width="${tableWidth}" height="${totalTableHeight}" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <rect width="${tableWidth}" height="${totalTableHeight}" rx="24" fill="#ffffff" fill-opacity="0.80" stroke="#cbd5e1" stroke-width="2.5"/>
 
           <!-- Match Rows & Dividers -->
           ${rowsSvg}
@@ -582,7 +582,7 @@ export class OverlayGenerator {
         <!-- Prediction Banner (Under the vertically centered game section box, black text on white highlight) -->
         <g filter="url(#predShadow)">
           <!-- White Highlight Box (Positioned right below centered game box at y=1060) -->
-          <rect x="50" y="1060" width="980" height="100" rx="26" fill="#ffffff" stroke="#cbd5e1" stroke-width="2.5"/>
+          <rect x="50" y="1060" width="980" height="100" rx="26" fill="#ffffff" fill-opacity="0.80" stroke="#cbd5e1" stroke-width="2.5"/>
           <!-- Black Prediction Text -->
           <text x="540" y="${Math.round(1060 + 50 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${pred}
@@ -641,8 +641,8 @@ export class OverlayGenerator {
       <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#0f172a" stop-opacity="0.96"/>
-            <stop offset="100%" stop-color="#020617" stop-opacity="0.98"/>
+            <stop offset="0%" stop-color="#0f172a" stop-opacity="0.80"/>
+            <stop offset="100%" stop-color="#020617" stop-opacity="0.80"/>
           </linearGradient>
           <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
             <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.7"/>
@@ -651,7 +651,7 @@ export class OverlayGenerator {
 
         <g filter="url(#cardShadow)">
           <!-- 1. "MATCH X OF N" Pill - Positioned ON TOP OF the vertically centered box (y=670 to 730) -->
-          <rect x="360" y="670" width="360" height="60" rx="30" fill="#0369a1" stroke="#38bdf8" stroke-width="2.5"/>
+          <rect x="360" y="670" width="360" height="60" rx="30" fill="#0369a1" fill-opacity="0.80" stroke="#38bdf8" stroke-width="2.5"/>
           <text x="540" y="710" fill="#ffffff" font-size="26" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
             MATCH ${matchIndex} OF ${totalMatches}
           </text>
