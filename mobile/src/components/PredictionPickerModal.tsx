@@ -22,6 +22,8 @@ interface PredictionPickerModalProps {
 
 const GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5];
 const TEAM_GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5];
+const CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5];
+const TEAM_CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5];
 
 // Mutually exclusive button groups: only one can be selected at a time per group / row
 const EXCLUSIVE_GROUPS: string[][] = [
@@ -42,7 +44,16 @@ const EXCLUSIVE_GROUPS: string[][] = [
   ...TEAM_GOAL_TOTALS.map((val) => [`HOME_OVER_${val}_GOALS`, `HOME_UNDER_${val}_GOALS`]),
 
   // Away Goals Over / Under rows (one selection per row)
-  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`])
+  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`]),
+
+  // Total Corners Over / Under rows (one selection per row)
+  ...CORNER_TOTALS.map((val) => [`OVER_${val}_CORNERS`, `UNDER_${val}_CORNERS`]),
+
+  // Home Corners Over / Under rows (one selection per row)
+  ...TEAM_CORNER_TOTALS.map((val) => [`HOME_OVER_${val}_CORNERS`, `HOME_UNDER_${val}_CORNERS`]),
+
+  // Away Corners Over / Under rows (one selection per row)
+  ...TEAM_CORNER_TOTALS.map((val) => [`AWAY_OVER_${val}_CORNERS`, `AWAY_UNDER_${val}_CORNERS`])
 ];
 
 const RESULT_FALLBACKS: Record<string, { label: string; spokenTemplate: string }> = {
@@ -95,6 +106,38 @@ for (const val of TEAM_GOAL_TOTALS) {
   };
 }
 
+const CORNERS_FALLBACKS: Record<string, { label: string; spokenTemplate: string }> = {};
+
+for (const val of CORNER_TOTALS) {
+  CORNERS_FALLBACKS[`OVER_${val}_CORNERS`] = {
+    label: `Total Corners Over ${val}`,
+    spokenTemplate: `Over ${val} corners`
+  };
+  CORNERS_FALLBACKS[`UNDER_${val}_CORNERS`] = {
+    label: `Total Corners Under ${val}`,
+    spokenTemplate: `Under ${val} corners`
+  };
+}
+
+for (const val of TEAM_CORNER_TOTALS) {
+  CORNERS_FALLBACKS[`HOME_OVER_${val}_CORNERS`] = {
+    label: `Home Team Corners Over ${val}`,
+    spokenTemplate: `{homeTeam} over ${val} corners`
+  };
+  CORNERS_FALLBACKS[`HOME_UNDER_${val}_CORNERS`] = {
+    label: `Home Team Corners Under ${val}`,
+    spokenTemplate: `{homeTeam} under ${val} corners`
+  };
+  CORNERS_FALLBACKS[`AWAY_OVER_${val}_CORNERS`] = {
+    label: `Away Team Corners Over ${val}`,
+    spokenTemplate: `{awayTeam} over ${val} corners`
+  };
+  CORNERS_FALLBACKS[`AWAY_UNDER_${val}_CORNERS`] = {
+    label: `Away Team Corners Under ${val}`,
+    spokenTemplate: `{awayTeam} under ${val} corners`
+  };
+}
+
 export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   visible,
   game,
@@ -122,16 +165,17 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
       const opt = availableOptions.find((o) => o.code === code);
       const resFallback = RESULT_FALLBACKS[code];
       const goalFallback = GOALS_FALLBACKS[code];
-      const label = opt?.label || resFallback?.label || goalFallback?.label || code;
+      const cornerFallback = CORNERS_FALLBACKS[code];
+      const label = opt?.label || resFallback?.label || goalFallback?.label || cornerFallback?.label || code;
       const category: 'RESULT' | 'GOALS' | 'CORNERS' =
         opt?.category ||
         (code in RESULT_FALLBACKS
           ? 'RESULT'
           : code in GOALS_FALLBACKS
           ? 'GOALS'
-          : activeTab);
+          : 'CORNERS');
 
-      let spokenText = opt?.spokenTemplate || resFallback?.spokenTemplate || goalFallback?.spokenTemplate || label;
+      let spokenText = opt?.spokenTemplate || resFallback?.spokenTemplate || goalFallback?.spokenTemplate || cornerFallback?.spokenTemplate || label;
       spokenText = spokenText
         .replace('{homeTeam}', game.homeTeam)
         .replace('{awayTeam}', game.awayTeam);
@@ -507,27 +551,16 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
                 {renderOverUnderTable(`${game.awayTeam} Goals (Over / Under)`, TEAM_GOAL_TOTALS, 'AWAY_')}
               </View>
             ) : (
-              filteredOptions.map((opt) => {
-                const isSelected = selectedCodes.includes(opt.code);
-                return (
-                  <TouchableOpacity
-                    key={opt.code}
-                    style={[styles.optionCard, isSelected && styles.optionCardSelected]}
-                    onPress={() => toggleSelection(opt.code)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.optionInfo}>
-                      <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
-                        {opt.label}
-                      </Text>
-                      <Text style={styles.optionCode}>{opt.code}</Text>
-                    </View>
-                    <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
+              <View style={styles.resultGroupsContainer}>
+                {/* 1. Total Corners (Over / Under) Table */}
+                {renderOverUnderTable('Total Corners (Over / Under)', CORNER_TOTALS, '', '_CORNERS')}
+
+                {/* 2. Home Team Corners Over / Under Table */}
+                {renderOverUnderTable(`${game.homeTeam} Corners (Over / Under)`, TEAM_CORNER_TOTALS, 'HOME_', '_CORNERS')}
+
+                {/* 3. Away Team Corners Over / Under Table */}
+                {renderOverUnderTable(`${game.awayTeam} Corners (Over / Under)`, TEAM_CORNER_TOTALS, 'AWAY_', '_CORNERS')}
+              </View>
             )}
           </ScrollView>
         </View>

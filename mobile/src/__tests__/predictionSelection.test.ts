@@ -36,6 +36,8 @@ function addSelectionToGame(
 
 const GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5];
 const TEAM_GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5];
+const CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5];
+const TEAM_CORNER_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5];
 
 const EXCLUSIVE_GROUPS: string[][] = [
   ['1', 'X', '2'],
@@ -46,7 +48,10 @@ const EXCLUSIVE_GROUPS: string[][] = [
   ['LAST_GOAL_HOME', 'LAST_GOAL_AWAY'],
   ...GOAL_TOTALS.map((val) => [`OVER_${val}_GOALS`, `UNDER_${val}_GOALS`]),
   ...TEAM_GOAL_TOTALS.map((val) => [`HOME_OVER_${val}_GOALS`, `HOME_UNDER_${val}_GOALS`]),
-  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`])
+  ...TEAM_GOAL_TOTALS.map((val) => [`AWAY_OVER_${val}_GOALS`, `AWAY_UNDER_${val}_GOALS`]),
+  ...CORNER_TOTALS.map((val) => [`OVER_${val}_CORNERS`, `UNDER_${val}_CORNERS`]),
+  ...TEAM_CORNER_TOTALS.map((val) => [`HOME_OVER_${val}_CORNERS`, `HOME_UNDER_${val}_CORNERS`]),
+  ...TEAM_CORNER_TOTALS.map((val) => [`AWAY_OVER_${val}_CORNERS`, `AWAY_UNDER_${val}_CORNERS`])
 ];
 
 function toggleExclusiveSelection(
@@ -255,4 +260,33 @@ test('Mobile Regression: Goals section mutually exclusive groups and over/under 
   const homeOu2 = toggleExclusiveSelection(homeOu1.selected, 'HOME_UNDER_1.5_GOALS');
   assert.equal(homeOu2.success, true);
   assert.deepEqual(homeOu2.selected, ['UNDER_2.5_GOALS', 'HOME_UNDER_1.5_GOALS']);
+});
+
+test('Mobile Regression: Corners section over/under tables row-level mutual exclusivity', () => {
+  let selected: string[] = [];
+
+  // Total Corners: select Over 9.5
+  const step1 = toggleExclusiveSelection(selected, 'OVER_9.5_CORNERS');
+  assert.equal(step1.success, true);
+  assert.deepEqual(step1.selected, ['OVER_9.5_CORNERS']);
+
+  // Tapping Under 9.5 on that same row swaps Over 9.5 to Under 9.5
+  const step2 = toggleExclusiveSelection(step1.selected, 'UNDER_9.5_CORNERS');
+  assert.equal(step2.success, true);
+  assert.deepEqual(step2.selected, ['UNDER_9.5_CORNERS']);
+
+  // Selecting Away Corners Over 4.5
+  const step3 = toggleExclusiveSelection(step2.selected, 'AWAY_OVER_4.5_CORNERS');
+  assert.equal(step3.success, true);
+  assert.deepEqual(step3.selected, ['UNDER_9.5_CORNERS', 'AWAY_OVER_4.5_CORNERS']);
+
+  // Swapping Away Over 4.5 to Away Under 4.5 on that row without exceeding max 2
+  const step4 = toggleExclusiveSelection(step3.selected, 'AWAY_UNDER_4.5_CORNERS');
+  assert.equal(step4.success, true);
+  assert.deepEqual(step4.selected, ['UNDER_9.5_CORNERS', 'AWAY_UNDER_4.5_CORNERS']);
+
+  // Deselecting Away Under 4.5
+  const step5 = toggleExclusiveSelection(step4.selected, 'AWAY_UNDER_4.5_CORNERS');
+  assert.equal(step5.success, true);
+  assert.deepEqual(step5.selected, ['UNDER_9.5_CORNERS']);
 });
