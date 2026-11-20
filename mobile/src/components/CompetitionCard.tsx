@@ -11,6 +11,7 @@ interface CompetitionCardProps {
   selectedGameIdsForAi: string[];
   selectionModeEnabled: boolean;
   onToggleSelectForAi: (gameId: string) => void;
+  onLongPressGame: (gameId: string) => void;
   onOpenPicker: (game: UpcomingGame) => void;
   onRemoveSelection: (gameId: string, code: string) => void;
 }
@@ -21,6 +22,7 @@ export const CompetitionCard: React.FC<CompetitionCardProps> = ({
   selectedGameIdsForAi,
   selectionModeEnabled,
   onToggleSelectForAi,
+  onLongPressGame,
   onOpenPicker,
   onRemoveSelection
 }) => {
@@ -68,13 +70,21 @@ export const CompetitionCard: React.FC<CompetitionCardProps> = ({
         const hasPredictions = selections.length > 0;
 
         return (
-          <View
+          <TouchableOpacity
             key={match.id}
             style={[
               styles.matchRow,
               index > 0 && styles.matchRowBorder,
               isSelectedForAi && styles.matchRowSelected
             ]}
+            onLongPress={() => onLongPressGame(match.id)}
+            onPress={() => {
+              if (selectionModeEnabled) {
+                onToggleSelectForAi(match.id);
+              }
+            }}
+            delayLongPress={300}
+            activeOpacity={selectionModeEnabled ? 0.7 : 0.95}
           >
             {/* Left Column: Date & Time */}
             <View style={styles.timeCol}>
@@ -173,7 +183,7 @@ export const CompetitionCard: React.FC<CompetitionCardProps> = ({
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </View>

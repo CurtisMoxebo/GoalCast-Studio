@@ -129,6 +129,7 @@ export const GamesScreen: React.FC = () => {
     if (canGoBackDate(selectedDate)) {
       setSelectedDate(getPreviousDayString(selectedDate));
       setSelectedGameIdsForAi([]);
+      setIsSelectionMode(false);
       setSearchQuery('');
     }
   };
@@ -136,19 +137,44 @@ export const GamesScreen: React.FC = () => {
   const handleNextDay = () => {
     setSelectedDate(getNextDayString(selectedDate));
     setSelectedGameIdsForAi([]);
+    setIsSelectionMode(false);
     setSearchQuery('');
   };
 
-  const handleToggleSelectForAi = (gameId: string) => {
-    if (selectedGameIdsForAi.includes(gameId)) {
-      setSelectedGameIdsForAi(selectedGameIdsForAi.filter((id) => id !== gameId));
-    } else {
-      if (selectedGameIdsForAi.length >= 10) {
-        Alert.alert('Limit Reached', 'You can select at most 10 games for AI prediction.');
-        return;
+  // Long press on a game enables selection mode and selects this game
+  const handleLongPressGame = (gameId: string) => {
+    setIsSelectionMode(true);
+    setSelectedGameIdsForAi((prev) => {
+      if (prev.includes(gameId)) {
+        return prev;
       }
-      setSelectedGameIdsForAi([...selectedGameIdsForAi, gameId]);
-    }
+      if (prev.length >= 10) {
+        Alert.alert('Limit Reached', 'You can select at most 10 games for AI prediction.');
+        return prev;
+      }
+      return [...prev, gameId];
+    });
+  };
+
+  const handleToggleSelectForAi = (gameId: string) => {
+    setSelectedGameIdsForAi((prev) => {
+      let next: string[];
+      if (prev.includes(gameId)) {
+        next = prev.filter((id) => id !== gameId);
+      } else {
+        if (prev.length >= 10) {
+          Alert.alert('Limit Reached', 'You can select at most 10 games for AI prediction.');
+          return prev;
+        }
+        next = [...prev, gameId];
+      }
+
+      // When no game is selected, disable selection mode automatically
+      if (next.length === 0) {
+        setIsSelectionMode(false);
+      }
+      return next;
+    });
   };
 
   const handleRunAiPrediction = async () => {
@@ -292,69 +318,7 @@ export const GamesScreen: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      {/* Top Controls Row: Date Navigation on Left, Selection Controls on Right */}
-      <View style={styles.topControlsRow}>
-        {/* Left: Date Change Section with Left/Right Arrows */}
-        <View style={styles.dateNavSection}>
-          <TouchableOpacity
-            style={[styles.arrowButton, isLeftArrowBlocked && styles.arrowButtonDisabled]}
-            onPress={handlePreviousDay}
-            disabled={isLeftArrowBlocked}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.arrowText, isLeftArrowBlocked && styles.arrowTextDisabled]}>◀</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dateBadge}>
-            <Text style={styles.dateBadgeText}>{displayDateLabel}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.arrowButton}
-            onPress={handleNextDay}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.arrowText}>▶</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Right: Enable Selection & AI Predict */}
-        <View style={styles.selectionSection}>
-          <TouchableOpacity
-            style={[styles.modeBtn, isSelectionMode && styles.modeBtnActive]}
-            onPress={() => {
-              setIsSelectionMode(!isSelectionMode);
-              setSelectedGameIdsForAi([]);
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.modeBtnText, isSelectionMode && styles.modeBtnTextActive]}>
-              {isSelectionMode ? 'Cancel' : '☑ Enable Selection'}
-            </Text>
-          </TouchableOpacity>
-
-          {isSelectionMode && (
-            <TouchableOpacity
-              style={[
-                styles.aiPredictBtn,
-                (isGeneratingAi || selectedGameIdsForAi.length === 0) && styles.aiPredictBtnDisabled
-              ]}
-              onPress={handleRunAiPrediction}
-              disabled={isGeneratingAi || selectedGameIdsForAi.length === 0}
-            >
-              {isGeneratingAi ? (
-                <ActivityIndicator color="#020617" size="small" />
-              ) : (
-                <Text style={styles.aiPredictBtnText}>
-                  ✨ AI ({selectedGameIdsForAi.length})
-                </Text>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Search Bar: Visible whenever games are loaded */}
+      {/* Search Bar: Placed at the top */}
       {!isLoadingGames && !fetchError && games.length > 0 && (
         <View style={styles.searchContainer}>
           <View style={[styles.searchBar, isSearchFocused && styles.searchBarFocused]}>
@@ -390,6 +354,66 @@ export const GamesScreen: React.FC = () => {
           </View>
         </View>
       )}
+
+      {/* Top Controls Row: Date Navigation on Left, Selection AI Actions on Right */}
+      <View style={styles.topControlsRow}>
+        {/* Date Change Section with Left/Right Arrows */}
+        <View style={styles.dateNavSection}>
+          <TouchableOpacity
+            style={[styles.arrowButton, isLeftArrowBlocked && styles.arrowButtonDisabled]}
+            onPress={handlePreviousDay}
+            disabled={isLeftArrowBlocked}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.arrowText, isLeftArrowBlocked && styles.arrowTextDisabled]}>◀</Text>
+          </TouchableOpacity>
+
+          <View style={styles.dateBadge}>
+            <Text style={styles.dateBadgeText}>{displayDateLabel}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.arrowButton}
+            onPress={handleNextDay}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.arrowText}>▶</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* AI Predict Action (Only visible when selection mode is enabled via long-press) */}
+        {isSelectionMode && (
+          <View style={styles.selectionSection}>
+            <TouchableOpacity
+              style={styles.cancelSelectionBtn}
+              onPress={() => {
+                setIsSelectionMode(false);
+                setSelectedGameIdsForAi([]);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelSelectionText}>✕ Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.aiPredictBtn,
+                (isGeneratingAi || selectedGameIdsForAi.length === 0) && styles.aiPredictBtnDisabled
+              ]}
+              onPress={handleRunAiPrediction}
+              disabled={isGeneratingAi || selectedGameIdsForAi.length === 0}
+            >
+              {isGeneratingAi ? (
+                <ActivityIndicator color="#020617" size="small" />
+              ) : (
+                <Text style={styles.aiPredictBtnText}>
+                  ✨ AI ({selectedGameIdsForAi.length})
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       {/* Main Content: Loading, Error, Empty List, Search Empty, or SectionList */}
       {isLoadingGames ? (
@@ -492,6 +516,7 @@ export const GamesScreen: React.FC = () => {
               selectedGameIdsForAi={selectedGameIdsForAi}
               selectionModeEnabled={isSelectionMode}
               onToggleSelectForAi={handleToggleSelectForAi}
+              onLongPressGame={handleLongPressGame}
               onOpenPicker={setActiveGameForPicker}
               onRemoveSelection={handleRemoveSelection}
             />
@@ -553,8 +578,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0f172a',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: 24,
+    paddingHorizontal: 14,
     height: 44,
     borderWidth: 1.5,
     borderColor: '#1e293b'
@@ -703,7 +728,20 @@ const styles = StyleSheet.create({
   selectionSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+    gap: 8
+  },
+  cancelSelectionBtn: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  cancelSelectionText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: 'bold'
   },
   modeBtn: {
     backgroundColor: '#1e293b',
