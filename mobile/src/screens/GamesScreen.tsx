@@ -39,8 +39,9 @@ export const GamesScreen: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Search filter query
+  // Search filter query & focus state
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Predictions map: gameId -> PredictionSelection[]
   const [gameSelections, setGameSelections] = useState<Record<string, PredictionSelection[]>>({});
@@ -356,26 +357,35 @@ export const GamesScreen: React.FC = () => {
       {/* Search Bar: Visible whenever games are loaded */}
       {!isLoadingGames && !fetchError && games.length > 0 && (
         <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Text style={styles.searchIcon}>🔍</Text>
+          <View style={[styles.searchBar, isSearchFocused && styles.searchBarFocused]}>
+            <Text style={[styles.searchIcon, isSearchFocused && styles.searchIconFocused]}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search teams or competitions..."
+              placeholder="Search teams, clubs or leagues..."
               placeholderTextColor="#64748b"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
               autoCorrect={false}
               autoCapitalize="none"
-              clearButtonMode="while-editing"
+              returnKeyType="search"
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity
-                style={styles.clearSearchBtn}
-                onPress={() => setSearchQuery('')}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.clearSearchText}>✕</Text>
-              </TouchableOpacity>
+              <View style={styles.searchRightActions}>
+                <View style={styles.searchCountBadge}>
+                  <Text style={styles.searchCountText}>
+                    {filteredGames.length}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.clearSearchBtn}
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.clearSearchText}>✕</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -555,42 +565,72 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.cardBorder
   },
   searchContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#0a0f1d',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#070b16',
     borderBottomWidth: 1,
-    borderColor: THEME.colors.cardBorder
+    borderColor: '#17223b'
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 38,
-    borderWidth: 1,
-    borderColor: '#334155'
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: '#1e293b'
+  },
+  searchBarFocused: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: '#111e38'
   },
   searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
-    color: '#94a3b8'
+    fontSize: 15,
+    marginRight: 10,
+    opacity: 0.7
+  },
+  searchIconFocused: {
+    opacity: 1
   },
   searchInput: {
     flex: 1,
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '500',
     paddingVertical: 0
   },
+  searchRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  searchCountBadge: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  searchCountText: {
+    color: THEME.colors.primary,
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
   clearSearchBtn: {
-    padding: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#334155',
     alignItems: 'center',
     justifyContent: 'center'
   },
   clearSearchText: {
-    color: '#94a3b8',
-    fontSize: 14,
-    fontWeight: 'bold'
+    color: '#f8fafc',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 13
   },
   sectionHeader: {
     flexDirection: 'row',

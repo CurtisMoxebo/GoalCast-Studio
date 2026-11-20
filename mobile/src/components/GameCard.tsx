@@ -26,28 +26,11 @@ export const GameCard: React.FC<GameCardProps> = ({
   const kickoff = formatKickoffTime(game.kickoffTime);
   const [homeLogoError, setHomeLogoError] = useState(false);
   const [awayLogoError, setAwayLogoError] = useState(false);
-  const [compLogoError, setCompLogoError] = useState(false);
 
   return (
     <View style={[styles.card, isSelectedForAi && styles.cardSelectedForAi]}>
-      {/* Top Bar: Competition & Kickoff Time */}
+      {/* Top Bar: Kickoff Time & Selection Mode */}
       <View style={styles.topBar}>
-        <View style={styles.compContainer}>
-          {game.competitionLogo && !compLogoError ? (
-            <Image
-              source={{ uri: game.competitionLogo }}
-              style={styles.compLogo}
-              resizeMode="contain"
-              onError={() => setCompLogoError(true)}
-            />
-          ) : (
-            <Text style={styles.compIcon}>🏆</Text>
-          )}
-          <Text style={styles.compName} numberOfLines={1}>
-            {game.competition}
-          </Text>
-        </View>
-
         <View style={styles.timeBadge}>
           <Text style={styles.timeText}>⏰ {kickoff}</Text>
         </View>
@@ -161,27 +144,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12
-  },
-  compContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8
-  },
-  compLogo: {
-    width: 20,
-    height: 20,
-    marginRight: 6
-  },
-  compIcon: {
-    fontSize: 16,
-    marginRight: 6
-  },
-  compName: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: THEME.colors.textSecondary
+    marginBottom: 10
   },
   timeBadge: {
     backgroundColor: '#1e293b',
