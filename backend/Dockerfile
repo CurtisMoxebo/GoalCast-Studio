@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json tsconfig.json ./
-RUN npm ci
+COPY package*.json tsconfig.json .npmrc* ./
+RUN npm ci --onnxruntime-node-install-cuda=skip
 
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -32,8 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
-RUN npm ci --only=production
+COPY package*.json .npmrc* ./
+RUN npm ci --only=production --onnxruntime-node-install-cuda=skip
 
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
