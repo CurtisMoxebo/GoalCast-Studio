@@ -240,7 +240,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
 
         {/* 3. Voice Actor Selector */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎙️ Voice Actor (Kokoro TTS)</Text>
+          <Text style={styles.sectionTitle}>🎙️ Voice Actor</Text>
           <View style={styles.voiceGrid}>
             {availableVoices.map((voice) => {
               const isSelected = selectedVoice === voice.id;
