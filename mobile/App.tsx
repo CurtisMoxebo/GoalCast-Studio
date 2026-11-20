@@ -14,6 +14,7 @@ import { THEME } from './src/constants/theme';
 import { GamesScreen } from './src/screens/GamesScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { AppInitialLoadingScreen } from './src/components/AppInitialLoadingScreen';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -126,10 +127,15 @@ function MainApp() {
 }
 
 export default function App() {
+  const [isAppReady, setIsAppReady] = useState(false);
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <MainApp />
+        {!isAppReady && (
+          <AppInitialLoadingScreen onFinish={() => setIsAppReady(true)} />
+        )}
       </ErrorBoundary>
     </SafeAreaProvider>
   );
