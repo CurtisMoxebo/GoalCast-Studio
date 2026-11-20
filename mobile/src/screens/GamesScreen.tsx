@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
 import { UpcomingGame, PredictionSelection, BettingOption, MediaAsset, VoiceOption, VideoSettings } from '../types';
 import { mobileApi } from '../services/api';
+import { sessionStore } from '../services/sessionStore';
 import {
   getUserTimezone,
   getTomorrowDateString,
@@ -35,10 +36,18 @@ import { PreviewModal } from '../components/PreviewModal';
 export const GamesScreen: React.FC = () => {
   const userTimezone = getUserTimezone();
 
-  // Selected date state: defaults strictly to tomorrow
-  const [selectedDate, setSelectedDate] = useState<string>(getTomorrowDateString());
-  const [games, setGames] = useState<UpcomingGame[]>([]);
-  const [isLoadingGames, setIsLoadingGames] = useState(false);
+  // Selected date state: defaults to session stored date or strictly to tomorrow
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return sessionStore.getSelectedDate() || getTomorrowDateString();
+  });
+  const [games, setGames] = useState<UpcomingGame[]>(() => {
+    const initialDate = sessionStore.getSelectedDate() || getTomorrowDateString();
+    return sessionStore.getGames(initialDate) || [];
+  });
+  const [isLoadingGames, setIsLoadingGames] = useState(() => {
+    const initialDate = sessionStore.getSelectedDate() || getTomorrowDateString();
+    return !sessionStore.hasGames(initialDate);
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -46,8 +55,19 @@ export const GamesScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-  // Predictions map: gameId -> PredictionSelection[]
-  const [gameSelections, setGameSelections] = useState<Record<string, PredictionSelection[]>>({});
+  // Predictions map: gameId -> PredictionSelection[] (restored from session store)
+  const [gameSelections, setGameSelections] = useState<Record<string, PredictionSelection[]>>(() => {
+    return sessionStore.getSelections();
+  });
+
+  // Sync selected date & selections to sessionStore
+  useEffect(() => {
+    sessionStore.setSelectedDate(selectedDate);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    sessionStore.setSelections(gameSelections);
+  }, [gameSelections]);
 
   // Filter to show only games with predictions
   const [showOnlyPredicted, setShowOnlyPredicted] = useState(false);
@@ -119,9 +139,9 @@ export const GamesScreen: React.FC = () => {
     }).catch(console.warn);
   }, []);
 
-  // Fetch games whenever selectedDate changes
+  // Fetch games whenever selectedDate changes (uses session cache if date is already loaded)
   useEffect(() => {
-    loadGamesForDate(selectedDate, true);
+    loadGamesForDate(selectedDate, true, false);
   }, [selectedDate]);
 
   // Handle device back action to cancel selection mode if active
@@ -141,7 +161,20 @@ export const GamesScreen: React.FC = () => {
     };
   }, [isSelectionMode]);
 
-  const loadGamesForDate = async (dateStr: string, showLoadingIndicator = true) => {
+  const loadGamesForDate = async (
+    dateStr: string,
+    showLoadingIndicator = true,
+    forceRefresh = false
+  ) => {
+    // If not forcing refresh and games for this date exist in session cache, use them instantly!
+    if (!forceRefresh && sessionStore.hasGames(dateStr)) {
+      const cached = sessionStore.getGames(dateStr) || [];
+      setGames(cached);
+      setFetchError(null);
+      setIsLoadingGames(false);
+      return;
+    }
+
     if (showLoadingIndicator) {
       setIsLoadingGames(true);
     }
@@ -149,10 +182,13 @@ export const GamesScreen: React.FC = () => {
 
     try {
       const fetched = await mobileApi.fetchGames(dateStr, userTimezone);
+      sessionStore.setGames(dateStr, fetched);
       setGames(fetched);
     } catch (err: any) {
       setFetchError(err?.message || 'Could not load matches from server');
-      setGames([]);
+      if (forceRefresh || !sessionStore.hasGames(dateStr)) {
+        setGames([]);
+      }
     } finally {
       setIsLoadingGames(false);
     }
@@ -160,7 +196,7 @@ export const GamesScreen: React.FC = () => {
 
   const handlePullToRefresh = async () => {
     setIsRefreshing(true);
-    await loadGamesForDate(selectedDate, false);
+    await loadGamesForDate(selectedDate, false, true);
     setIsRefreshing(false);
   };
 
@@ -538,7 +574,7 @@ export const GamesScreen: React.FC = () => {
           <Text style={styles.errorDetails}>{fetchError}</Text>
           <TouchableOpacity
             style={styles.retryBtn}
-            onPress={() => loadGamesForDate(selectedDate, true)}
+            onPress={() => loadGamesForDate(selectedDate, true, true)}
             activeOpacity={0.7}
           >
             <Text style={styles.retryBtnText}>🔄 Retry Query</Text>
@@ -564,7 +600,7 @@ export const GamesScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             style={styles.retryBtn}
-            onPress={() => loadGamesForDate(selectedDate, true)}
+            onPress={() => loadGamesForDate(selectedDate, true, true)}
             activeOpacity={0.7}
           >
             <Text style={styles.retryBtnText}>🔄 Refresh Fixtures</Text>

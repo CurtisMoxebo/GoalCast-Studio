@@ -78,9 +78,15 @@ function MainApp() {
 
       {/* Main Screen Content */}
       <View style={styles.content}>
-        {currentTab === 'GAMES' && <GamesScreen />}
-        {currentTab === 'HISTORY' && <HistoryScreen />}
-        {currentTab === 'SETTINGS' && <SettingsScreen />}
+        <View style={[styles.tabContent, currentTab !== 'GAMES' && styles.hiddenTab]}>
+          <GamesScreen />
+        </View>
+        <View style={[styles.tabContent, currentTab !== 'HISTORY' && styles.hiddenTab]}>
+          <HistoryScreen />
+        </View>
+        <View style={[styles.tabContent, currentTab !== 'SETTINGS' && styles.hiddenTab]}>
+          <SettingsScreen />
+        </View>
       </View>
 
       {/* Bottom Tab Bar (3 Tabs) with Device Safe Area Insets */}
@@ -152,6 +158,12 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1
+  },
+  tabContent: {
+    flex: 1
+  },
+  hiddenTab: {
+    display: 'none'
   },
   tabBar: {
     flexDirection: 'row',

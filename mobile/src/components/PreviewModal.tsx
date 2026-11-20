@@ -13,6 +13,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { THEME } from '../constants/theme';
 import { mobileApi } from '../services/api';
 import { deviceStorage } from '../services/deviceStorage';
+import { sessionStore } from '../services/sessionStore';
 import { shareToSocialMedia, SOCIAL_PLATFORMS, SocialPlatform } from '../services/socialShare';
 
 const { width } = Dimensions.get('window');
@@ -155,6 +156,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       setIsProcessingAction(true);
       if (groupId) {
         await mobileApi.updatePredictionStatus(groupId, 'ACCEPTED');
+        sessionStore.invalidateHistory();
       }
       setIsAccepted(true);
       onAccepted();

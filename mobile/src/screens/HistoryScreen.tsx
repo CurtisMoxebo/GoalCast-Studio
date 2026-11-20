@@ -15,6 +15,7 @@ import { THEME } from '../constants/theme';
 import { HistoryItem } from '../types';
 import { mobileApi } from '../services/api';
 import { deviceStorage } from '../services/deviceStorage';
+import { sessionStore } from '../services/sessionStore';
 import { formatOrdinalDate } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
@@ -36,24 +37,41 @@ const HistoryVideoPlayer: React.FC<{ videoUri: string }> = ({ videoUri }) => {
 };
 
 export const HistoryScreen: React.FC = () => {
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    return sessionStore.getHistory() || [];
+  });
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeVideoUri, setActiveVideoUri] = useState<string | null>(null);
 
-  const loadHistory = async () => {
-    setIsLoading(true);
+  const loadHistory = async (forceRefresh = false) => {
+    // If data is already in session and not an explicit refresh, don't re-fetch
+    if (!forceRefresh && sessionStore.hasHistory()) {
+      setHistory(sessionStore.getHistory() || []);
+      setIsLoading(false);
+      return;
+    }
+
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
     try {
       const items = await mobileApi.fetchHistory();
+      sessionStore.setHistory(items);
       setHistory(items);
     } catch (err: any) {
       console.warn('Error loading history:', err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadHistory();
+    loadHistory(false);
   }, []);
 
   const handleWatchVideo = async (item: HistoryItem) => {
@@ -89,7 +107,7 @@ export const HistoryScreen: React.FC = () => {
           <Text style={styles.emptySub}>
             Accepted prediction groups will appear here with instant video playback.
           </Text>
-          <TouchableOpacity style={styles.refreshBtn} onPress={loadHistory}>
+          <TouchableOpacity style={styles.refreshBtn} onPress={() => loadHistory(true)}>
             <Text style={styles.refreshBtnText}>Refresh</Text>
           </TouchableOpacity>
         </View>
@@ -98,8 +116,8 @@ export const HistoryScreen: React.FC = () => {
           data={history}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          onRefresh={loadHistory}
-          refreshing={isLoading}
+          onRefresh={() => loadHistory(true)}
+          refreshing={isRefreshing}
           renderItem={({ item }) => {
             const formattedDate = formatOrdinalDate(item.targetDate);
             return (
