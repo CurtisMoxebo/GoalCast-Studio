@@ -9,13 +9,29 @@ import {
   Alert,
   Dimensions
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { THEME } from '../constants/theme';
 import { mobileApi } from '../services/api';
 import { deviceStorage } from '../services/deviceStorage';
 import { shareToSocialMedia, SOCIAL_PLATFORMS, SocialPlatform } from '../services/socialShare';
 
 const { width } = Dimensions.get('window');
+
+const VideoPlayerComponent: React.FC<{ videoUri: string }> = ({ videoUri }) => {
+  const player = useVideoPlayer(videoUri, (p) => {
+    p.loop = true;
+    p.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.videoPlayer}
+      nativeControls={true}
+      contentFit="contain"
+    />
+  );
+};
 
 interface PreviewModalProps {
   visible: boolean;
@@ -182,17 +198,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         ) : localVideoUri ? (
           <View style={styles.playerContainer}>
             {/* Video Player */}
-            <Video
-              source={{ uri: localVideoUri }}
-              rate={1.0}
-              volume={1.0}
-              isMuted={false}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={true}
-              isLooping={true}
-              useNativeControls
-              style={styles.videoPlayer}
-            />
+            <VideoPlayerComponent videoUri={localVideoUri} />
 
             {/* Post-Accept View: 4 Branded Social Share Buttons */}
             {isAccepted ? (

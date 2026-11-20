@@ -4,13 +4,7 @@
     "slug": "goalcast-studio",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "splash": {
-      "backgroundColor": "#020617",
-      "resizeMode": "contain"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -19,8 +13,10 @@
         "backgroundColor": "#020617"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-video"
+    ]
   }
 }

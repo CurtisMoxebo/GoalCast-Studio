@@ -10,7 +10,7 @@ import {
   Dimensions,
   Alert
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { THEME } from '../constants/theme';
 import { HistoryItem } from '../types';
 import { mobileApi } from '../services/api';
@@ -18,6 +18,22 @@ import { deviceStorage } from '../services/deviceStorage';
 import { formatOrdinalDate } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
+
+const HistoryVideoPlayer: React.FC<{ videoUri: string }> = ({ videoUri }) => {
+  const player = useVideoPlayer(videoUri, (p) => {
+    p.loop = true;
+    p.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.modalVideo}
+      nativeControls={true}
+      contentFit="contain"
+    />
+  );
+};
 
 export const HistoryScreen: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -144,17 +160,7 @@ export const HistoryScreen: React.FC = () => {
           </View>
 
           {activeVideoUri && (
-            <Video
-              source={{ uri: activeVideoUri }}
-              rate={1.0}
-              volume={1.0}
-              isMuted={false}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={true}
-              isLooping={true}
-              useNativeControls
-              style={styles.modalVideo}
-            />
+            <HistoryVideoPlayer videoUri={activeVideoUri} />
           )}
         </View>
       </Modal>
