@@ -388,11 +388,40 @@ export class VideoComposer {
       outputVideoPath
     });
 
+    // 7. Extract Thumbnail at thumbnailTimestamp if specified
+    const thumbnailPath = path.join(workDir, 'thumbnail.jpg');
+    try {
+      const thumbTime = typeof input.thumbnailTimestamp === 'number' ? input.thumbnailTimestamp : 3.0;
+      await this.extractThumbnail(outputVideoPath, thumbTime, thumbnailPath);
+    } catch (e: any) {
+      console.warn('[VideoComposer] Could not extract thumbnail frame:', e.message);
+    }
+
     notify(100, 'Video generation completed successfully');
     return {
       videoPath: outputVideoPath,
+      thumbnailPath: fs.existsSync(thumbnailPath) ? thumbnailPath : undefined,
       durationSeconds: totalDuration
     };
+  }
+
+  /**
+   * Extract a single JPEG frame at a specific timestamp for thumbnail cover
+   */
+  private extractThumbnail(
+    videoPath: string,
+    timestampSeconds: number,
+    outputPath: string
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      ffmpeg(videoPath)
+        .seekInput(Math.max(0, timestampSeconds))
+        .frames(1)
+        .output(outputPath)
+        .on('end', () => resolve())
+        .on('error', (err) => reject(err))
+        .run();
+    });
   }
 
   /**

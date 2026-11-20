@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOCIAL_PLATFORMS } from '../services/socialShare';
+import { SOCIAL_PLATFORMS, formatThumbnailTimestamp } from '../services/socialShare';
 import { MobileApiService } from '../services/api';
 import { sessionStore } from '../services/sessionStore';
 import { UpcomingGame, HistoryItem } from '../types';
@@ -26,6 +26,14 @@ test('Mobile Regression: Social platforms configuration', () => {
   const tiktok = SOCIAL_PLATFORMS.find((p) => p.id === 'tiktok');
   assert.equal(tiktok?.name, 'TikTok');
   assert.equal(tiktok?.color, '#000000');
+});
+
+test('Mobile Regression: formatThumbnailTimestamp formats seconds into MM:SS', () => {
+  assert.equal(formatThumbnailTimestamp(0), '00:00');
+  assert.equal(formatThumbnailTimestamp(3), '00:03');
+  assert.equal(formatThumbnailTimestamp(15.7), '00:15');
+  assert.equal(formatThumbnailTimestamp(65), '01:05');
+  assert.equal(formatThumbnailTimestamp(undefined), '00:03');
 });
 
 test('Mobile Regression: MobileApiService URL builder methods', () => {
