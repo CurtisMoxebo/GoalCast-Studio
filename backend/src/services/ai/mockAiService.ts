@@ -60,11 +60,20 @@ export class MockAIService implements IAIService {
   }
 
   async generatePredictions(games: UpcomingGame[]): Promise<GamePredictionResult[]> {
-    console.log(`[MockAIService] 🔮 Generating heuristic mock predictions for ${games.length} games...`);
+    const startTime = Date.now();
+    console.log(`\n------------------ [MockAIService: generatePredictions] ------------------`);
+    console.log(`[MockAIService] 🔮 Generating heuristic statistical predictions for ${games.length} games...`);
+    games.forEach((g, idx) => {
+      console.log(`  [Match ${idx + 1}/${games.length}] ${g.homeTeam} vs ${g.awayTeam} | League: ${g.competition || 'N/A'} | ID: ${g.id}`);
+    });
+
     const results = games.map((game, index) => {
       // Pick dynamic plausible predictions
       const optCode = index % 2 === 0 ? 'BTTS_YES' : '1X';
       const opt = findBettingOptionByCode(optCode)!;
+      const spoken = formatSpokenPrediction(opt.spokenTemplate, game.homeTeam, game.awayTeam);
+      console.log(`  ✅ Match: ${game.homeTeam} vs ${game.awayTeam} => [${opt.code}] "${opt.label}" (Spoken: "${spoken}")`);
+
       return {
         gameId: game.id,
         homeTeam: game.homeTeam,
@@ -74,13 +83,16 @@ export class MockAIService implements IAIService {
             category: opt.category,
             code: opt.code,
             label: opt.label,
-            spokenText: formatSpokenPrediction(opt.spokenTemplate, game.homeTeam, game.awayTeam),
+            spokenText: spoken,
             confidence: 0.88,
             reasoning: 'Strong home attacking form in last 5 games with high xG and regular corner conversion.'
           }
         ]
       };
     });
+
+    console.log(`[MockAIService] 🏁 Generated mock predictions for ${results.length} games in ${Date.now() - startTime}ms`);
+    console.log(`--------------------------------------------------------------------------\n`);
     return results;
   }
 

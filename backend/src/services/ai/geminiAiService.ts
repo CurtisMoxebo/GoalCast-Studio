@@ -91,11 +91,37 @@ export class GeminiAIService implements IAIService {
    * Generate predictions for selected games based on past 5 matches statistics
    */
   async generatePredictions(games: UpcomingGame[]): Promise<GamePredictionResult[]> {
-    if (games.length === 0) return [];
-    const ai = this.getClient();
+    const startTime = Date.now();
+    const timestamp = new Date().toISOString();
+    console.log(`\n------------------ [GeminiAIService: generatePredictions] ------------------`);
+    console.log(`[GeminiAIService] 🕒 Execution started at: ${timestamp}`);
+    console.log(`[GeminiAIService] ⚙️ Target Model: "${this.modelName}"`);
+    const apiKey = process.env.GEMINI_API_KEY || '';
+    const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : (apiKey ? '***' : 'MISSING');
+    console.log(`[GeminiAIService] 🔑 API Key Status: ${maskedKey} (Length: ${apiKey.length} characters)`);
+    console.log(`[GeminiAIService] 🎯 Selected matches count: ${games.length}`);
+
+    if (games.length === 0) {
+      console.warn('[GeminiAIService] ⚠️ Empty games array passed to generatePredictions. Returning [].');
+      return [];
+    }
+
+    games.forEach((g, idx) => {
+      console.log(`  [Match ${idx + 1}/${games.length}] ${g.homeTeam} vs ${g.awayTeam} | League: ${g.competition || 'N/A'} | Kickoff: ${g.kickoffTime} | ID: ${g.id}`);
+    });
+
+    let ai: GoogleGenAI;
+    try {
+      ai = this.getClient();
+      console.log('[GeminiAIService] ✅ GoogleGenAI client successfully initialized');
+    } catch (clientErr: any) {
+      console.error('[GeminiAIService] ❌ Failed to initialize GoogleGenAI client:', clientErr?.message || clientErr);
+      throw clientErr;
+    }
 
     // Give AI the list of valid prediction codes
     const validCodes = BETTING_OPTIONS.map((o) => `${o.code} (${o.category}: ${o.label})`).join(', ');
+    console.log(`[GeminiAIService] 📋 Betting catalog: ${BETTING_OPTIONS.length} valid market options passed to prompt`);
 
     const prompt = `
 You are an expert football data analyst and statistician.
@@ -106,8 +132,12 @@ For each of the following games, analyze the last 5 games played by both teams:
 - Average corners won/conceded
 - Head-to-head records and injury/tactical trends
 
-Based on this in-depth statistical analysis, pick the STRONGEST 1 or 2 betting predictions for each match.
-You MUST choose ONLY from the valid prediction codes below:
+Based on this in-depth statistical analysis, provide betting predictions for each match adhering to these strict rules:
+- You do NOT necessarily have to give 2 predictions per game.
+- 1 solid, high-confidence prediction per match is completely sufficient and preferred if only one clear statistical trend stands out.
+- Give a 2nd prediction ONLY if you genuinely feel there is distinct, strong statistical justification and high confidence for it. Never force a second pick.
+- Do NOT provide conflicting predictions for the same game (e.g. OVER_2_5 and UNDER_2_5).
+- You MUST choose ONLY from the valid prediction codes below:
 ${validCodes}
 
 Matches to analyze:
@@ -130,6 +160,7 @@ Return a JSON array of objects with the exact schema:
     "homeTeam": "string",
     "awayTeam": "string",
     "predictions": [
+      // 1 high-confidence prediction by default; include a 2nd only if you strongly feel both are justified
       {
         "category": "RESULT" | "GOALS" | "CORNERS",
         "code": "EXACT_CODE_FROM_LIST",
@@ -141,7 +172,10 @@ Return a JSON array of objects with the exact schema:
 ]
 `;
 
-    console.log(`[GeminiAIService] 🔮 Generating statistical predictions for ${games.length} matches...`);
+    console.log(`[GeminiAIService] 📝 Prompt built (${prompt.length} chars). Target model: "${this.modelName}", temperature: 0.2, mimeType: application/json`);
+    console.log(`[GeminiAIService] 🚀 Dispatching request to Gemini API (ai.models.generateContent)...`);
+
+    const apiCallStart = Date.now();
     try {
       const response = await ai.models.generateContent({
         model: this.modelName,
@@ -152,10 +186,34 @@ Return a JSON array of objects with the exact schema:
         }
       });
 
-      const text = response.text || '[]';
-      console.log(`[GeminiAIService] 📥 Full AI Predictions Response (${text.length} chars):\n${text}\n`);
-      const parsed = JSON.parse(text);
+      const apiCallDuration = Date.now() - apiCallStart;
+      console.log(`[GeminiAIService] ✅ Gemini API call completed in ${apiCallDuration}ms`);
 
+      if ((response as any)?.usageMetadata) {
+        const usage = (response as any).usageMetadata;
+        console.log(`[GeminiAIService] 📊 Token Usage: Prompt=${usage.promptTokenCount}, Candidates=${usage.candidatesTokenCount}, Total=${usage.totalTokenCount}`);
+      }
+
+      const text = response.text || '[]';
+      console.log(`[GeminiAIService] 📥 Raw AI Response received (${text.length} chars):\n${text}\n`);
+
+      console.log('[GeminiAIService] 🔄 Parsing AI JSON response...');
+      let parsed: any;
+      try {
+        parsed = JSON.parse(text);
+      } catch (jsonErr: any) {
+        console.error('[GeminiAIService] ❌ Failed to parse JSON from AI response:');
+        console.error(`  Parse Error: ${jsonErr?.message}`);
+        console.error(`  Raw text received:`, text);
+        throw new Error(`AI returned invalid JSON: ${jsonErr?.message}`);
+      }
+
+      if (!Array.isArray(parsed)) {
+        console.warn(`[GeminiAIService] ⚠️ Expected JSON array but received type: ${typeof parsed}`);
+        parsed = [];
+      }
+
+      console.log(`[GeminiAIService] 🔍 Processing predictions for ${parsed.length} match objects...`);
       const results: GamePredictionResult[] = [];
 
       for (const item of parsed) {
@@ -166,29 +224,33 @@ Return a JSON array of objects with the exact schema:
         };
 
         const predictions: PredictionSuggestion[] = [];
-
-        // At most 2 predictions per game as per rules
         const incomingPredictions = Array.isArray(item.predictions) ? item.predictions.slice(0, 2) : [];
+        console.log(`  🔎 Match: ${matchingGame.homeTeam} vs ${matchingGame.awayTeam} (GameId: ${matchingGame.id}) - AI suggested ${incomingPredictions.length} prediction(s):`);
 
         for (const pred of incomingPredictions) {
           const matchedOpt = findBettingOptionByCode(pred.code);
           if (matchedOpt) {
+            const spoken = formatSpokenPrediction(
+              matchedOpt.spokenTemplate,
+              matchingGame.homeTeam,
+              matchingGame.awayTeam
+            );
+            console.log(`    ✅ Code matched: [${matchedOpt.code}] -> "${matchedOpt.label}" | Category: ${matchedOpt.category} | Confidence: ${pred.confidence || 0.8}`);
+            console.log(`       Reasoning: "${pred.reasoning || 'N/A'}"`);
+            console.log(`       Spoken: "${spoken}"`);
+
             predictions.push({
               category: matchedOpt.category,
               code: matchedOpt.code,
               label: matchedOpt.label,
-              spokenText: formatSpokenPrediction(
-                matchedOpt.spokenTemplate,
-                matchingGame.homeTeam,
-                matchingGame.awayTeam
-              ),
+              spokenText: spoken,
               confidence: typeof pred.confidence === 'number' ? pred.confidence : 0.8,
               reasoning: pred.reasoning || ''
             });
+          } else {
+            console.warn(`    ⚠️ [GeminiAIService] AI returned uncataloged prediction code: "${pred.code}" for ${matchingGame.homeTeam} vs ${matchingGame.awayTeam}. Skipping.`);
           }
         }
-
-        console.log(`[GeminiAIService] 🎯 Predictions for ${matchingGame.homeTeam} vs ${matchingGame.awayTeam}: [${predictions.map((p) => p.code).join(', ')}]`);
 
         results.push({
           gameId: matchingGame.id,
@@ -198,15 +260,37 @@ Return a JSON array of objects with the exact schema:
         });
       }
 
+      const totalDuration = Date.now() - startTime;
+      console.log(`[GeminiAIService] 🏁 generatePredictions finished successfully in ${totalDuration}ms (${results.length} games processed)`);
+      console.log(`----------------------------------------------------------------------------\n`);
+
       return results;
     } catch (err: any) {
-      console.error('[GeminiAIService] generatePredictions failed:', err?.message || err);
-      if (err?.status === 503 || err?.status === 429 || err?.message?.includes('high demand') || err?.message?.includes('spikes in demand')) {
-        console.warn('[GeminiAIService] Falling back to heuristic mock predictions due to temporary Google API demand');
+      const apiCallDuration = Date.now() - apiCallStart;
+      console.error(`\n❌ [GeminiAIService] generatePredictions FAILED after ${apiCallDuration}ms:`);
+      console.error(`  Error Name: ${err?.name}`);
+      console.error(`  Error Message: ${err?.message}`);
+      console.error(`  Error Status/Code: ${err?.status || err?.code || 'N/A'}`);
+      if (err?.stack) {
+        console.error(`  Stack Trace:\n${err.stack}`);
+      }
+      if (err?.status === 404 || err?.message?.includes('not found') || err?.message?.includes('models/')) {
+        console.error(`  💡 Note: The configured model "${this.modelName}" was not found or is unavailable for this Gemini API key.`);
+      }
+
+      if (
+        err?.status === 503 ||
+        err?.status === 429 ||
+        err?.message?.includes('high demand') ||
+        err?.message?.includes('spikes in demand')
+      ) {
+        console.warn('[GeminiAIService] ⚠️ High demand / rate limit detected. Falling back to heuristic mock predictions...');
         const { MockAIService } = require('./mockAiService');
         const mock = new MockAIService();
         return mock.generatePredictions(games);
       }
+
+      console.error(`----------------------------------------------------------------------------\n`);
       throw err;
     }
   }

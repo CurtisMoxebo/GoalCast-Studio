@@ -29,22 +29,48 @@ router.get('/options', (_req: Request, res: Response) => {
  * Prompts AI to generate predictions for the provided matches
  */
 router.post('/ai', async (req: Request, res: Response): Promise<void> => {
+  const reqStart = Date.now();
+  const timestamp = new Date().toISOString();
+  console.log(`\n==================== [PredictionsRoute] POST /api/predictions/ai [${timestamp}] ====================`);
+  console.log(`[PredictionsRoute] 📥 Request received from client (${req.ip || 'unknown IP'})`);
+
   try {
     const { games } = req.body;
+    console.log(`[PredictionsRoute] 📦 Raw payload games count: ${Array.isArray(games) ? games.length : typeof games}`);
+
     if (!Array.isArray(games) || games.length === 0) {
+      console.warn('[PredictionsRoute] ⚠️ Validation failed: games array is missing or empty.');
       res.status(400).json({ error: 'Please provide at least one game to predict.' });
       return;
     }
 
     if (games.length > BETTING_RULES.maxGamesPredicted) {
+      console.warn(`[PredictionsRoute] ⚠️ Validation failed: ${games.length} games requested, max allowed is ${BETTING_RULES.maxGamesPredicted}`);
       res.status(400).json({
         error: `Cannot predict more than ${BETTING_RULES.maxGamesPredicted} games at once.`
       });
       return;
     }
 
+    console.log(`[PredictionsRoute] 📋 Matches received for statistical prediction (${games.length}):`);
+    games.forEach((g: any, idx: number) => {
+      console.log(`  [${idx + 1}/${games.length}] ${g.homeTeam} vs ${g.awayTeam} (${g.competition || 'No League'}) [ID: ${g.id}]`);
+    });
+
     const ai = getAIService();
+    console.log(`[PredictionsRoute] 🤖 Resolved AI Service provider: "${ai.providerName}"`);
+    console.log(`[PredictionsRoute] ⏳ Invoking ai.generatePredictions()...`);
+
     const predictions = await ai.generatePredictions(games);
+    const durationMs = Date.now() - reqStart;
+
+    console.log(`[PredictionsRoute] ✅ Statistical predictions successfully generated in ${durationMs}ms`);
+    console.log(`[PredictionsRoute] 📊 Predictions summary (${predictions.length} games returned):`);
+    predictions.forEach((p, idx) => {
+      const picks = p.predictions.map((x) => `${x.code} (${x.confidence ? Math.round(x.confidence * 100) : 80}%)`).join(', ');
+      console.log(`  [${idx + 1}] ${p.homeTeam} vs ${p.awayTeam} => [${picks || 'NO PICKS'}]`);
+    });
+    console.log(`========================================================================================\n`);
 
     res.json({
       success: true,
@@ -52,7 +78,19 @@ router.post('/ai', async (req: Request, res: Response): Promise<void> => {
       predictions
     });
   } catch (error: any) {
-    console.error('[PredictionsRoute] AI prediction generation failed:', error);
+    const durationMs = Date.now() - reqStart;
+    console.error(`\n❌ [PredictionsRoute] AI statistical prediction generation FAILED after ${durationMs}ms:`);
+    console.error(`  Error Name: ${error?.name}`);
+    console.error(`  Error Message: ${error?.message}`);
+    console.error(`  Error Code/Status: ${error?.status || error?.code || 'N/A'}`);
+    if (error?.stack) {
+      console.error(`  Stack Trace:\n${error.stack}`);
+    }
+    if (error?.response?.data || error?.errorDetails) {
+      console.error(`  Error Details:\n`, JSON.stringify(error?.response?.data || error?.errorDetails, null, 2));
+    }
+    console.error(`========================================================================================\n`);
+
     res.status(500).json({
       error: 'Failed to generate AI predictions',
       details: error?.message || 'Internal error'
