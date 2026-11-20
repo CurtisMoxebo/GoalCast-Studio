@@ -7,7 +7,9 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  PanResponder
+  PanResponder,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -145,6 +147,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   isLoading
 }) => {
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<any>(null);
   const formattedDate = formatOrdinalDate(targetDate);
   const defaultDesc = `Football predictions for ${formattedDate} ⚽🔥\n#football #soccer #predictions #footballpredictions #fyp`;
 
@@ -169,12 +172,19 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {/* Scrollable Configuration Form */}
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollArea}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardDismissMode="interactive"
       >
         {/* Header with Arrow to the left of the title */}
         <View style={styles.header}>
@@ -291,6 +301,11 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             numberOfLines={4}
             value={description}
             onChangeText={setDescription}
+            onFocus={() => {
+              setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+              }, 180);
+            }}
             placeholder="Enter video description with hashtags..."
             placeholderTextColor={THEME.colors.textMuted}
           />
@@ -329,7 +344,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -433,7 +448,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 18,
-    paddingBottom: 28
+    paddingBottom: 60
   },
   header: {
     marginBottom: 20
