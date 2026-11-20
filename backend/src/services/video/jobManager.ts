@@ -36,7 +36,7 @@ class VideoJobManager {
 
   completeJob(
     jobId: string,
-    result: { videoPath: string; thumbnailPath: string; durationSeconds: number }
+    result: { videoPath: string; thumbnailPath?: string; durationSeconds: number }
   ): void {
     const job = this.jobs.get(jobId);
     if (job) {

@@ -134,7 +134,7 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
       message: 'Test video generation complete',
       durationSeconds: result.durationSeconds,
       downloadUrl: `/api/video/download/${jobId}`,
-      thumbnailUrl: `/api/video/thumbnail/${jobId}`
+      ...(result.thumbnailPath ? { thumbnailUrl: `/api/video/thumbnail/${jobId}` } : {})
     });
   } catch (error: any) {
     console.error('[VideoTestRoute] Error generating video:', error);

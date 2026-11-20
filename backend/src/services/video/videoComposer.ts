@@ -32,7 +32,7 @@ export interface VideoComposerInput {
 
 export interface VideoComposerResult {
   videoPath: string;
-  thumbnailPath: string;
+  thumbnailPath?: string;
   durationSeconds: number;
 }
 
@@ -235,7 +235,6 @@ export class VideoComposer {
     }
 
     const outputVideoPath = path.join(workDir, `final_goalcast_${input.jobId}.mp4`);
-    const outputThumbPath = path.join(workDir, `thumbnail_${input.jobId}.jpg`);
 
     // 4b. Generate Synchronized Top-Karaoke Subtitles (.ass)
     notify(65, 'Generating synchronized top karaoke subtitles');
@@ -344,18 +343,9 @@ export class VideoComposer {
       outputVideoPath
     });
 
-    // 7. Extract Thumbnail at requested timestamp
-    notify(95, 'Extracting thumbnail frame');
-    const thumbTime = Math.min(
-      Math.max(0, input.thumbnailTimestamp || 3.0),
-      totalDuration - 0.5
-    );
-    await this.extractThumbnail(outputVideoPath, outputThumbPath, thumbTime);
-
     notify(100, 'Video generation completed successfully');
     return {
       videoPath: outputVideoPath,
-      thumbnailPath: outputThumbPath,
       durationSeconds: totalDuration
     };
   }
@@ -676,21 +666,6 @@ export class VideoComposer {
         ])
         .duration(params.totalDuration)
         .output(params.outputVideoPath)
-        .on('end', () => resolve())
-        .on('error', (err) => reject(err))
-        .run();
-    });
-  }
-
-  /**
-   * Extract thumbnail frame at the user-specified frame time
-   */
-  private extractThumbnail(videoPath: string, outputPath: string, timeSeconds: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      ffmpeg(videoPath)
-        .seekInput(timeSeconds)
-        .frames(1)
-        .output(outputPath)
         .on('end', () => resolve())
         .on('error', (err) => reject(err))
         .run();
