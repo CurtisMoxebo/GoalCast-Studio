@@ -565,9 +565,16 @@ export class VideoComposer {
 
       let overlayInputIdx = 3;
       let celebInputIdx = -1;
+      let confettiInputIdx = -1;
       if (params.celebrationDuration > 0 && params.celebrationTablePng && fs.existsSync(params.celebrationTablePng)) {
         celebInputIdx = overlayInputIdx++;
         command.input(params.celebrationTablePng);
+
+        const confettiVideoPath = assetsManager.getAssetPath('confetti_splash.mp4');
+        if (fs.existsSync(confettiVideoPath)) {
+          confettiInputIdx = overlayInputIdx++;
+          command.input(confettiVideoPath);
+        }
       }
 
       const matchCardIndices: number[] = [];
@@ -606,6 +613,16 @@ export class VideoComposer {
           `${lastVideoStage}[${celebInputIdx}:v]overlay=x='if(lt(t,${celebStart + 0.4}), -w + w*(t-${celebStart})/0.4, if(gt(t,${celebEnd - 0.4}), (w*(t-(${celebEnd-0.4}))/0.4)*-1, (W-w)/2))':y='(H-h)/2':enable='between(t,${celebStart},${celebEnd})'[v_celeb]`
         );
         lastVideoStage = '[v_celeb]';
+
+        // Animated Confetti Splash overlay bursting once across the screen over the winning games
+        if (confettiInputIdx >= 0) {
+          filters.push(
+            `[${confettiInputIdx}:v]colorkey=0x000000:0.1:0.1,setpts=PTS-STARTPTS+${celebStart}/TB[confetti_keyed]`,
+            `${lastVideoStage}[confetti_keyed]overlay=x=0:y=0:eof_action=pass:enable='between(t,${celebStart},${celebEnd})'[v_celeb_confetti]`
+          );
+          lastVideoStage = '[v_celeb_confetti]';
+        }
+
         currentTime = celebEnd;
       }
 

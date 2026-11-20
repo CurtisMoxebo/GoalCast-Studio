@@ -438,17 +438,41 @@ export class OverlayGenerator {
     const titleY = startY;
     const tableStartY = titleY + titleHeight + gapBetweenTitleAndTable;
 
-    // Confetti visual particles in SVG background
-    const confettiColors = ['#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#8b5cf6', '#eab308'];
+    // Confetti visual splash particles in SVG
+    const confettiColors = [
+      '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#8b5cf6', 
+      '#eab308', '#ef4444', '#06b6d4', '#22c55e', '#ffd700'
+    ];
     const confettiElements: string[] = [];
-    for (let c = 0; c < 40; c++) {
+    for (let c = 0; c < 90; c++) {
       const cx = Math.floor(Math.random() * 1040) + 20;
       const cy = Math.floor(Math.random() * 1800) + 60;
       const color = confettiColors[c % confettiColors.length];
-      const r = Math.floor(Math.random() * 12) + 6;
-      confettiElements.push(
-        `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" fill-opacity="0.85"/>`
-      );
+      const shapeType = c % 4;
+      const rot = Math.floor(Math.random() * 360);
+      const size = Math.floor(Math.random() * 14) + 8;
+
+      if (shapeType === 0) {
+        // Streamer ribbon
+        confettiElements.push(
+          `<rect x="${cx - size}" y="${cy - Math.round(size / 4)}" width="${size * 2}" height="${Math.round(size * 0.6)}" rx="3" fill="${color}" transform="rotate(${rot} ${cx} ${cy})"/>`
+        );
+      } else if (shapeType === 1) {
+        // Disc / circle
+        confettiElements.push(
+          `<circle cx="${cx}" cy="${cy}" r="${Math.round(size * 0.6)}" fill="${color}"/>`
+        );
+      } else if (shapeType === 2) {
+        // Diamond / square
+        confettiElements.push(
+          `<rect x="${cx - Math.round(size / 2)}" y="${cy - Math.round(size / 2)}" width="${size}" height="${size}" rx="2" fill="${color}" transform="rotate(${rot} ${cx} ${cy})"/>`
+        );
+      } else {
+        // Star sparkle
+        confettiElements.push(
+          `<polygon points="${cx},${cy-size} ${cx+Math.round(size*0.25)},${cy-Math.round(size*0.25)} ${cx+size},${cy} ${cx+Math.round(size*0.25)},${cy+Math.round(size*0.25)} ${cx},${cy+size} ${cx-Math.round(size*0.25)},${cy+Math.round(size*0.25)} ${cx-size},${cy} ${cx-Math.round(size*0.25)},${cy-Math.round(size*0.25)}" fill="${color}"/>`
+        );
+      }
     }
 
     // Render game rows inside unified white table with dividers
@@ -555,9 +579,6 @@ export class OverlayGenerator {
           </filter>
         </defs>
 
-        <!-- Confetti festive particles floating in background -->
-        ${confettiElements.join('\n')}
-
         <!-- 1. TITLE ABOVE THE WINNING GROUP: White highlight background + Black text on one line -->
         <g filter="url(#celebCardShadow)" transform="translate(${tableX}, ${titleY})">
           <!-- White Highlight Box -->
@@ -576,6 +597,9 @@ export class OverlayGenerator {
           <!-- Match Rows & Dividers -->
           ${rowsSvg}
         </g>
+
+        <!-- Confetti festive splash particles in foreground -->
+        ${confettiElements.join('\n')}
       </svg>
     `;
 
