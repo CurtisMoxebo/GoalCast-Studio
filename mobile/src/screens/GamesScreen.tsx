@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
+  SectionList,
+  TextInput,
+  Image,
   StyleSheet,
   ActivityIndicator,
   Alert,
@@ -21,6 +23,7 @@ import {
   getPreviousDayString,
   canGoBackDate
 } from '../utils/dateUtils';
+import { filterGamesBySearchQuery, groupGamesByCompetition } from '../utils/gameUtils';
 import { GameCard } from '../components/GameCard';
 import { PredictionPickerModal } from '../components/PredictionPickerModal';
 import { VideoSettingsWizard } from '../components/VideoSettingsWizard';
@@ -36,6 +39,9 @@ export const GamesScreen: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Search filter query
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Predictions map: gameId -> PredictionSelection[]
   const [gameSelections, setGameSelections] = useState<Record<string, PredictionSelection[]>>({});
 
@@ -49,6 +55,16 @@ export const GamesScreen: React.FC = () => {
 
   // Active game for modal picker
   const [activeGameForPicker, setActiveGameForPicker] = useState<UpcomingGame | null>(null);
+
+  // Filter games based on search query
+  const filteredGames = useMemo(() => {
+    return filterGamesBySearchQuery(games, searchQuery);
+  }, [games, searchQuery]);
+
+  // Group filtered games into sections by competition
+  const sections = useMemo(() => {
+    return groupGamesByCompetition(filteredGames);
+  }, [filteredGames]);
 
   // Wizard & Preview State
   const [isWizardActive, setIsWizardActive] = useState(false);
@@ -112,12 +128,14 @@ export const GamesScreen: React.FC = () => {
     if (canGoBackDate(selectedDate)) {
       setSelectedDate(getPreviousDayString(selectedDate));
       setSelectedGameIdsForAi([]);
+      setSearchQuery('');
     }
   };
 
   const handleNextDay = () => {
     setSelectedDate(getNextDayString(selectedDate));
     setSelectedGameIdsForAi([]);
+    setSearchQuery('');
   };
 
   const handleToggleSelectForAi = (gameId: string) => {
@@ -335,7 +353,35 @@ export const GamesScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Main Content: Loading, Error, Empty List, or FlatList */}
+      {/* Search Bar: Visible whenever games are loaded */}
+      {!isLoadingGames && !fetchError && games.length > 0 && (
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search teams or competitions..."
+              placeholderTextColor="#64748b"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearSearchBtn}
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.clearSearchText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Main Content: Loading, Error, Empty List, Search Empty, or SectionList */}
       {isLoadingGames ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={THEME.colors.primary} />
@@ -391,11 +437,9 @@ export const GamesScreen: React.FC = () => {
           </TouchableOpacity>
           <Text style={styles.pullHint}>Or pull down to refresh</Text>
         </ScrollView>
-      ) : (
-        <FlatList
-          data={games}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+      ) : filteredGames.length === 0 ? (
+        <ScrollView
+          contentContainerStyle={styles.centerContainer}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -404,6 +448,55 @@ export const GamesScreen: React.FC = () => {
               colors={[THEME.colors.primary]}
             />
           }
+        >
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>No Matches Found</Text>
+          <Text style={styles.emptyText}>
+            No fixtures matching "{searchQuery}". Try searching for another team or league.
+          </Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => setSearchQuery('')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryBtnText}>✕ Clear Search</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handlePullToRefresh}
+              tintColor={THEME.colors.primary}
+              colors={[THEME.colors.primary]}
+            />
+          }
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                {section.logo ? (
+                  <Image
+                    source={{ uri: section.logo }}
+                    style={styles.sectionLogo}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.sectionTrophy}>🏆</Text>
+                )}
+                <Text style={styles.sectionTitle} numberOfLines={1}>
+                  {section.title}
+                </Text>
+              </View>
+              <View style={styles.sectionBadge}>
+                <Text style={styles.sectionBadgeText}>{section.data.length}</Text>
+              </View>
+            </View>
+          )}
           renderItem={({ item }) => (
             <GameCard
               game={item}
@@ -460,6 +553,93 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0f1d',
     borderBottomWidth: 1,
     borderColor: THEME.colors.cardBorder
+  },
+  searchContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#0a0f1d',
+    borderBottomWidth: 1,
+    borderColor: THEME.colors.cardBorder
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 38,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  searchIcon: {
+    fontSize: 14,
+    marginRight: 8,
+    color: '#94a3b8'
+  },
+  searchInput: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 13,
+    paddingVertical: 0
+  },
+  clearSearchBtn: {
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  clearSearchText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0f172a',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 14,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: THEME.colors.primary,
+    borderWidth: 1,
+    borderColor: '#1e293b'
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8
+  },
+  sectionLogo: {
+    width: 22,
+    height: 22,
+    marginRight: 8
+  },
+  sectionTrophy: {
+    fontSize: 16,
+    marginRight: 8
+  },
+  sectionTitle: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+    flexShrink: 1
+  },
+  sectionBadge: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  sectionBadgeText: {
+    color: THEME.colors.primary,
+    fontSize: 11,
+    fontWeight: 'bold'
   },
   dateNavSection: {
     flexDirection: 'row',
