@@ -41,6 +41,12 @@ export class SessionStore {
     this.history = items;
   }
 
+  removeHistoryItems(target: string | string[]): void {
+    if (!this.history) return;
+    const targetSet = new Set(Array.isArray(target) ? target : [target]);
+    this.history = this.history.filter((item) => !targetSet.has(item.id));
+  }
+
   hasHistory(): boolean {
     return this.history !== null;
   }

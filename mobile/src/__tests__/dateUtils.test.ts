@@ -10,7 +10,8 @@ import {
   formatNavDisplayDate,
   getNextDayString,
   getPreviousDayString,
-  canGoBackDate
+  canGoBackDate,
+  formatCreationDateTime
 } from '../utils/dateUtils';
 
 test('Mobile Regression: getUserTimezone returns non-empty string', () => {
@@ -78,4 +79,11 @@ test('Mobile Regression: Date Navigation helpers', () => {
   const display = formatNavDisplayDate(dayAfter);
   assert.notEqual(display, 'Tomorrow');
   assert.match(display, /^[A-Z][a-z]{2}\s[A-Z][a-z]{2}\s\d+$/);
+});
+
+test('Mobile Regression: formatCreationDateTime formats date and time cleanly', () => {
+  const result = formatCreationDateTime('2026-11-20T14:30:00Z');
+  assert.ok(typeof result === 'string');
+  assert.ok(result.includes('•'));
+  assert.ok(result.includes('2026'));
 });

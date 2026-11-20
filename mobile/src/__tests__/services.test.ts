@@ -133,3 +133,24 @@ test('Mobile Regression: SessionStore preserves prediction selections and active
   assert.deepEqual(sessionStore.getSelections(), selections);
 });
 
+test('Mobile Regression: SessionStore removeHistoryItems removes single and batch items correctly', () => {
+  sessionStore.clearAll();
+  const mockHistory: HistoryItem[] = [
+    { id: 'h1', targetDate: '2026-11-20', description: '', status: 'ACCEPTED', createdAt: '2026-11-20T10:00:00Z', games: [] },
+    { id: 'h2', targetDate: '2026-11-21', description: '', status: 'ACCEPTED', createdAt: '2026-11-21T10:00:00Z', games: [] },
+    { id: 'h3', targetDate: '2026-11-22', description: '', status: 'ACCEPTED', createdAt: '2026-11-22T10:00:00Z', games: [] }
+  ];
+
+  sessionStore.setHistory(mockHistory);
+  assert.equal(sessionStore.getHistory()?.length, 3);
+
+  // Single deletion
+  sessionStore.removeHistoryItems('h2');
+  assert.equal(sessionStore.getHistory()?.length, 2);
+  assert.deepEqual(sessionStore.getHistory()?.map(h => h.id), ['h1', 'h3']);
+
+  // Batch deletion
+  sessionStore.removeHistoryItems(['h1', 'h3']);
+  assert.equal(sessionStore.getHistory()?.length, 0);
+});
+

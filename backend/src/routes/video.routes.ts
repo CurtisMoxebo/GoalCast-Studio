@@ -1,9 +1,94 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
 
 const router = Router();
+
+/**
+ * Resolves video path from in-memory manager or disk search
+ */
+function resolveVideoPath(identifier: string): string | null {
+  // 1. Check in-memory job manager
+  const job = videoJobManager.getJob(identifier);
+  if (job?.videoPath && fs.existsSync(job.videoPath)) {
+    return job.videoPath;
+  }
+
+  // 2. Check filesystem temp directory
+  const renderBase = path.join(os.tmpdir(), 'goalcast_render');
+  if (fs.existsSync(renderBase)) {
+    // 2a. Direct folder match: goalcast_render/<identifier>/
+    const directFolder = path.join(renderBase, identifier);
+    if (fs.existsSync(directFolder) && fs.statSync(directFolder).isDirectory()) {
+      const files = fs.readdirSync(directFolder);
+      const mp4 = files.find((f) => f.endsWith('.mp4'));
+      if (mp4) return path.join(directFolder, mp4);
+    }
+
+    // 2b. Scan subfolders containing identifier
+    const entries = fs.readdirSync(renderBase);
+    for (const entry of entries) {
+      if (entry.includes(identifier)) {
+        const fullDir = path.join(renderBase, entry);
+        if (fs.statSync(fullDir).isDirectory()) {
+          const files = fs.readdirSync(fullDir);
+          const mp4 = files.find((f) => f.endsWith('.mp4'));
+          if (mp4) return path.join(fullDir, mp4);
+        }
+      }
+    }
+
+    // 2c. Fallback: find the newest rendered MP4 video on disk only if specifically requested as 'latest' or 'default'
+    if (identifier === 'latest' || identifier === 'default') {
+      const dirsWithMtime = entries
+        .map((entry) => {
+          const fullDir = path.join(renderBase, entry);
+          try {
+            const stat = fs.statSync(fullDir);
+            return stat.isDirectory() ? { dir: fullDir, mtime: stat.mtimeMs } : null;
+          } catch {
+            return null;
+          }
+        })
+        .filter((x): x is { dir: string; mtime: number } => x !== null)
+        .sort((a, b) => b.mtime - a.mtime);
+
+      for (const d of dirsWithMtime) {
+        try {
+          const files = fs.readdirSync(d.dir);
+          const mp4 = files.find((f) => f.endsWith('.mp4'));
+          if (mp4) return path.join(d.dir, mp4);
+        } catch {}
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolves thumbnail path from in-memory manager or disk search
+ */
+function resolveThumbnailPath(identifier: string): string | null {
+  const job = videoJobManager.getJob(identifier);
+  if (job?.thumbnailPath && fs.existsSync(job.thumbnailPath)) {
+    return job.thumbnailPath;
+  }
+
+  const renderBase = path.join(os.tmpdir(), 'goalcast_render');
+  if (fs.existsSync(renderBase)) {
+    const directFolder = path.join(renderBase, identifier);
+    if (fs.existsSync(directFolder) && fs.statSync(directFolder).isDirectory()) {
+      const thumb = path.join(directFolder, 'thumbnail.jpg');
+      if (fs.existsSync(thumb)) return thumb;
+    }
+  }
+
+  return null;
+}
 
 /**
  * GET /api/video/progress/:jobId
@@ -23,23 +108,48 @@ router.get('/progress/:jobId', (req: Request, res: Response): void => {
 
 /**
  * GET /api/video/download/:jobId
- * Streams or downloads generated video file
+ * Streams video file with full HTTP Range (206) support for mobile video players
  */
 router.get('/download/:jobId', (req: Request, res: Response): void => {
   const jobId = req.params.jobId as string;
-  const job = videoJobManager.getJob(jobId);
+  const videoPath = resolveVideoPath(jobId);
 
-  if (!job || job.status !== 'COMPLETED' || !job.videoPath) {
+  if (!videoPath || !fs.existsSync(videoPath)) {
     res.status(404).json({ error: 'Video is not ready or does not exist.' });
     return;
   }
 
-  if (!fs.existsSync(job.videoPath)) {
-    res.status(404).json({ error: 'Video file not found on disk.' });
-    return;
-  }
+  const stat = fs.statSync(videoPath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
 
-  res.download(job.videoPath, `goalcast_${jobId}.mp4`);
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (start >= fileSize) {
+      res.status(416).send('Requested range not satisfiable');
+      return;
+    }
+
+    const chunksize = end - start + 1;
+    const file = fs.createReadStream(videoPath, { start, end });
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': 'video/mp4'
+    });
+    file.pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Content-Type': 'video/mp4',
+      'Accept-Ranges': 'bytes'
+    });
+    fs.createReadStream(videoPath).pipe(res);
+  }
 });
 
 /**
@@ -48,14 +158,14 @@ router.get('/download/:jobId', (req: Request, res: Response): void => {
  */
 router.get('/thumbnail/:jobId', (req: Request, res: Response): void => {
   const jobId = req.params.jobId as string;
-  const job = videoJobManager.getJob(jobId);
+  const thumbPath = resolveThumbnailPath(jobId);
 
-  if (!job || !job.thumbnailPath || !fs.existsSync(job.thumbnailPath)) {
+  if (!thumbPath || !fs.existsSync(thumbPath)) {
     res.status(404).json({ error: 'Thumbnail not found.' });
     return;
   }
 
-  res.sendFile(job.thumbnailPath);
+  res.sendFile(thumbPath);
 });
 
 /**

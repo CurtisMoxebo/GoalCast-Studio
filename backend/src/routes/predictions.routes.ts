@@ -314,28 +314,40 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
 
 /**
  * POST /api/predictions/status
- * Updates status of a prediction group (ACCEPTED or CANCELLED)
+ * Updates status of prediction group(s) (ACCEPTED, CANCELLED, or DELETED)
+ * Supports single groupId or array of groupIds
  */
 router.post('/status', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId, status } = req.body;
-    if (!groupId || !['ACCEPTED', 'CANCELLED'].includes(status)) {
-      res.status(400).json({ error: 'Valid groupId and status (ACCEPTED or CANCELLED) are required.' });
+    const { groupId, groupIds, status } = req.body;
+    const validStatuses = ['ACCEPTED', 'CANCELLED', 'DELETED'];
+    if (!status || !validStatuses.includes(status)) {
+      res.status(400).json({ error: 'Valid status (ACCEPTED, CANCELLED, or DELETED) is required.' });
+      return;
+    }
+
+    const targetIds: string[] = Array.isArray(groupIds)
+      ? groupIds.filter((id) => typeof id === 'string' && id.trim().length > 0)
+      : (groupId && typeof groupId === 'string' ? [groupId] : []);
+
+    if (targetIds.length === 0) {
+      res.status(400).json({ error: 'Valid groupId or groupIds array is required.' });
       return;
     }
 
     try {
-      await prisma.predictionGroup.update({
-        where: { id: groupId },
+      await prisma.predictionGroup.updateMany({
+        where: { id: { in: targetIds } },
         data: { status }
       });
     } catch (e) {
-      console.warn(`[PredictionsRoute] Could not update status in DB for groupId ${groupId}:`, e);
+      console.warn(`[PredictionsRoute] Could not update status in DB for targetIds ${targetIds.join(', ')}:`, e);
     }
 
     res.json({
       success: true,
-      groupId,
+      count: targetIds.length,
+      targetIds,
       status
     });
   } catch (error: any) {

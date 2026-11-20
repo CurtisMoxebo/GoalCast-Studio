@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { THEME } from '../constants/theme';
+import * as FileSystem from 'expo-file-system/legacy';
 import { mobileApi } from '../services/api';
 import { deviceStorage } from '../services/deviceStorage';
 import { sessionStore } from '../services/sessionStore';
@@ -93,9 +94,19 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           clearInterval(pollInterval);
           setProgressMessage('Downloading video to device storage...');
 
-          // Save video directly to user's device storage
+          // Save video directly to user's device storage under groupId and jobId
           const downloadUrl = mobileApi.getVideoDownloadUrl(jobId);
-          const localUri = await deviceStorage.saveVideoToDevice(downloadUrl, `goalcast_${jobId}.mp4`);
+          const primaryFilename = groupId ? `goalcast_${groupId}.mp4` : `goalcast_${jobId}.mp4`;
+          const localUri = await deviceStorage.saveVideoToDevice(downloadUrl, primaryFilename);
+
+          if (groupId && jobId && groupId !== jobId) {
+            try {
+              const jobDestination = deviceStorage.getVideoUri(`goalcast_${jobId}.mp4`);
+              await FileSystem.copyAsync({ from: localUri, to: jobDestination });
+            } catch (copyErr) {
+              console.warn('[PreviewModal] Could not copy video to jobId destination:', copyErr);
+            }
+          }
 
           if (isMounted) {
             setLocalVideoUri(localUri);

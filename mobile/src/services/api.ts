@@ -97,11 +97,18 @@ export class MobileApiService {
     return `${this.baseUrl}/api/video/thumbnail/${jobId}`;
   }
 
-  async updatePredictionStatus(groupId: string, status: 'ACCEPTED' | 'CANCELLED'): Promise<any> {
+  async updatePredictionStatus(
+    target: string | string[],
+    status: 'ACCEPTED' | 'CANCELLED' | 'DELETED'
+  ): Promise<any> {
+    const body = Array.isArray(target)
+      ? { groupIds: target, status }
+      : { groupId: target, status };
+
     const res = await fetch(`${this.baseUrl}/api/predictions/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groupId, status })
+      body: JSON.stringify(body)
     });
     return res.json();
   }

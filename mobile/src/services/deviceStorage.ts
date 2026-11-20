@@ -74,14 +74,27 @@ export class DeviceStorageService {
    */
   async doesVideoExist(filenameOrUri: string): Promise<boolean> {
     try {
-      const uri = filenameOrUri.startsWith('file://')
-        ? filenameOrUri
-        : `${this.getStorageDir()}${filenameOrUri}`;
+      const uri = this.getVideoUri(filenameOrUri);
       const info = await FileSystem.getInfoAsync(uri);
       return info.exists;
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Get the full file:// URI for a video filename or path
+   */
+  getVideoUri(filenameOrUri: string): string {
+    if (
+      filenameOrUri.startsWith('file://') ||
+      filenameOrUri.startsWith('http://') ||
+      filenameOrUri.startsWith('https://')
+    ) {
+      return filenameOrUri;
+    }
+    const clean = filenameOrUri.startsWith('/') ? filenameOrUri.slice(1) : filenameOrUri;
+    return `${this.getStorageDir()}${clean}`;
   }
 
   /**
@@ -94,6 +107,35 @@ export class DeviceStorageService {
       return await FileSystem.readDirectoryAsync(dir);
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Delete all local videos associated with a prediction group
+   */
+  async deleteVideoForGroup(groupId: string): Promise<void> {
+    try {
+      // 1. Direct filename delete
+      await this.deleteVideoFromDevice(`goalcast_${groupId}.mp4`);
+
+      // 2. Scan directory for any file matching this groupId
+      const files = await this.listSavedVideos();
+      for (const file of files) {
+        if (file.includes(groupId)) {
+          await this.deleteVideoFromDevice(file);
+        }
+      }
+    } catch (err) {
+      console.warn('[DeviceStorage] Error deleting video for group:', groupId, err);
+    }
+  }
+
+  /**
+   * Batch delete all local videos for multiple prediction groups
+   */
+  async deleteVideosForGroups(groupIds: string[]): Promise<void> {
+    for (const id of groupIds) {
+      await this.deleteVideoForGroup(id);
     }
   }
 }

@@ -55,17 +55,7 @@ export async function shareToSocialMedia(
   const platformName = config?.name || 'Social Media';
   const thumbStr = formatThumbnailTimestamp(payload.thumbnailTimestamp);
 
-  // 1. Copy description to clipboard so user can simply paste into the caption field
-  if (payload.description) {
-    try {
-      const Clipboard = await import('expo-clipboard');
-      await Clipboard.setStringAsync(payload.description);
-    } catch (clipErr) {
-      console.warn('[SocialShare] Clipboard copy warning:', clipErr);
-    }
-  }
-
-  // 2. Android Direct App Intent Launch (Bypasses system chooser directly into Reel/Post edit mode)
+  // Android Direct App Intent Launch (Bypasses system chooser directly into Reel/Post edit mode)
   try {
     const { Platform, ToastAndroid, Alert } = await import('react-native');
 
@@ -86,7 +76,7 @@ export async function shareToSocialMedia(
         // Show non-blocking toast with thumbnail timeframe guidance
         try {
           ToastAndroid.show(
-            `Opening ${platformName}... (Caption copied! Cover: ${thumbStr})`,
+            `Opening ${platformName}... (Cover: ${thumbStr})`,
             ToastAndroid.LONG
           );
         } catch {}
@@ -233,6 +223,103 @@ export async function shareToSocialMedia(
       const { Alert } = await import('react-native');
       Alert.alert('Sharing Notice', `Could not complete share to ${platformName}: ${err?.message}`);
     } catch {}
+    return false;
+  }
+}
+
+/**
+ * Share video file with its description directly into the native share sheet
+ * Attaches the local video file and sets the description as the share caption/title.
+ */
+export async function sharePredictionVideo(payload: SocialSharePayload): Promise<boolean> {
+  const { videoUri, description } = payload;
+
+  try {
+    const { Platform } = await import('react-native');
+
+    // On iOS, React Native Share.share natively attaches both message (caption) and file URL
+    if (Platform.OS === 'ios') {
+      try {
+        const { Share } = await import('react-native');
+        const res = await Share.share({
+          title: 'GoalCast Prediction Reel',
+          message: description,
+          url: videoUri
+        });
+        if (res.action === Share.sharedAction) {
+          return true;
+        }
+      } catch (iosErr) {
+        console.warn('[SocialShare] iOS Share.share warning, falling back to expo-sharing:', iosErr);
+      }
+    }
+
+    // On Android & cross-platform: expo-sharing creates the native FileProvider share chooser
+    const Sharing = await import('expo-sharing');
+    const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+
+    if (isAvailable && videoUri.startsWith('file://')) {
+      await Sharing.shareAsync(videoUri, {
+        mimeType: 'video/mp4',
+        dialogTitle: description || 'Share GoalCast Prediction Reel',
+        UTI: 'public.movie'
+      });
+      return true;
+    }
+
+    // Fallback: React Native Share
+    const { Share } = await import('react-native');
+    await Share.share({
+      title: 'GoalCast Prediction Reel',
+      message: description ? `${description}\n\n${videoUri}` : videoUri
+    });
+    return true;
+  } catch (err: any) {
+    console.error('[SocialShare] Error sharing video:', err);
+    try {
+      const { Alert } = await import('react-native');
+      Alert.alert('Share Error', `Could not share video: ${err?.message}`);
+    } catch {}
+    return false;
+  }
+}
+
+/**
+ * Share multiple prediction video files with their descriptions directly into native share sheet
+ */
+export async function shareMultiplePredictionVideos(
+  items: { videoUri: string; description: string }[]
+): Promise<boolean> {
+  if (items.length === 0) return false;
+  if (items.length === 1) {
+    return sharePredictionVideo(items[0]);
+  }
+
+  const combinedDescription = items
+    .map((item, i) => `[Reel ${i + 1}]: ${item.description}`)
+    .join('\n\n');
+
+  try {
+    const Sharing = await import('expo-sharing');
+    const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+
+    if (isAvailable && items[0].videoUri.startsWith('file://')) {
+      await Sharing.shareAsync(items[0].videoUri, {
+        mimeType: 'video/mp4',
+        dialogTitle: combinedDescription,
+        UTI: 'public.movie'
+      });
+      return true;
+    }
+
+    const { Share } = await import('react-native');
+    await Share.share({
+      title: `GoalCast Prediction Reels (${items.length})`,
+      message: combinedDescription
+    });
+    return true;
+  } catch (err: any) {
+    console.error('[SocialShare] Error batch sharing videos:', err);
     return false;
   }
 }

@@ -173,3 +173,27 @@ export function getSelectableFutureDates(numDays = 7): { dateStr: string; label:
 
   return dates;
 }
+
+/**
+ * Format creation date and time for History items
+ * E.g. "Nov 20, 2026 • 2:45 PM"
+ */
+export function formatCreationDateTime(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    const datePart = d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const timePart = d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${datePart} • ${timePart}`;
+  } catch {
+    return isoString;
+  }
+}

@@ -59,19 +59,22 @@ export interface VoiceOption {
 
 export interface HistoryItem {
   id: string;
-  status: 'ACCEPTED' | 'PREVIEW' | 'CANCELLED';
+  status: 'ACCEPTED' | 'PREVIEW' | 'CANCELLED' | 'DELETED';
   targetDate: string;
   description: string;
   createdAt: string;
   localVideoPath?: string;
   games: {
     homeTeam: string;
+    homeTeamLogo?: string;
     awayTeam: string;
-    competition: string;
-    kickoffTime: string;
+    awayTeamLogo?: string;
+    competition?: string;
+    kickoffTime?: string;
     selections: {
       code: string;
       label: string;
+      category?: string;
     }[];
   }[];
 }
