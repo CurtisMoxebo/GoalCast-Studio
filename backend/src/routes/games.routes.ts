@@ -51,8 +51,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    console.log(`[GamesRoute] 📅 Querying fixtures for targetDate="${targetDate}", timezone="${timezone}"`);
+
     const ai = getAIService();
+    console.log(`[GamesRoute] 🤖 Using AI Service provider: "${ai.providerName}"`);
     const games = await ai.fetchUpcomingGames(targetDate, timezone);
+
+    console.log(`[GamesRoute] ✅ Found ${games.length} matches for ${targetDate}`);
+    if (games.length > 0) {
+      games.forEach((g, i) => {
+        console.log(`  ${i + 1}. [${g.competition}] ${g.homeTeam} vs ${g.awayTeam} (Kickoff: ${g.kickoffTime})`);
+      });
+    }
 
     res.json({
       success: true,

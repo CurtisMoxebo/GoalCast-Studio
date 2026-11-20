@@ -90,6 +90,7 @@ Respond ONLY with a valid JSON array adhering strictly to this schema:
 ]
 `;
 
+    console.log(`[GeminiAIService] 🤖 Calling Gemini model "${this.modelName}" for upcoming fixtures on ${targetDate}...`);
     try {
       const response = await ai.models.generateContent({
         model: this.modelName,
@@ -101,6 +102,7 @@ Respond ONLY with a valid JSON array adhering strictly to this schema:
       });
 
       const text = (response.text || '[]').trim();
+      console.log(`[GeminiAIService] 📥 Gemini response received (${text.length} chars)`);
       let parsed: any[] = [];
       try {
         parsed = JSON.parse(text);
@@ -130,22 +132,29 @@ Respond ONLY with a valid JSON array adhering strictly to this schema:
         return url;
       };
 
-      return parsed.map((item: any, index: number) => {
+      const results = parsed.map((item: any, index: number) => {
         const homeTeam = String(item.homeTeam || 'Home Team').trim();
         const awayTeam = String(item.awayTeam || 'Away Team').trim();
         const competition = String(item.competition || 'Football Match').trim();
+        const homeLogo = formatLogoUrl(item.homeTeamLogo);
+        const awayLogo = formatLogoUrl(item.awayTeamLogo);
+        const compLogo = formatLogoUrl(item.competitionLogo);
+
+        console.log(`[GeminiAIService] ⚽ [${competition}] ${homeTeam} (Logo: ${homeLogo || 'none'}) vs ${awayTeam} (Logo: ${awayLogo || 'none'})`);
 
         return {
           id: item.id || `game_${targetDate}_${index}_${Date.now()}`,
           homeTeam,
-          homeTeamLogo: formatLogoUrl(item.homeTeamLogo),
+          homeTeamLogo: homeLogo,
           awayTeam,
-          awayTeamLogo: formatLogoUrl(item.awayTeamLogo),
+          awayTeamLogo: awayLogo,
           competition,
-          competitionLogo: formatLogoUrl(item.competitionLogo),
+          competitionLogo: compLogo,
           kickoffTime: item.kickoffTime || `${targetDate}T15:00:00Z`
         };
       });
+
+      return results;
     } catch (err: any) {
       console.error('[GeminiAIService] fetchUpcomingGames failed:', err?.message || err);
       if (
@@ -219,6 +228,7 @@ Return a JSON array of objects with the exact schema:
 ]
 `;
 
+    console.log(`[GeminiAIService] 🔮 Generating statistical predictions for ${games.length} matches...`);
     try {
       const response = await ai.models.generateContent({
         model: this.modelName,
@@ -263,6 +273,8 @@ Return a JSON array of objects with the exact schema:
             });
           }
         }
+
+        console.log(`[GeminiAIService] 🎯 Predictions for ${matchingGame.homeTeam} vs ${matchingGame.awayTeam}: [${predictions.map((p) => p.code).join(', ')}]`);
 
         results.push({
           gameId: matchingGame.id,

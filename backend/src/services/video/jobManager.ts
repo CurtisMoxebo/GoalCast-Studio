@@ -14,6 +14,7 @@ class VideoJobManager {
   private jobs = new Map<string, VideoJobProgress>();
 
   createJob(jobId: string): VideoJobProgress {
+    console.log(`[JobManager] 🎬 [${jobId}] Initializing new video rendering job`);
     const job: VideoJobProgress = {
       jobId,
       status: 'PENDING',
@@ -26,6 +27,7 @@ class VideoJobManager {
   }
 
   updateProgress(jobId: string, percent: number, message: string): void {
+    console.log(`[JobManager] ⏳ [${jobId}] Progress: ${percent}% - ${message}`);
     const job = this.jobs.get(jobId);
     if (job) {
       job.status = 'PROCESSING';
@@ -38,6 +40,7 @@ class VideoJobManager {
     jobId: string,
     result: { videoPath: string; thumbnailPath?: string; durationSeconds: number }
   ): void {
+    console.log(`[JobManager] ✅ [${jobId}] Completed successfully in ${result.durationSeconds}s! Video: ${result.videoPath}`);
     const job = this.jobs.get(jobId);
     if (job) {
       job.status = 'COMPLETED';
@@ -50,6 +53,7 @@ class VideoJobManager {
   }
 
   failJob(jobId: string, error: string): void {
+    console.error(`[JobManager] ❌ [${jobId}] Video generation failed:`, error);
     const job = this.jobs.get(jobId);
     if (job) {
       job.status = 'FAILED';

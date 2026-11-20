@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -16,6 +16,37 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Comprehensive Request Logger Middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+  const time = new Date().toLocaleTimeString();
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+
+  const queryStr = Object.keys(req.query).length > 0 ? ` ? ${JSON.stringify(req.query)}` : '';
+  console.log(`\n[${time}] 🌐 INCOMING: ${req.method} ${req.originalUrl || req.url}${queryStr} (from ${ip})`);
+
+  if ((req.method === 'POST' || req.method === 'PUT') && req.body && Object.keys(req.body).length > 0) {
+    const bodyCopy = { ...req.body };
+    if (Array.isArray(bodyCopy.games) && bodyCopy.games.length > 3) {
+      console.log(`[${time}] 📦 Payload (${bodyCopy.games.length} games):`, JSON.stringify({
+        ...bodyCopy,
+        games: bodyCopy.games.slice(0, 2).concat([`... +${bodyCopy.games.length - 2} more games`] as any)
+      }, null, 2));
+    } else {
+      console.log(`[${time}] 📦 Payload:`, JSON.stringify(bodyCopy, null, 2));
+    }
+  }
+
+  res.on('finish', () => {
+    const elapsed = Date.now() - start;
+    const isError = res.statusCode >= 400;
+    const badge = isError ? '❌' : '✅';
+    console.log(`[${time}] ${badge} RESPONSE: ${req.method} ${req.originalUrl || req.url} -> ${res.statusCode} (${elapsed}ms)`);
+  });
+
+  next();
+});
+
 // API Routes
 app.use('/api/games', gamesRoutes);
 app.use('/api/predictions', predictionsRoutes);
@@ -23,7 +54,8 @@ app.use('/api/media', mediaRoutes);
 app.use('/api/video', videoRoutes);
 
 // Health Check
-app.get('/api/health', (_req: Request, res: Response) => {
+app.get('/api/health', (req: Request, res: Response) => {
+  console.log(`[GoalCast Health] Health check pinged from ${req.ip || 'unknown'}`);
   res.json({
     status: 'ok',
     service: 'goalcast-studio-backend',
@@ -35,9 +67,12 @@ const isTest = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg
 if (!isTest) {
   const host = '0.0.0.0';
   app.listen(Number(port), host, () => {
-    console.log(`[GoalCast Backend] Server running on http://${host}:${port}`);
-    console.log(`[GoalCast Backend] Health check: http://localhost:${port}/api/health`);
-    console.log(`[GoalCast Backend] Video Test:  http://localhost:${port}/api/video/test`);
+    console.log(`====================================================`);
+    console.log(`⚽ [GoalCast Studio Backend] Running on http://${host}:${port}`);
+    console.log(`🔍 Health check: http://localhost:${port}/api/health`);
+    console.log(`🎥 Video Test:  http://localhost:${port}/api/video/test`);
+    console.log(`📡 Ready to receive connections from mobile app & LAN`);
+    console.log(`====================================================\n`);
   });
 }
 

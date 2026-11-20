@@ -11,6 +11,7 @@ export class MockAIService implements IAIService {
   public readonly providerName = 'mock';
 
   async fetchUpcomingGames(targetDate: string, _timezone: string): Promise<UpcomingGame[]> {
+    console.log(`[MockAIService] 🤖 Returning fallback/mock fixtures for date ${targetDate}`);
     const baseDate = new Date(targetDate);
     const dateStr = baseDate.toISOString().split('T')[0];
 
