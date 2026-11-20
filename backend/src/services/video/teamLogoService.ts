@@ -63,12 +63,14 @@ export class TeamLogoService {
   private async fetchImageBuffer(url: string): Promise<Buffer | null> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const resp = await fetch(url, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'GoalCastStudio/1.0 (contact@goalcast.studio)'
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
         }
       });
       clearTimeout(timeoutId);
@@ -79,6 +81,10 @@ export class TeamLogoService {
       }
 
       const ab = await resp.arrayBuffer();
+      if (ab.byteLength < 50) {
+        console.warn(`[TeamLogoService] Image response from ${url} was too small (${ab.byteLength} bytes)`);
+        return null;
+      }
       return Buffer.from(ab);
     } catch (e: any) {
       console.warn(`[TeamLogoService] Error fetching image ${url}:`, e.message);
@@ -131,13 +137,16 @@ export class TeamLogoService {
     }
 
     try {
-      // 1. Determine target URL (from customUrl provided by AI or query AI directly)
-      let targetUrl: string | undefined = customUrl && (customUrl.startsWith('http://') || customUrl.startsWith('https://'))
-        ? customUrl
-        : undefined;
+      // 1. Determine target URL (strictly prioritize AI-provided logo URL)
+      let targetUrl: string | undefined =
+        customUrl && (customUrl.startsWith('http://') || customUrl.startsWith('https://'))
+          ? customUrl
+          : undefined;
 
-      // 2. If no custom URL was provided, query Gemini for the logo URL
-      if (!targetUrl) {
+      if (targetUrl) {
+        console.log(`[TeamLogoService] 🎯 Using AI-provided logo for "${teamName}": ${targetUrl}`);
+      } else {
+        console.log(`[TeamLogoService] 🔍 Querying Gemini AI for direct logo of "${teamName}"...`);
         targetUrl = (await this.queryGeminiForLogoUrl(teamName)) || undefined;
       }
 

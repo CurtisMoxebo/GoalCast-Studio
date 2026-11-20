@@ -84,7 +84,7 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
     const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     videoJobManager.createJob(jobId);
 
-    // Format games for video composer and database
+    // Format games for video composer and database, strictly preserving AI-provided logos
     const mappedGames = games.map((g: any, index: number) => {
       const selections = (g.selections || []).map((sel: any) => {
         const opt = findBettingOptionByCode(sel.code);
@@ -98,13 +98,39 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
 
       return {
         homeTeam: g.homeTeam,
+        homeTeamLogo: g.homeTeamLogo || undefined,
         awayTeam: g.awayTeam,
+        awayTeamLogo: g.awayTeamLogo || undefined,
         competition: g.competition,
+        competitionLogo: g.competitionLogo || undefined,
         kickoffTime: g.kickoffTime,
         orderIndex: index,
         selections
       };
     });
+
+    // In case any game is missing logos from client, resolve directly from real official fixtures
+    const hasMissingLogos = mappedGames.some((m) => !m.homeTeamLogo || !m.awayTeamLogo);
+    if (hasMissingLogos) {
+      try {
+        const { RealFixturesService } = await import('../services/fixtures/realFixturesService');
+        const officialMatches = await RealFixturesService.fetchRealFixtures(targetDate);
+        for (const mg of mappedGames) {
+          const match = officialMatches.find(
+            (o) =>
+              o.homeTeam.toLowerCase().trim() === mg.homeTeam.toLowerCase().trim() ||
+              o.awayTeam.toLowerCase().trim() === mg.awayTeam.toLowerCase().trim()
+          );
+          if (match) {
+            if (!mg.homeTeamLogo && match.homeTeamLogo) mg.homeTeamLogo = match.homeTeamLogo;
+            if (!mg.awayTeamLogo && match.awayTeamLogo) mg.awayTeamLogo = match.awayTeamLogo;
+            if (!mg.competitionLogo && match.competitionLogo) mg.competitionLogo = match.competitionLogo;
+          }
+        }
+      } catch (e: any) {
+        console.warn('[PredictionsRoute] Fixture logo fallback lookup failed:', e.message);
+      }
+    }
 
     // Check for previous prediction group to see if it won (cached in DB or evaluate with AI)
     let previousWonGroup: { games: any[] } | undefined = undefined;
@@ -156,8 +182,11 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
           previousWonGroup = {
             games: lastGroup.games.map((g) => ({
               homeTeam: g.homeTeam,
+              homeTeamLogo: g.homeTeamLogo || undefined,
               awayTeam: g.awayTeam,
+              awayTeamLogo: g.awayTeamLogo || undefined,
               competition: g.competition,
+              competitionLogo: g.competitionLogo || undefined,
               kickoffTime: g.kickoffTime.toISOString(),
               selections: g.selections.map((s) => ({
                 code: s.code,
@@ -182,8 +211,11 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
           games: {
             create: mappedGames.map((g: any) => ({
               homeTeam: g.homeTeam,
+              homeTeamLogo: g.homeTeamLogo || null,
               awayTeam: g.awayTeam,
+              awayTeamLogo: g.awayTeamLogo || null,
               competition: g.competition,
+              competitionLogo: g.competitionLogo || null,
               kickoffTime: new Date(g.kickoffTime),
               orderIndex: g.orderIndex,
               selections: {

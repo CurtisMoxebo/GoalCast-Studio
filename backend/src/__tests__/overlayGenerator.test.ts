@@ -100,3 +100,27 @@ test('Regression: OverlayGenerator generates Prediction Banner PNG under game bo
   // Clean up
   if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
 });
+
+test('Regression: OverlayGenerator embeds AI-provided logo URLs directly into Match Card', async () => {
+  const tmpDir = path.join(os.tmpdir(), 'goalcast_tests_overlay');
+  const outputPath = path.join(tmpDir, 'test_match_card_ai_logos.png');
+
+  const game = {
+    homeTeam: 'Arsenal',
+    homeTeamLogo: 'https://a.espncdn.com/i/teamlogos/soccer/500/359.png',
+    awayTeam: 'Chelsea',
+    awayTeamLogo: 'https://a.espncdn.com/i/teamlogos/soccer/500/363.png',
+    competition: 'Premier League',
+    kickoffTime: '2026-11-20T18:00:00Z'
+  };
+
+  await overlayGenerator.generateMatchCardOverlay(game, 1, 1, 'Arsenal to win or draw', outputPath);
+
+  assert.ok(fs.existsSync(outputPath), 'Match card with AI logos must exist');
+  const metadata = await sharp(outputPath).metadata();
+  assert.equal(metadata.width, 1080);
+  assert.equal(metadata.height, 1920);
+
+  // Clean up
+  if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+});
