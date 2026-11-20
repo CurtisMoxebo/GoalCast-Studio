@@ -212,7 +212,7 @@ export class TeamLogoService {
       }
 
       // 2. Determine target URL
-      let targetUrl = customUrl && (customUrl.startsWith('http://') || customUrl.startsWith('https://'))
+      let targetUrl: string | undefined = customUrl && (customUrl.startsWith('http://') || customUrl.startsWith('https://'))
         ? customUrl
         : KNOWN_ONLINE_LOGOS[normalized];
 

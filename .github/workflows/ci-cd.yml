@@ -7,8 +7,34 @@ on:
     branches: [main]
 
 jobs:
-  backend-ci:
-    name: Backend Test & Build
+  backend-build:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build TypeScript
+        run: npm run build
+
+  backend-test:
+    name: Backend Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,11 +59,31 @@ jobs:
       - name: Run Unit & Regression Tests
         run: npm test
 
-      - name: Build TypeScript
+  mobile-build:
+    name: Build Mobile App
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mobile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Mobile App
         run: npm run build
 
-  mobile-ci:
-    name: Mobile App Test & Typecheck
+  mobile-test:
+    name: Mobile App Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -59,12 +105,9 @@ jobs:
       - name: Run Mobile Regression Tests
         run: npm test
 
-      - name: Typecheck React Native Mobile App
-        run: npm run typecheck
-
   build-docker:
     name: Build Backend Docker Image
-    needs: [backend-ci, mobile-ci]
+    needs: [backend-build, backend-test, mobile-build, mobile-test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
