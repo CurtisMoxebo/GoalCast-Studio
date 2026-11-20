@@ -23,7 +23,7 @@ export const SOCIAL_PLATFORMS: PlatformConfig[] = [
   {
     id: 'instagram',
     name: 'Instagram Reels',
-    color: '#E1306C',
+    color: '#833AB4',
     icon: 'logo-instagram'
   },
   {

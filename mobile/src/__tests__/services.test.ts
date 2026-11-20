@@ -17,7 +17,7 @@ test('Mobile Regression: Social platforms configuration', () => {
   const fb = SOCIAL_PLATFORMS.find((p) => p.id === 'facebook');
   assert.equal(fb?.color, '#1877F2');
   const ig = SOCIAL_PLATFORMS.find((p) => p.id === 'instagram');
-  assert.equal(ig?.color, '#E1306C');
+  assert.equal(ig?.color, '#833AB4');
   const yt = SOCIAL_PLATFORMS.find((p) => p.id === 'youtube');
   assert.equal(yt?.color, '#FF0000');
   const tiktok = SOCIAL_PLATFORMS.find((p) => p.id === 'tiktok');

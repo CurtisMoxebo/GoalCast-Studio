@@ -3,6 +3,7 @@ import {
   Modal,
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -17,6 +18,13 @@ import { sessionStore } from '../services/sessionStore';
 import { shareToSocialMedia, SOCIAL_PLATFORMS, SocialPlatform } from '../services/socialShare';
 
 const { width } = Dimensions.get('window');
+
+const SOCIAL_ICONS: Record<SocialPlatform, any> = {
+  facebook: require('../../assets/icons/facebook.png'),
+  instagram: require('../../assets/icons/instagram.png'),
+  tiktok: require('../../assets/icons/tiktok.png'),
+  youtube: require('../../assets/icons/youtube.png')
+};
 
 const VideoPlayerComponent: React.FC<{ videoUri: string }> = ({ videoUri }) => {
   const player = useVideoPlayer(videoUri, (p) => {
@@ -212,15 +220,14 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       key={platform.id}
                       style={[styles.socialButton, { backgroundColor: platform.color }]}
                       onPress={() => handleShare(platform.id)}
+                      activeOpacity={0.8}
                     >
+                      <Image
+                        source={SOCIAL_ICONS[platform.id]}
+                        style={styles.socialIconImage}
+                        resizeMode="contain"
+                      />
                       <Text style={styles.socialButtonText}>
-                        {platform.id === 'facebook'
-                          ? '📘'
-                          : platform.id === 'instagram'
-                          ? '📸'
-                          : platform.id === 'tiktok'
-                          ? '🎵'
-                          : '▶️'}{' '}
                         {platform.name}
                       </Text>
                     </TouchableOpacity>
@@ -402,15 +409,29 @@ const styles = StyleSheet.create({
   },
   socialButton: {
     width: '48%',
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12
+    justifyContent: 'center',
+    marginBottom: 12,
+    gap: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  socialIconImage: {
+    width: 22,
+    height: 22,
+    borderRadius: 5
   },
   socialButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold'
+    fontSize: 13,
+    fontWeight: '700'
   },
   doneBtn: {
     backgroundColor: '#1e293b',
