@@ -56,7 +56,7 @@ export const GameCard: React.FC<GameCardProps> = ({
               <Text style={styles.teamInitials}>{game.homeTeam.substring(0, 2).toUpperCase()}</Text>
             </View>
           )}
-          <Text style={styles.teamName} numberOfLines={2}>
+          <Text style={styles.teamName} numberOfLines={1}>
             {game.homeTeam}
           </Text>
         </View>
@@ -82,7 +82,7 @@ export const GameCard: React.FC<GameCardProps> = ({
               <Text style={styles.teamInitials}>{game.awayTeam.substring(0, 2).toUpperCase()}</Text>
             </View>
           )}
-          <Text style={styles.teamName} numberOfLines={2}>
+          <Text style={styles.teamName} numberOfLines={1}>
             {game.awayTeam}
           </Text>
         </View>
@@ -124,9 +124,10 @@ export const GameCard: React.FC<GameCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: THEME.colors.cardBackground,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    marginBottom: 5,
     borderWidth: 1,
     borderColor: THEME.colors.cardBorder,
     position: 'relative'
@@ -137,11 +138,11 @@ const styles = StyleSheet.create({
   },
   aiCheckboxTopRight: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    top: 5,
+    right: 5,
+    width: 18,
+    height: 18,
+    borderRadius: 4,
     borderWidth: 1.5,
     borderColor: THEME.colors.textMuted,
     justifyContent: 'center',
@@ -155,74 +156,72 @@ const styles = StyleSheet.create({
   },
   aiCheckboxCheck: {
     color: '#000000',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold'
   },
   teamsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 2
+    paddingVertical: 1
   },
   teamColumn: {
     flex: 1,
     alignItems: 'center'
   },
   teamLogo: {
-    width: 34,
-    height: 34,
-    marginBottom: 4
+    width: 24,
+    height: 24,
+    marginBottom: 2
   },
   teamLogoPlaceholder: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#1e293b',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4
+    marginBottom: 2
   },
   teamInitials: {
     color: THEME.colors.primary,
     fontWeight: 'bold',
-    fontSize: 12
+    fontSize: 10
   },
   teamName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: THEME.colors.textPrimary,
-    textAlign: 'center',
-    lineHeight: 16
+    textAlign: 'center'
   },
   timeCenterContainer: {
-    width: 60,
+    width: 52,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 2
   },
   timeCenterBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
     backgroundColor: '#1e293b',
     borderWidth: 1,
     borderColor: '#334155',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 50
+    minWidth: 44
   },
   timeCenterText: {
     color: THEME.colors.primary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.3
+    fontSize: 10,
+    fontWeight: 'bold'
   },
   selectionsArea: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 5,
+    paddingTop: 5,
     borderTopWidth: 1,
     borderColor: '#1e293b'
   },
@@ -230,7 +229,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     flex: 1,
-    marginRight: 8
+    marginRight: 6
   },
   predictionBadge: {
     flexDirection: 'row',
@@ -238,44 +237,44 @@ const styles = StyleSheet.create({
     backgroundColor: '#0c4a6e',
     borderColor: THEME.colors.primary,
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginRight: 4,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginRight: 3,
     marginBottom: 2
   },
   badgeLabel: {
     color: '#e0f2fe',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
-    maxWidth: 110
+    maxWidth: 100
   },
   badgeRemove: {
-    marginLeft: 4,
-    padding: 2
+    marginLeft: 3,
+    padding: 1
   },
   badgeRemoveText: {
     color: '#f87171',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold'
   },
   noSelectionsText: {
-    fontSize: 11,
+    fontSize: 10,
     color: THEME.colors.textMuted,
     fontStyle: 'italic',
     flex: 1
   },
   predictBtn: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: THEME.colors.primary
   },
   predictBtnText: {
     color: THEME.colors.primary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold'
   }
 });

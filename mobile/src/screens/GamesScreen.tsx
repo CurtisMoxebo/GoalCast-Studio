@@ -637,12 +637,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#0f172a',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    marginTop: 8,
-    marginBottom: 5,
-    borderRadius: 6,
-    borderLeftWidth: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    marginTop: 5,
+    marginBottom: 3,
+    borderRadius: 5,
+    borderLeftWidth: 2.5,
     borderLeftColor: THEME.colors.primary,
     borderWidth: 1,
     borderColor: '#1e293b'
@@ -654,31 +654,31 @@ const styles = StyleSheet.create({
     marginRight: 6
   },
   sectionLogo: {
-    width: 18,
-    height: 18,
-    marginRight: 6
+    width: 15,
+    height: 15,
+    marginRight: 5
   },
   sectionTrophy: {
-    fontSize: 14,
-    marginRight: 6
+    fontSize: 12,
+    marginRight: 5
   },
   sectionTitle: {
     color: '#f8fafc',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     flexShrink: 1
   },
   sectionBadge: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#334155'
   },
   sectionBadgeText: {
     color: THEME.colors.primary,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold'
   },
   dateNavSection: {
@@ -762,8 +762,8 @@ const styles = StyleSheet.create({
     fontWeight: '900'
   },
   listContent: {
-    padding: 10,
-    paddingBottom: 85
+    padding: 6,
+    paddingBottom: 80
   },
   centerContainer: {
     flex: 1,
