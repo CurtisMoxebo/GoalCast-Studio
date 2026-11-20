@@ -60,38 +60,8 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
 
   if (!game) return null;
 
-  const toggleSelection = (code: string) => {
-    // If already selected, deselect it
-    if (selectedCodes.includes(code)) {
-      setSelectedCodes(selectedCodes.filter((c) => c !== code));
-      return;
-    }
-
-    // Check if code belongs to a mutually exclusive group
-    const group = EXCLUSIVE_GROUPS.find((g) => g.includes(code));
-    if (group) {
-      const existingInGroup = group.find((c) => selectedCodes.includes(c));
-      if (existingInGroup) {
-        // Replace existing selection in this group without changing total count
-        setSelectedCodes(selectedCodes.map((c) => (c === existingInGroup ? code : c)));
-        return;
-      }
-    }
-
-    // Not replacing an existing in-group selection; check 2-selection limit
-    if (selectedCodes.length >= 2) {
-      Alert.alert(
-        'Maximum Reached',
-        'You can make at most 2 betting predictions per match. Please deselect one first.'
-      );
-      return;
-    }
-
-    setSelectedCodes([...selectedCodes, code]);
-  };
-
-  const handleConfirm = () => {
-    const finalSelections: PredictionSelection[] = selectedCodes.map((code) => {
+  const buildSelections = (codes: string[]): PredictionSelection[] => {
+    return codes.map((code) => {
       const opt = availableOptions.find((o) => o.code === code);
       const fallback = RESULT_FALLBACKS[code];
       const label = opt?.label || fallback?.label || code;
@@ -109,8 +79,44 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
         spokenText
       };
     });
-    onConfirm(finalSelections);
-    onClose();
+  };
+
+  const updateSelectionsAndSave = (nextCodes: string[]) => {
+    setSelectedCodes(nextCodes);
+    onConfirm(buildSelections(nextCodes));
+  };
+
+  const toggleSelection = (code: string) => {
+    // If already selected, deselect it
+    if (selectedCodes.includes(code)) {
+      const next = selectedCodes.filter((c) => c !== code);
+      updateSelectionsAndSave(next);
+      return;
+    }
+
+    // Check if code belongs to a mutually exclusive group
+    const group = EXCLUSIVE_GROUPS.find((g) => g.includes(code));
+    if (group) {
+      const existingInGroup = group.find((c) => selectedCodes.includes(c));
+      if (existingInGroup) {
+        // Replace existing selection in this group without changing total count
+        const next = selectedCodes.map((c) => (c === existingInGroup ? code : c));
+        updateSelectionsAndSave(next);
+        return;
+      }
+    }
+
+    // Not replacing an existing in-group selection; check 2-selection limit
+    if (selectedCodes.length >= 2) {
+      Alert.alert(
+        'Maximum Reached',
+        'You can make at most 2 betting predictions per match. Please deselect one first.'
+      );
+      return;
+    }
+
+    const next = [...selectedCodes, code];
+    updateSelectionsAndSave(next);
   };
 
   const filteredOptions = availableOptions.filter((opt) => opt.category === activeTab);
@@ -292,18 +298,6 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
               })
             )}
           </ScrollView>
-
-          {/* Footer Actions */}
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
-              <Text style={styles.confirmBtnText}>
-                Confirm ({selectedCodes.length})
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </Modal>
@@ -316,12 +310,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end'
   },
+  backdropTouch: {
+    ...StyleSheet.absoluteFill
+  },
   container: {
     backgroundColor: THEME.colors.cardBackground,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '85%',
     paddingTop: 20,
+    paddingBottom: 28,
     borderTopWidth: 1,
     borderColor: THEME.colors.cardBorder
   },
@@ -512,37 +510,5 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 14,
     fontWeight: '900'
-  },
-  footer: {
-    flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
-    borderColor: THEME.colors.cardBorder,
-    backgroundColor: THEME.colors.tabBarBackground
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginRight: 10,
-    borderRadius: 12,
-    backgroundColor: '#1e293b'
-  },
-  cancelBtnText: {
-    color: THEME.colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '600'
-  },
-  confirmBtn: {
-    flex: 2,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderRadius: 12,
-    backgroundColor: THEME.colors.primary
-  },
-  confirmBtnText: {
-    color: '#020617',
-    fontSize: 15,
-    fontWeight: 'bold'
   }
 });
