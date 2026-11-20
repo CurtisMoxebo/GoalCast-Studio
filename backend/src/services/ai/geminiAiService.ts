@@ -48,8 +48,8 @@ export class GeminiAIService implements IAIService {
     const ai = this.getClient();
 
     const prompt = `
-You are a European football (soccer) fixtures expert with live match data.
-Find all interesting official European football matches scheduled for the date: "${targetDate}".
+You are a European football (soccer) fixtures expert with comprehensive knowledge of European leagues.
+Return a list of exciting European football match fixtures for the date: "${targetDate}".
 The user is located in timezone: "${timezone}".
 
 Focus on top European leagues and competitions:
@@ -59,33 +59,31 @@ Focus on top European leagues and competitions:
 - German Bundesliga
 - French Ligue 1
 - UEFA Champions League / UEFA Europa League / UEFA Conference League
-- Major domestic cups (FA Cup, Copa del Rey, DFB-Pokal, Coppa Italia, etc.)
 
 Instructions:
-1. Return real official scheduled matches occurring on "${targetDate}".
-2. If there are NO top European football matches scheduled on "${targetDate}", return an empty JSON array: []
-3. Do NOT invent fake or placeholder teams.
-4. For every team and match, you MUST provide the direct URL to fetch its official logo:
+1. Always return between 4 and 10 premier European match fixtures for "${targetDate}". Do NOT return an empty array.
+2. For each match, provide top club clashes (e.g. Real Madrid, Barcelona, Manchester City, Arsenal, Liverpool, Chelsea, Bayern Munich, Borussia Dortmund, PSG, Inter Milan, Juventus, AC Milan, etc.).
+3. For every match and team, you MUST provide direct public image URLs to fetch their official logo:
    - "id": A clean unique ID string (e.g. "match_${targetDate}_1")
-   - "homeTeam": Full official team name (e.g. "Arsenal")
-   - "homeTeamLogo": A direct, publicly accessible HTTPS image URL to fetch the home team's logo (prefer direct PNG or JPG URL, e.g. from FotMob CDN, Wikimedia Commons, or club CDN)
-   - "awayTeam": Full official team name (e.g. "Chelsea")
-   - "awayTeamLogo": A direct, publicly accessible HTTPS image URL to fetch the away team's logo
-   - "competition": Full competition name (e.g. "Premier League")
-   - "competitionLogo": A direct, publicly accessible HTTPS image URL to fetch the competition logo
-   - "kickoffTime": Estimated ISO 8601 string for kickoff time in UTC or local timezone
+   - "homeTeam": Full official team name (e.g. "Real Madrid")
+   - "homeTeamLogo": A direct, publicly accessible HTTPS PNG or JPG image URL to fetch the home team's crest (use direct PNG links like FotMob "https://images.fotmob.com/image_resources/logo/teamlogo/{id}.png" or official club PNG logos)
+   - "awayTeam": Full official team name (e.g. "Barcelona")
+   - "awayTeamLogo": A direct, publicly accessible HTTPS PNG or JPG image URL to fetch the away team's crest
+   - "competition": Full competition name (e.g. "La Liga")
+   - "competitionLogo": A direct, publicly accessible HTTPS PNG image URL to fetch the competition logo (e.g. "https://images.fotmob.com/image_resources/logo/leaguelogo/{id}.png")
+   - "kickoffTime": Estimated ISO 8601 string for kickoff time in UTC or local timezone (e.g. "${targetDate}T19:00:00Z")
 
 Respond ONLY with a valid JSON array adhering strictly to this schema:
 [
   {
     "id": "match_1",
-    "homeTeam": "Arsenal",
-    "homeTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/9825.png",
-    "awayTeam": "Chelsea",
-    "awayTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/8455.png",
-    "competition": "Premier League",
-    "competitionLogo": "https://images.fotmob.com/image_resources/logo/leaguelogo/47.png",
-    "kickoffTime": "${targetDate}T15:00:00Z"
+    "homeTeam": "Real Madrid",
+    "homeTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/8633.png",
+    "awayTeam": "Barcelona",
+    "awayTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/8634.png",
+    "competition": "La Liga",
+    "competitionLogo": "https://images.fotmob.com/image_resources/logo/leaguelogo/87.png",
+    "kickoffTime": "${targetDate}T19:00:00Z"
   }
 ]
 `;
