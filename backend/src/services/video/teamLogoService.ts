@@ -1,24 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
-import { GoogleGenAI } from '@google/genai';
 
 export class TeamLogoService {
   private localLogosDir: string;
   private cacheDir: string;
   private memoryCache: Map<string, string> = new Map();
-  private geminiClient: GoogleGenAI | null = null;
 
   constructor() {
     this.localLogosDir = path.resolve(__dirname, '../../../assets/logos');
     this.cacheDir = path.join(this.localLogosDir, 'cache');
     if (!fs.existsSync(this.cacheDir)) {
       fs.mkdirSync(this.cacheDir, { recursive: true });
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey && apiKey !== 'dummy_gemini_api_key_for_build_testing' && apiKey.length > 10) {
-      this.geminiClient = new GoogleGenAI({ apiKey });
     }
   }
 
@@ -34,49 +27,25 @@ export class TeamLogoService {
   }
 
   /**
-   * Query Gemini for team logo URL if not in dictionary
-   */
-  private async queryGeminiForLogoUrl(teamName: string): Promise<string | null> {
-    if (!this.geminiClient) return null;
-
-    try {
-      console.log(`[TeamLogoService] 🔍 Querying Gemini for direct logo URL of "${teamName}"...`);
-      const response = await this.geminiClient.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
-        contents: `What is the direct transparent SVG or PNG logo URL on Wikimedia Commons or FotMob for the football club "${teamName}"? Reply ONLY with the direct HTTPS URL, without markdown formatting or quotes.`
-      });
-
-      const text = (response.text || '').trim();
-      console.log(`[TeamLogoService] 📥 Gemini logo response for "${teamName}": ${text}`);
-      if (text.startsWith('http://') || text.startsWith('https://')) {
-        return text;
-      }
-    } catch (e: any) {
-      console.warn(`[TeamLogoService] ❌ Gemini logo lookup error for "${teamName}":`, e.message);
-    }
-    return null;
-  }
-
-  /**
-   * Fetch image buffer from a URL with timeout and appropriate User-Agent
+   * Fetch image buffer from a URL with timeout and appropriate headers
    */
   private async fetchImageBuffer(url: string): Promise<Buffer | null> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const resp = await fetch(url, {
         signal: controller.signal,
         headers: {
           'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
         }
       });
       clearTimeout(timeoutId);
 
       if (!resp.ok) {
-        console.warn(`[TeamLogoService] Failed to fetch image ${url}: HTTP ${resp.status}`);
+        console.warn(`[TeamLogoService] HTTP ${resp.status} fetching image ${url}`);
         return null;
       }
 
@@ -87,13 +56,38 @@ export class TeamLogoService {
       }
       return Buffer.from(ab);
     } catch (e: any) {
-      console.warn(`[TeamLogoService] Error fetching image ${url}:`, e.message);
+      console.warn(`[TeamLogoService] Network error fetching ${url}:`, e?.message || e);
       return null;
     }
   }
 
   /**
-   * Fallback vector crest shield data URI if image fetch fails
+   * Fetch image buffer with up to 2 retries (3 attempts total) before falling back
+   */
+  private async fetchImageBufferWithRetry(url: string, retries: number = 2): Promise<Buffer | null> {
+    const totalAttempts = 1 + retries;
+    for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+      console.log(`[TeamLogoService] 🌐 Fetching logo from ${url} (attempt ${attempt}/${totalAttempts})...`);
+      const buffer = await this.fetchImageBuffer(url);
+      if (buffer) {
+        if (attempt > 1) {
+          console.log(`[TeamLogoService] ✅ Successfully fetched logo on retry attempt ${attempt}/${totalAttempts}`);
+        }
+        return buffer;
+      }
+
+      if (attempt < totalAttempts) {
+        console.warn(`[TeamLogoService] ⚠️ Attempt ${attempt} failed for ${url}. Retrying in 300ms...`);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    }
+
+    console.warn(`[TeamLogoService] ❌ Failed to fetch logo after ${totalAttempts} attempts from ${url}. Using default shield.`);
+    return null;
+  }
+
+  /**
+   * Fallback vector crest shield data URI if image fetch fails or no URL provided
    */
   private async getFallbackShieldDataUri(teamName: string, size: number): Promise<string> {
     const rawInitials = (teamName || '')
@@ -137,21 +131,14 @@ export class TeamLogoService {
     }
 
     try {
-      // 1. Determine target URL (strictly prioritize AI-provided logo URL)
-      let targetUrl: string | undefined =
+      // 1. Directly use provided logo URL
+      const targetUrl =
         customUrl && (customUrl.startsWith('http://') || customUrl.startsWith('https://'))
           ? customUrl
           : undefined;
 
       if (targetUrl) {
-        console.log(`[TeamLogoService] 🎯 Using AI-provided logo for "${teamName}": ${targetUrl}`);
-      } else {
-        console.log(`[TeamLogoService] 🔍 Querying Gemini AI for direct logo of "${teamName}"...`);
-        targetUrl = (await this.queryGeminiForLogoUrl(teamName)) || undefined;
-      }
-
-      // 3. If we have a URL, fetch and rasterize
-      if (targetUrl) {
+        console.log(`[TeamLogoService] 🎯 Using provided logo URL for "${teamName}": ${targetUrl}`);
         const safeFilename = Buffer.from(targetUrl).toString('base64url').slice(0, 48) + '.png';
         const cachedPath = path.join(this.cacheDir, safeFilename);
 
@@ -159,7 +146,8 @@ export class TeamLogoService {
         if (fs.existsSync(cachedPath)) {
           imgBuffer = fs.readFileSync(cachedPath);
         } else {
-          imgBuffer = await this.fetchImageBuffer(targetUrl);
+          // Fetch from URL with 2 retries (3 attempts total)
+          imgBuffer = await this.fetchImageBufferWithRetry(targetUrl, 2);
           if (imgBuffer) {
             try {
               fs.writeFileSync(cachedPath, imgBuffer);
@@ -176,12 +164,14 @@ export class TeamLogoService {
           this.memoryCache.set(cacheKey, uri);
           return uri;
         }
+      } else {
+        console.log(`[TeamLogoService] ℹ No URL provided for "${teamName}". Using default shield.`);
       }
     } catch (e: any) {
-      console.warn(`[TeamLogoService] Error rasterizing logo for "${teamName}":`, e.message);
+      console.warn(`[TeamLogoService] Error rasterizing logo for "${teamName}":`, e?.message || e);
     }
 
-    // 5. Fallback vector shield
+    // 2. Fallback to default vector crest shield
     const fallbackUri = await this.getFallbackShieldDataUri(teamName, size);
     this.memoryCache.set(cacheKey, fallbackUri);
     return fallbackUri;

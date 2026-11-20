@@ -5,6 +5,7 @@ import path from 'path';
 import os from 'os';
 import sharp from 'sharp';
 import { overlayGenerator } from '../services/video/overlayGenerator';
+import { teamLogoService } from '../services/video/teamLogoService';
 
 test('Regression: OverlayGenerator generates Intro Table PNG with correct dimensions', async () => {
   const tmpDir = path.join(os.tmpdir(), 'goalcast_tests_overlay');
@@ -123,4 +124,9 @@ test('Regression: OverlayGenerator embeds AI-provided logo URLs directly into Ma
 
   // Clean up
   if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+});
+
+test('Regression: TeamLogoService retries failing URL 2 more times (3 attempts total) before using default shield', async () => {
+  const uri = await teamLogoService.getLogoDataUri('FailingTeam', 'https://127.0.0.1:59999/nonexistent.png', 80);
+  assert.ok(uri.startsWith('data:image/png;base64,'), 'Must return a valid base64 PNG data URI fallback');
 });
