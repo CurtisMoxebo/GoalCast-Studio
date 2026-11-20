@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, Image, StyleSheet } from 'react-native';
 import { THEME } from '../constants/theme';
 import { UpcomingGame, PredictionSelection } from '../types';
 import { formatKickoffTime } from '../utils/dateUtils';
@@ -28,7 +28,21 @@ export const GameCard: React.FC<GameCardProps> = ({
   const [awayLogoError, setAwayLogoError] = useState(false);
 
   return (
-    <View style={[styles.card, isSelectedForAi && styles.cardSelectedForAi]}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        isSelectedForAi && styles.cardSelectedForAi,
+        pressed && styles.cardPressed
+      ]}
+      android_ripple={{ color: 'rgba(56, 189, 248, 0.15)' }}
+      onPress={() => {
+        if (selectionModeEnabled) {
+          onToggleSelectForAi();
+        } else {
+          onOpenPicker();
+        }
+      }}
+    >
       {/* Selection mode checkbox in top-right */}
       {selectionModeEnabled && (
         <TouchableOpacity
@@ -98,7 +112,11 @@ export const GameCard: React.FC<GameCardProps> = ({
                   {sel.label}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => onRemoveSelection(sel.code)}
+                  onPress={(e) => {
+                    // @ts-ignore
+                    e?.stopPropagation?.();
+                    onRemoveSelection(sel.code);
+                  }}
                   style={styles.badgeRemove}
                 >
                   <Text style={styles.badgeRemoveText}>✕</Text>
@@ -107,17 +125,10 @@ export const GameCard: React.FC<GameCardProps> = ({
             ))}
           </View>
         ) : (
-          <Text style={styles.noSelectionsText}>No prediction selected</Text>
+          <Text style={styles.noSelectionsText}>Tap match to make predictions</Text>
         )}
-
-        {/* Predict / Edit Button */}
-        <TouchableOpacity style={styles.predictBtn} onPress={onOpenPicker}>
-          <Text style={styles.predictBtnText}>
-            {selections.length > 0 ? 'Edit Picks' : '➕ Predict'}
-          </Text>
-        </TouchableOpacity>
       </View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -135,6 +146,10 @@ const styles = StyleSheet.create({
   cardSelectedForAi: {
     borderColor: THEME.colors.primary,
     backgroundColor: '#0c2438'
+  },
+  cardPressed: {
+    backgroundColor: '#13233a',
+    opacity: 0.85
   },
   aiCheckboxTopRight: {
     position: 'absolute',
@@ -263,18 +278,5 @@ const styles = StyleSheet.create({
     color: THEME.colors.textMuted,
     fontStyle: 'italic',
     flex: 1
-  },
-  predictBtn: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: THEME.colors.primary
-  },
-  predictBtnText: {
-    color: THEME.colors.primary,
-    fontSize: 10,
-    fontWeight: 'bold'
   }
 });

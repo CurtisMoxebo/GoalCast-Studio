@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, Image, StyleSheet } from 'react-native';
 import { UpcomingGame, PredictionSelection } from '../types';
 import { THEME } from '../constants/theme';
 import { formatMatchDate, formatMatchTime } from '../utils/dateUtils';
@@ -70,21 +70,24 @@ export const CompetitionCard: React.FC<CompetitionCardProps> = ({
         const hasPredictions = selections.length > 0;
 
         return (
-          <TouchableOpacity
+          <Pressable
             key={match.id}
-            style={[
+            style={({ pressed }) => [
               styles.matchRow,
               index > 0 && styles.matchRowBorder,
-              isSelectedForAi && styles.matchRowSelected
+              isSelectedForAi && styles.matchRowSelected,
+              pressed && styles.matchRowPressed
             ]}
+            android_ripple={{ color: 'rgba(56, 189, 248, 0.15)' }}
             onLongPress={() => onLongPressGame(match.id)}
             onPress={() => {
               if (selectionModeEnabled) {
                 onToggleSelectForAi(match.id);
+              } else {
+                onOpenPicker(match);
               }
             }}
             delayLongPress={300}
-            activeOpacity={selectionModeEnabled ? 0.7 : 0.95}
           >
             {/* Left Column: Date & Time */}
             <View style={styles.timeCol}>
@@ -143,7 +146,11 @@ export const CompetitionCard: React.FC<CompetitionCardProps> = ({
                         {sel.code}
                       </Text>
                       <TouchableOpacity
-                        onPress={() => onRemoveSelection(match.id, sel.code)}
+                        onPress={(e) => {
+                          // @ts-ignore
+                          e?.stopPropagation?.();
+                          onRemoveSelection(match.id, sel.code);
+                        }}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         style={styles.pillRemove}
                       >
@@ -155,9 +162,9 @@ export const CompetitionCard: React.FC<CompetitionCardProps> = ({
               )}
             </View>
 
-            {/* Right Column: AI Checkbox (in selection mode) & Predict Button */}
-            <View style={styles.actionsCol}>
-              {selectionModeEnabled && (
+            {/* Right Column: AI Checkbox (in selection mode only) */}
+            {selectionModeEnabled && (
+              <View style={styles.actionsCol}>
                 <TouchableOpacity
                   style={[styles.aiCheckbox, isSelectedForAi && styles.aiCheckboxActive]}
                   onPress={() => onToggleSelectForAi(match.id)}
@@ -165,25 +172,9 @@ export const CompetitionCard: React.FC<CompetitionCardProps> = ({
                 >
                   {isSelectedForAi && <Text style={styles.aiCheckboxCheck}>✓</Text>}
                 </TouchableOpacity>
-              )}
-
-              {/* Predict Button (replaces the bell button) */}
-              <TouchableOpacity
-                style={[
-                  styles.predictButton,
-                  hasPredictions && styles.predictButtonActive
-                ]}
-                onPress={() => onOpenPicker(match)}
-                activeOpacity={0.7}
-              >
-                {hasPredictions ? (
-                  <Text style={styles.predictButtonTextActive}>🎯</Text>
-                ) : (
-                  <Text style={styles.predictButtonText}>🔮</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+              </View>
+            )}
+          </Pressable>
         );
       })}
     </View>
@@ -271,6 +262,10 @@ const styles = StyleSheet.create({
   },
   matchRowSelected: {
     backgroundColor: '#092138'
+  },
+  matchRowPressed: {
+    backgroundColor: '#162842',
+    opacity: 0.8
   },
   timeCol: {
     width: 68,
@@ -376,25 +371,5 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 12,
     fontWeight: 'bold'
-  },
-  predictButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#172236',
-    borderWidth: 1,
-    borderColor: '#24344d',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  predictButtonActive: {
-    backgroundColor: '#0369a1',
-    borderColor: THEME.colors.primary
-  },
-  predictButtonText: {
-    fontSize: 16
-  },
-  predictButtonTextActive: {
-    fontSize: 16
   }
 });
