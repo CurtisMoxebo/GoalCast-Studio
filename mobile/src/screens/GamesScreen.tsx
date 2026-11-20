@@ -28,6 +28,7 @@ import {
 import { filterGamesBySearchQuery, groupGamesByCompetition } from '../utils/gameUtils';
 import { triggerHaptic } from '../utils/haptics';
 import { CompetitionCard } from '../components/CompetitionCard';
+import { FixturesLoadingView } from '../components/FixturesLoadingView';
 import { PredictionPickerModal } from '../components/PredictionPickerModal';
 import { VideoSettingsWizard } from '../components/VideoSettingsWizard';
 import { PreviewModal } from '../components/PreviewModal';
@@ -517,10 +518,7 @@ export const GamesScreen: React.FC = () => {
 
       {/* Main Content: Loading, Error, Empty List, Search Empty, or SectionList */}
       {isLoadingGames ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={THEME.colors.primary} />
-          <Text style={styles.loadingText}>Querying AI for upcoming fixtures...</Text>
-        </View>
+        <FixturesLoadingView displayDate={displayDateLabel} />
       ) : fetchError ? (
         <ScrollView
           contentContainerStyle={styles.centerContainer}
