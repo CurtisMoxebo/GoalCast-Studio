@@ -106,14 +106,27 @@ export class VideoComposer {
 
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
-      // When a game has multiple predictions, strictly use ONLY the first prediction for video speech
-      const primaryPrediction = g.selections?.[0];
-      const predSpoken = primaryPrediction?.spokenText || primaryPrediction?.label || 'Both teams to score';
+      const selections = g.selections || [];
 
-      if (g.selections && g.selections.length > 1) {
+      // If a game has multiple predictions, speak both: "{pred1} and {pred2}"
+      let predSpoken = 'Both teams to score';
+      let predText = '';
+
+      if (selections.length >= 2) {
+        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
+        const spoken2 = selections[1].spokenText || selections[1].label || selections[1].code;
+        predSpoken = `${spoken1} and ${spoken2}`;
+        predText = `${spoken1} and ${spoken2} stand out as the strongest outcomes.`;
         console.log(
-          `[VideoComposer] ℹ Match ${i + 1} (${g.homeTeam} vs ${g.awayTeam}) has ${g.selections.length} predictions. Using first prediction only for speech: "${predSpoken}"`
+          `[VideoComposer] 🎙️ Match ${i + 1} (${g.homeTeam} vs ${g.awayTeam}): 2 predictions spoken => "${predText}"`
         );
+      } else if (selections.length === 1) {
+        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
+        predSpoken = spoken1;
+        predText = `${predSpoken} stands out as the strongest outcome.`;
+      } else {
+        predSpoken = 'Both teams to score';
+        predText = `${predSpoken} stands out as the strongest outcome.`;
       }
 
       // 4a. Match Announcement (Spoken as game box slides in)
@@ -127,7 +140,6 @@ export class VideoComposer {
       matchIntroSpeeches.push(introSpeech);
 
       // 4b. Prediction Text (Spoken when prediction text reveals on video)
-      const predText = `${predSpoken} stands out as the strongest outcome.`;
       const predAudioPath = path.join(workDir, `speech_match_${i + 1}_pred.wav`);
       const predSpeech = await tts.generateSpeech(predText, {
         voice,
@@ -163,9 +175,21 @@ export class VideoComposer {
     const matchPredPngs: string[] = [];
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
-      // When a game has multiple predictions, strictly use ONLY the first prediction for visual banner display
-      const primaryPrediction = g.selections?.[0];
-      const predLabel = primaryPrediction?.label || 'Both Teams to Score';
+      const selections = g.selections || [];
+
+      // Display predictions as "{prediction 1} & {prediction 2}" if 2 predictions exist
+      let predLabel = 'Both Teams to Score';
+      if (selections.length >= 2) {
+        const label1 = selections[0].label || selections[0].code;
+        const label2 = selections[1].label || selections[1].code;
+        predLabel = `${label1} & ${label2}`;
+        console.log(
+          `[VideoComposer] 🖼️ Match ${i + 1} (${g.homeTeam} vs ${g.awayTeam}): 2 predictions banner => "${predLabel}"`
+        );
+      } else if (selections.length === 1) {
+        predLabel = selections[0].label || selections[0].code;
+      }
+
       const cardPath = path.join(workDir, `overlay_match_${i + 1}_card.png`);
       const predPath = path.join(workDir, `overlay_match_${i + 1}_pred.png`);
 
@@ -284,9 +308,19 @@ export class VideoComposer {
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
       const m = matchScenes[i];
-      // Only the first prediction is captioned on the video
-      const primaryPrediction = g.selections?.[0];
-      const predSpoken = primaryPrediction?.spokenText || primaryPrediction?.label || 'Both teams to score';
+      const selections = g.selections || [];
+
+      let matchPredText = '';
+      if (selections.length >= 2) {
+        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
+        const spoken2 = selections[1].spokenText || selections[1].label || selections[1].code;
+        matchPredText = `${spoken1} and ${spoken2} stand out as the strongest outcomes.`;
+      } else if (selections.length === 1) {
+        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
+        matchPredText = `${spoken1} stands out as the strongest outcome.`;
+      } else {
+        matchPredText = 'Both teams to score stands out as the strongest outcome.';
+      }
 
       const matchIntroText = `Match ${i + 1}, ${g.homeTeam} versus ${g.awayTeam}.`;
       spokenPhrases.push({
@@ -296,7 +330,6 @@ export class VideoComposer {
         marginV: 260
       });
 
-      const matchPredText = `${predSpoken} stands out as the strongest outcome.`;
       const predRevealTime = phraseOffset + m.predRevealOffset;
       spokenPhrases.push({
         text: matchPredText,

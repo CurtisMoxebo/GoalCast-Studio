@@ -416,7 +416,10 @@ export class OverlayGenerator {
         const rowY = i * rowHeight;
         const home = this.escapeXml(game.homeTeam);
         const away = this.escapeXml(game.awayTeam);
-        const shortPred = this.formatShortPrediction(game.selections?.[0]?.code, game.selections?.[0]?.label);
+        const shortPred =
+          game.selections && game.selections.length > 1
+            ? `${this.formatShortPrediction(game.selections[0].code, game.selections[0].label)} & ${this.formatShortPrediction(game.selections[1].code, game.selections[1].label)}`
+            : this.formatShortPrediction(game.selections?.[0]?.code, game.selections?.[0]?.label);
 
         // Team line offsets (home on top half, away on bottom half)
         const rowHalf = rowHeight / 2;
@@ -442,7 +445,11 @@ export class OverlayGenerator {
         const highlightY = Math.round((badgeHeight - highlightHeight) / 2);
 
         let predFontSize = Math.min(34, Math.round(highlightHeight * 0.52));
-        if (shortPred.length > 7) predFontSize = Math.min(22, Math.round(highlightHeight * 0.38));
+        if (shortPred.length > 14) {
+          predFontSize = Math.min(18, Math.round(highlightHeight * 0.30));
+        } else if (shortPred.length > 7) {
+          predFontSize = Math.min(22, Math.round(highlightHeight * 0.38));
+        }
         else if (shortPred.length > 5) predFontSize = Math.min(26, Math.round(highlightHeight * 0.44));
 
         const badgeContent = `
@@ -554,10 +561,14 @@ export class OverlayGenerator {
   ): Promise<string> {
     const pred = this.escapeXml(predictionLabel);
     let predFontSize = 46;
-    if (pred.length > 25) {
-      predFontSize = 36;
-    } else if (pred.length > 18) {
-      predFontSize = 40;
+    if (pred.length > 40) {
+      predFontSize = 28;
+    } else if (pred.length > 30) {
+      predFontSize = 32;
+    } else if (pred.length > 22) {
+      predFontSize = 38;
+    } else if (pred.length > 16) {
+      predFontSize = 42;
     }
 
     const svg = `
