@@ -4,13 +4,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Platform,
   StatusBar as RNStatusBar
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME } from './src/constants/theme';
 import { GamesScreen } from './src/screens/GamesScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
@@ -46,7 +45,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaView style={styles.errorContainer}>
+        <View style={styles.errorContainer}>
           <ScrollView contentContainerStyle={styles.errorContent}>
             <Text style={styles.errorIcon}>⚠️</Text>
             <Text style={styles.errorTitle}>Something went wrong</Text>
@@ -55,7 +54,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               <Text style={styles.retryButtonText}>🔄 Reload Studio</Text>
             </TouchableOpacity>
           </ScrollView>
-        </SafeAreaView>
+        </View>
       );
     }
     return this.props.children;
@@ -64,58 +63,73 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 type Tab = 'GAMES' | 'HISTORY' | 'SETTINGS';
 
-export default function App() {
+function MainApp() {
   const [currentTab, setCurrentTab] = useState<Tab>('GAMES');
+  const insets = useSafeAreaInsets();
 
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar style="light" />
+
+      {/* Main Screen Content */}
+      <View style={styles.content}>
+        {currentTab === 'GAMES' && <GamesScreen />}
+        {currentTab === 'HISTORY' && <HistoryScreen />}
+        {currentTab === 'SETTINGS' && <SettingsScreen />}
+      </View>
+
+      {/* Bottom Tab Bar (3 Tabs) with Device Safe Area Insets */}
+      <View
+        style={[
+          styles.tabBar,
+          {
+            paddingBottom: Math.max(insets.bottom, 10),
+            height: 58 + Math.max(insets.bottom, 10)
+          }
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setCurrentTab('GAMES')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.tabIcon}>⚽</Text>
+          <Text style={[styles.tabLabel, currentTab === 'GAMES' && styles.tabLabelActive]}>
+            Games
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setCurrentTab('HISTORY')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.tabIcon}>📜</Text>
+          <Text style={[styles.tabLabel, currentTab === 'HISTORY' && styles.tabLabelActive]}>
+            History
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setCurrentTab('SETTINGS')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.tabIcon}>⚙️</Text>
+          <Text style={[styles.tabLabel, currentTab === 'SETTINGS' && styles.tabLabelActive]}>
+            Settings
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+export default function App() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <SafeAreaView style={styles.container}>
-          <StatusBar style="light" />
-
-          {/* Main Screen Content */}
-          <View style={styles.content}>
-            {currentTab === 'GAMES' && <GamesScreen />}
-            {currentTab === 'HISTORY' && <HistoryScreen />}
-            {currentTab === 'SETTINGS' && <SettingsScreen />}
-          </View>
-
-          {/* Bottom Tab Bar (3 Tabs) */}
-          <View style={styles.tabBar}>
-            <TouchableOpacity
-              style={styles.tabItem}
-              onPress={() => setCurrentTab('GAMES')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.tabIcon}>⚽</Text>
-              <Text style={[styles.tabLabel, currentTab === 'GAMES' && styles.tabLabelActive]}>
-                Games
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.tabItem}
-              onPress={() => setCurrentTab('HISTORY')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.tabIcon}>📜</Text>
-              <Text style={[styles.tabLabel, currentTab === 'HISTORY' && styles.tabLabelActive]}>
-                History
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.tabItem}
-              onPress={() => setCurrentTab('SETTINGS')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.tabIcon}>⚙️</Text>
-              <Text style={[styles.tabLabel, currentTab === 'SETTINGS' && styles.tabLabelActive]}>
-                Settings
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+        <MainApp />
       </ErrorBoundary>
     </SafeAreaProvider>
   );
@@ -124,21 +138,18 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.colors.background,
-    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 0
+    backgroundColor: THEME.colors.background
   },
   content: {
     flex: 1
   },
   tabBar: {
     flexDirection: 'row',
-    height: 64,
     backgroundColor: THEME.colors.tabBarBackground,
     borderTopWidth: 1,
     borderColor: THEME.colors.tabBarBorder,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingBottom: 4
+    justifyContent: 'space-around'
   },
   tabItem: {
     alignItems: 'center',
