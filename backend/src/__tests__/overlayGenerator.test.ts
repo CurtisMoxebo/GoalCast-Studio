@@ -130,3 +130,9 @@ test('Regression: TeamLogoService retries failing URL 2 more times (3 attempts t
   const uri = await teamLogoService.getLogoDataUri('FailingTeam', 'https://127.0.0.1:59999/nonexistent.png', 80);
   assert.ok(uri.startsWith('data:image/png;base64,'), 'Must return a valid base64 PNG data URI fallback');
 });
+
+test('Regression: TeamLogoService caches different ESPN URLs separately without collisions', async () => {
+  const uriArsenal = await teamLogoService.getLogoDataUri('Arsenal', 'https://a.espncdn.com/i/teamlogos/soccer/500/359.png', 80);
+  const uriChelsea = await teamLogoService.getLogoDataUri('Chelsea', 'https://a.espncdn.com/i/teamlogos/soccer/500/363.png', 80);
+  assert.notEqual(uriArsenal, uriChelsea, 'Arsenal and Chelsea logos must be completely distinct');
+});

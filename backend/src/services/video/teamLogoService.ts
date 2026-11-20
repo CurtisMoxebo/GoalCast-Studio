@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import sharp from 'sharp';
 
 export class TeamLogoService {
@@ -139,7 +140,7 @@ export class TeamLogoService {
 
       if (targetUrl) {
         console.log(`[TeamLogoService] 🎯 Using provided logo URL for "${teamName}": ${targetUrl}`);
-        const safeFilename = Buffer.from(targetUrl).toString('base64url').slice(0, 48) + '.png';
+        const safeFilename = crypto.createHash('sha256').update(targetUrl).digest('hex') + '.png';
         const cachedPath = path.join(this.cacheDir, safeFilename);
 
         let imgBuffer: Buffer | null = null;
