@@ -60,7 +60,8 @@ export class MockAIService implements IAIService {
   }
 
   async generatePredictions(games: UpcomingGame[]): Promise<GamePredictionResult[]> {
-    return games.map((game, index) => {
+    console.log(`[MockAIService] 🔮 Generating heuristic mock predictions for ${games.length} games...`);
+    const results = games.map((game, index) => {
       // Pick dynamic plausible predictions
       const optCode = index % 2 === 0 ? 'BTTS_YES' : '1X';
       const opt = findBettingOptionByCode(optCode)!;
@@ -80,6 +81,7 @@ export class MockAIService implements IAIService {
         ]
       };
     });
+    return results;
   }
 
   async validatePreviousPredictions(_games: ValidatableGame[]): Promise<ValidationResult> {

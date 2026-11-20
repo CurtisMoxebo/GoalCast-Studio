@@ -102,7 +102,7 @@ Respond ONLY with a valid JSON array adhering strictly to this schema:
       });
 
       const text = (response.text || '[]').trim();
-      console.log(`[GeminiAIService] 📥 Gemini response received (${text.length} chars)`);
+      console.log(`[GeminiAIService] 📥 Full AI Fixtures Response (${text.length} chars):\n${text}\n`);
       let parsed: any[] = [];
       try {
         parsed = JSON.parse(text);
@@ -240,6 +240,7 @@ Return a JSON array of objects with the exact schema:
       });
 
       const text = response.text || '[]';
+      console.log(`[GeminiAIService] 📥 Full AI Predictions Response (${text.length} chars):\n${text}\n`);
       const parsed = JSON.parse(text);
 
       const results: GamePredictionResult[] = [];
@@ -335,6 +336,7 @@ Return a JSON object adhering to this schema:
       });
 
       const text = response.text || '{}';
+      console.log(`[GeminiAIService] 📥 Full AI Outcome Validation Response:\n${text}\n`);
       const parsed = JSON.parse(text);
 
       return {

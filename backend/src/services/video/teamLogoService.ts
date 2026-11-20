@@ -40,17 +40,19 @@ export class TeamLogoService {
     if (!this.geminiClient) return null;
 
     try {
+      console.log(`[TeamLogoService] 🔍 Querying Gemini for direct logo URL of "${teamName}"...`);
       const response = await this.geminiClient.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
+        model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
         contents: `What is the direct transparent SVG or PNG logo URL on Wikimedia Commons or FotMob for the football club "${teamName}"? Reply ONLY with the direct HTTPS URL, without markdown formatting or quotes.`
       });
 
       const text = (response.text || '').trim();
+      console.log(`[TeamLogoService] 📥 Gemini logo response for "${teamName}": ${text}`);
       if (text.startsWith('http://') || text.startsWith('https://')) {
         return text;
       }
     } catch (e: any) {
-      console.warn(`[TeamLogoService] Gemini logo lookup error for "${teamName}":`, e.message);
+      console.warn(`[TeamLogoService] ❌ Gemini logo lookup error for "${teamName}":`, e.message);
     }
     return null;
   }
