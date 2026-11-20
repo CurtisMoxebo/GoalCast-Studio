@@ -270,7 +270,26 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           </View>
         </View>
 
-        {/* 4. Thumbnail Frame Selector (Slider from 00:00 to 00:20) */}
+        {/* 4. Description Input Field */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📝 Caption & Description</Text>
+          <TextInput
+            style={styles.descInput}
+            multiline
+            numberOfLines={4}
+            value={description}
+            onChangeText={setDescription}
+            onFocus={() => {
+              setTimeout(() => {
+                scrollViewRef.current?.scrollTo({ y: 320, animated: true });
+              }, 180);
+            }}
+            placeholder="Enter video description with hashtags..."
+            placeholderTextColor={THEME.colors.textMuted}
+          />
+        </View>
+
+        {/* 5. Thumbnail Frame Selector (Slider from 00:00 to 00:20) */}
         <View style={styles.section}>
           <View style={styles.thumbHeader}>
             <Text style={styles.sectionTitle}>📸 Thumbnail Frame Time</Text>
@@ -289,25 +308,6 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             min={0}
             max={20}
             onChange={setThumbnailSeconds}
-          />
-        </View>
-
-        {/* 5. Description Input Field */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📝 Caption & Description</Text>
-          <TextInput
-            style={styles.descInput}
-            multiline
-            numberOfLines={4}
-            value={description}
-            onChangeText={setDescription}
-            onFocus={() => {
-              setTimeout(() => {
-                scrollViewRef.current?.scrollToEnd({ animated: true });
-              }, 180);
-            }}
-            placeholder="Enter video description with hashtags..."
-            placeholderTextColor={THEME.colors.textMuted}
           />
         </View>
       </ScrollView>
