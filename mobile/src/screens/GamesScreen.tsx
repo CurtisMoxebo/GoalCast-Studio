@@ -12,6 +12,7 @@ import {
   RefreshControl,
   ScrollView
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
 import { UpcomingGame, PredictionSelection, BettingOption, MediaAsset, VoiceOption, VideoSettings } from '../types';
 import { mobileApi } from '../services/api';
@@ -363,9 +364,14 @@ export const GamesScreen: React.FC = () => {
             style={[styles.arrowButton, isLeftArrowBlocked && styles.arrowButtonDisabled]}
             onPress={handlePreviousDay}
             disabled={isLeftArrowBlocked}
-            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.6}
           >
-            <Text style={[styles.arrowText, isLeftArrowBlocked && styles.arrowTextDisabled]}>◀</Text>
+            <Ionicons
+              name="chevron-back"
+              size={22}
+              color={isLeftArrowBlocked ? THEME.colors.textMuted : THEME.colors.primary}
+            />
           </TouchableOpacity>
 
           <View style={styles.dateBadge}>
@@ -375,9 +381,14 @@ export const GamesScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.arrowButton}
             onPress={handleNextDay}
-            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.6}
           >
-            <Text style={styles.arrowText}>▶</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={22}
+              color={THEME.colors.primary}
+            />
           </TouchableOpacity>
         </View>
 
@@ -690,18 +701,11 @@ const styles = StyleSheet.create({
     flexShrink: 0
   },
   arrowButton: {
-    backgroundColor: '#1e293b',
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    padding: 6,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#334155'
+    justifyContent: 'center'
   },
   arrowButtonDisabled: {
-    backgroundColor: '#0f172a',
-    borderColor: '#1e293b',
     opacity: 0.35
   },
   arrowText: {
