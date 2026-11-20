@@ -106,7 +106,15 @@ export class VideoComposer {
 
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
-      const predSpoken = g.selections?.[0]?.spokenText || 'Both teams to score';
+      // When a game has multiple predictions, strictly use ONLY the first prediction for video speech
+      const primaryPrediction = g.selections?.[0];
+      const predSpoken = primaryPrediction?.spokenText || primaryPrediction?.label || 'Both teams to score';
+
+      if (g.selections && g.selections.length > 1) {
+        console.log(
+          `[VideoComposer] ℹ Match ${i + 1} (${g.homeTeam} vs ${g.awayTeam}) has ${g.selections.length} predictions. Using first prediction only for speech: "${predSpoken}"`
+        );
+      }
 
       // 4a. Match Announcement (Spoken as game box slides in)
       const introText = `Match ${i + 1}, ${g.homeTeam} versus ${g.awayTeam}.`;
@@ -155,7 +163,9 @@ export class VideoComposer {
     const matchPredPngs: string[] = [];
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
-      const predLabel = g.selections?.[0]?.label || 'Both Teams to Score';
+      // When a game has multiple predictions, strictly use ONLY the first prediction for visual banner display
+      const primaryPrediction = g.selections?.[0];
+      const predLabel = primaryPrediction?.label || 'Both Teams to Score';
       const cardPath = path.join(workDir, `overlay_match_${i + 1}_card.png`);
       const predPath = path.join(workDir, `overlay_match_${i + 1}_pred.png`);
 
@@ -274,7 +284,9 @@ export class VideoComposer {
     for (let i = 0; i < input.games.length; i++) {
       const g = input.games[i];
       const m = matchScenes[i];
-      const predSpoken = g.selections?.[0]?.spokenText || 'Both teams to score';
+      // Only the first prediction is captioned on the video
+      const primaryPrediction = g.selections?.[0];
+      const predSpoken = primaryPrediction?.spokenText || primaryPrediction?.label || 'Both teams to score';
 
       const matchIntroText = `Match ${i + 1}, ${g.homeTeam} versus ${g.awayTeam}.`;
       spokenPhrases.push({
