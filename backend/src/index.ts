@@ -1,7 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import path from 'path';
 
 import gamesRoutes from './routes/games.routes';
 import predictionsRoutes from './routes/predictions.routes';

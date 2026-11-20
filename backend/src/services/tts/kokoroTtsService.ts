@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ITTSService, VoiceOption, GenerateSpeechOptions, TTSVoice } from './ttsService.interface';
+import { ITTSService, VoiceOption, GenerateSpeechOptions } from './ttsService.interface';
 
 // Voice mapping from user requested names to Kokoro voice IDs
 const VOICE_MAP: Record<string, string> = {

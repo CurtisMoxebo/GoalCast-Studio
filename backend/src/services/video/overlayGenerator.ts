@@ -14,34 +14,6 @@ export interface OverlayGameData {
   selections?: { code: string; label: string; spokenText: string }[];
 }
 
-// Pre-defined color palettes for popular clubs to render crisp vector crests
-const TEAM_CREST_THEMES: Record<string, { bg: string; fg: string; accent: string; icon?: string }> = {
-  arsenal: { bg: '#DB0007', fg: '#FFFFFF', accent: '#9C824A', icon: '⚽' },
-  chelsea: { bg: '#034694', fg: '#FFFFFF', accent: '#DBA111', icon: '🦁' },
-  'real madrid': { bg: '#FFFFFF', fg: '#1F2937', accent: '#EE8707', icon: '👑' },
-  barcelona: { bg: '#A50044', fg: '#FFFFFF', accent: '#004D98', icon: '🛡️' },
-  'manchester city': { bg: '#6CABDD', fg: '#1C2C5B', accent: '#FFFFFF', icon: '⛵' },
-  'man city': { bg: '#6CABDD', fg: '#1C2C5B', accent: '#FFFFFF', icon: '⛵' },
-  liverpool: { bg: '#C8102E', fg: '#FFFFFF', accent: '#00B2A9', icon: '🦅' },
-  'bayern munich': { bg: '#DC052D', fg: '#FFFFFF', accent: '#0066B2', icon: '⭐' },
-  'bayern': { bg: '#DC052D', fg: '#FFFFFF', accent: '#0066B2', icon: '⭐' },
-  'borussia dortmund': { bg: '#FDE100', fg: '#000000', accent: '#000000', icon: '⚡' },
-  dortmund: { bg: '#FDE100', fg: '#000000', accent: '#000000', icon: '⚡' },
-  'paris saint-germain': { bg: '#004170', fg: '#FFFFFF', accent: '#DA291C', icon: '🗼' },
-  psg: { bg: '#004170', fg: '#FFFFFF', accent: '#DA291C', icon: '🗼' },
-  'inter milan': { bg: '#0068A8', fg: '#FFFFFF', accent: '#000000', icon: '⭐' },
-  'ac milan': { bg: '#FB090B', fg: '#FFFFFF', accent: '#000000', icon: '🔴' },
-  'al-hilal': { bg: '#004BA0', fg: '#FFFFFF', accent: '#FFFFFF', icon: '🌙' },
-  'al-nassr': { bg: '#FBE106', fg: '#00407B', accent: '#00407B', icon: '👑' },
-  'inter miami': { bg: '#F7B5CD', fg: '#231F20', accent: '#231F20', icon: '🦩' },
-  'inter miami cf': { bg: '#F7B5CD', fg: '#231F20', accent: '#231F20', icon: '🦩' },
-  'la galaxy': { bg: '#00245D', fg: '#FFFFFF', accent: '#EEB111', icon: '✨' },
-  'sporting cp': { bg: '#008057', fg: '#FFFFFF', accent: '#FFD700', icon: '🦁' },
-  benfica: { bg: '#E41C23', fg: '#FFFFFF', accent: '#FFD700', icon: '🦅' },
-  ajax: { bg: '#D2122E', fg: '#FFFFFF', accent: '#FFFFFF', icon: '🛡️' },
-  feyenoord: { bg: '#DF0024', fg: '#FFFFFF', accent: '#000000', icon: '⚪' }
-};
-
 export class OverlayGenerator {
   /**
    * Escape XML/SVG special characters
@@ -73,43 +45,6 @@ export class OverlayGenerator {
     } catch {
       return dateStr;
     }
-  }
-
-  /**
-   * Generate vector shield/crest SVG snippet for a team
-   */
-  private renderTeamCrestSvg(teamName: string, size: number): string {
-    const key = (teamName || '').toLowerCase().trim();
-    const theme = TEAM_CREST_THEMES[key] || {
-      bg: '#1e293b',
-      fg: '#ffffff',
-      accent: '#38bdf8',
-      icon: '⚽'
-    };
-
-    const initials = this.escapeXml(
-      teamName
-        .split(' ')
-        .filter((w) => w.length > 0)
-        .slice(0, 2)
-        .map((w) => w[0].toUpperCase())
-        .join('')
-    );
-
-    const half = size / 2;
-    const radius = Math.round(size * 0.22);
-    const fontSize = Math.round(size * 0.36);
-
-    return `
-      <g>
-        <!-- Shield Base -->
-        <rect width="${size}" height="${size}" rx="${radius}" fill="${theme.bg}" stroke="${theme.accent}" stroke-width="2"/>
-        <!-- Inner Accent Circle -->
-        <circle cx="${half}" cy="${half}" r="${Math.round(size * 0.36)}" fill="${theme.accent}" fill-opacity="0.18"/>
-        <!-- Initials Text -->
-        <text x="${half}" y="${Math.round(half + fontSize * 0.36)}" fill="${theme.fg}" font-size="${fontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">${initials}</text>
-      </g>
-    `;
   }
 
   /**

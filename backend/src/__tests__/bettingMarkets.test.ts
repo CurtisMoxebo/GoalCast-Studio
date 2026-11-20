@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BETTING_CATEGORIES,
-  BETTING_OPTIONS,
   BETTING_RULES,
   findBettingOptionByCode,
   formatSpokenPrediction
