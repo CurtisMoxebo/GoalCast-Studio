@@ -24,6 +24,7 @@
     },
     "android": {
       "package": "com.curtismoxebo.goalcaststudio",
+      "usesCleartextTraffic": true,
       "backgroundColor": "#020617",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -52,6 +53,11 @@
       "expo-asset",
       "expo-font",
       "expo-video"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1ed598d5-4aa0-4a07-ad07-ea1498761b30"
+      }
+    }
   }
 }
