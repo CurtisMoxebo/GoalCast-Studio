@@ -1,6 +1,5 @@
 const getDefaultApiHost = (): string => {
-  // Android emulator loopback host is 10.0.2.2
-  return 'http://localhost:5000';
+  return 'http://66.131.227.117:8006';
 };
 
 export const API_BASE_URL =
