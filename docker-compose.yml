@@ -22,7 +22,7 @@ services:
     depends_on:
       - mariadb
     ports:
-      - "${PORT:-8006}:${PORT:-8006}"
+      - "0.0.0.0:${PORT:-8006}:${PORT:-8006}"
     environment:
       PORT: ${PORT:-8006}
       NODE_ENV: production
