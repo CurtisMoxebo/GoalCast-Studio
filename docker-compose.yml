@@ -33,7 +33,7 @@ services:
       DEFAULT_TTS_VOICE: hearth
     volumes:
       - type: bind
-        source: ./resources
+        source: ${RESOURCES_DIR:-./resources}
         target: /resources
 
 volumes:
