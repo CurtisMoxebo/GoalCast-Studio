@@ -23,6 +23,7 @@
       }
     },
     "android": {
+      "package": "com.curtismoxebo.goalcaststudio",
       "backgroundColor": "#020617",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
