@@ -24,9 +24,9 @@ services:
     depends_on:
       - mariadb
     ports:
-      - "5000:5000"
+      - "${PORT:-8006}:${PORT:-8006}"
     environment:
-      PORT: 5000
+      PORT: ${PORT:-8006}
       NODE_ENV: production
       DATABASE_URL: "mysql://goalcast_user:goalcast_pass@mariadb:3306/goalcast_db"
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
