@@ -1,6 +1,6 @@
 declare const __DEV__: boolean | undefined;
 
-const PROD_API_HOST = 'http://66.131.227.117:8006';
+const PROD_API_HOST = 'https://goalcast-zone-api.moxebocurtis.com';
 const DEV_API_HOST = 'http://localhost:5000';
 
 const getDefaultApiHost = (): string => {
