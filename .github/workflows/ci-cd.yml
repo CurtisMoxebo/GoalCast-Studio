@@ -156,13 +156,11 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           $env:COMPOSE_CONVERT_WINDOWS_PATHS = "1"
+          if (-not (Test-Path "resources")) { New-Item -ItemType Directory -Force -Path "resources" | Out-Null }
           if (Test-Path "C:\actions-runner\GoalCast-Studio\resources") {
-            $env:RESOURCES_DIR = "C:/actions-runner/GoalCast-Studio/resources"
-          } else {
-            if (-not (Test-Path "resources")) { New-Item -ItemType Directory -Force -Path "resources" | Out-Null }
-            $env:RESOURCES_DIR = "./resources"
+            Write-Host "Syncing resources into workspace..."
+            Copy-Item -Path "C:\actions-runner\GoalCast-Studio\resources\*" -Destination "resources" -Recurse -Force -ErrorAction SilentlyContinue
           }
-          Write-Host "Mounting resources directly from: $env:RESOURCES_DIR"
           Write-Host "Deploying Docker containers..."
           docker compose down --remove-orphans
           docker compose up -d --build
