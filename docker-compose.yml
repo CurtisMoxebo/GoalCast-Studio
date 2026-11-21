@@ -34,7 +34,7 @@ services:
       RESOURCES_DIR: /resources
     volumes:
       - type: bind
-        source: ${RESOURCES_DIR:-./resources}
+        source: ${RESOURCES_DIR:-C:/actions-runner/GoalCast-Studio/resources}
         target: /resources
 
 volumes:
