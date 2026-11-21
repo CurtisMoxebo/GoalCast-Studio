@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mariadb:
     image: mariadb:11.4
@@ -34,7 +32,9 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
       DEFAULT_TTS_VOICE: hearth
     volumes:
-      - ./resources:/resources:ro
+      - type: bind
+        source: ./resources
+        target: /resources
 
 volumes:
   mariadb_data:

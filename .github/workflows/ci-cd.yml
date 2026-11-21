@@ -155,10 +155,27 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          $env:COMPOSE_CONVERT_WINDOWS_PATHS = "1"
+          if (-not (Test-Path "resources")) {
+            New-Item -ItemType Directory -Force -Path "resources" | Out-Null
+          }
+          if (Test-Path "C:\actions-runner\GoalCast-Studio\resources") {
+            Write-Host "Copying resources from C:\actions-runner\GoalCast-Studio\resources..."
+            Copy-Item -Path "C:\actions-runner\GoalCast-Studio\resources\*" -Destination "resources" -Recurse -Force -ErrorAction SilentlyContinue
+          }
           Write-Host "Deploying Docker containers..."
           docker compose down --remove-orphans
           docker compose up -d --build
-          Write-Host "Waiting for database to initialize..."
-          Start-Sleep -Seconds 8
+          Write-Host "Waiting for database to be ready..."
+          $retry = 0
+          while ($retry -lt 15) {
+            Start-Sleep -Seconds 2
+            $res = docker compose exec -T mariadb mariadb-admin ping -u root -prootpassword 2>&1
+            if ($res -like "*alive*") {
+              Write-Host "Database is ready!"
+              break
+            }
+            $retry++
+          }
           docker compose exec -T backend npx prisma db push --skip-generate
           docker compose ps
