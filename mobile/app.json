@@ -24,7 +24,6 @@
     },
     "android": {
       "package": "com.curtismoxebo.goalcaststudio",
-      "usesCleartextTraffic": true,
       "backgroundColor": "#020617",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -37,14 +36,6 @@
       }
     },
     "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true
-          }
-        }
-      ],
       [
         "expo-splash-screen",
         {
