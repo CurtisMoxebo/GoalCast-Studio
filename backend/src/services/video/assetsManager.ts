@@ -13,16 +13,18 @@ export class AssetsManager {
   private resourcesDir: string;
 
   constructor() {
-    // Look for resources in root folder or env
-    this.resourcesDir =
-      process.env.RESOURCES_DIR ||
-      path.resolve(process.cwd(), '../resources');
-
-    // Fallback if running from root directory
-    if (!fs.existsSync(this.resourcesDir)) {
-      const rootFallback = path.resolve(process.cwd(), 'resources');
-      if (fs.existsSync(rootFallback)) {
-        this.resourcesDir = rootFallback;
+    // Look for resources in env, /resources (Docker container), or local folder
+    if (process.env.RESOURCES_DIR && fs.existsSync(process.env.RESOURCES_DIR)) {
+      this.resourcesDir = process.env.RESOURCES_DIR;
+    } else if (fs.existsSync('/resources')) {
+      this.resourcesDir = '/resources';
+    } else {
+      this.resourcesDir = path.resolve(process.cwd(), '../resources');
+      if (!fs.existsSync(this.resourcesDir)) {
+        const rootFallback = path.resolve(process.cwd(), 'resources');
+        if (fs.existsSync(rootFallback)) {
+          this.resourcesDir = rootFallback;
+        }
       }
     }
   }

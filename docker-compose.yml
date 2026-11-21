@@ -31,6 +31,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
       DEFAULT_TTS_VOICE: hearth
+      RESOURCES_DIR: /resources
     volumes:
       - type: bind
         source: ${RESOURCES_DIR:-./resources}
