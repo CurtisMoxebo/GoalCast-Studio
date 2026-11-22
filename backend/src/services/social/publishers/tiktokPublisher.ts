@@ -24,7 +24,7 @@ export class TikTokPublisher implements ISocialPublisher {
     const logs: string[] = [];
     logs.push(`[TikTok] Initializing TikTok scheduled upload for group "${options.groupId}"`);
 
-    const clientKey = process.env.TIKTOK_CLIENT_KEY || 'aw24z5truoqnbpco';
+    const clientKey = process.env.TIKTOK_CLIENT_KEY || 'sbawpqeq4f9iwpxhhe';
     const accessToken = this.getAccessToken();
 
     // If access token is not yet generated from review OAuth, execute in graceful simulated mode

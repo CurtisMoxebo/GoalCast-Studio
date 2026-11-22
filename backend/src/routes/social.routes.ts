@@ -158,9 +158,9 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
  * Initiates the TikTok OAuth 2.0 authorization code flow
  */
 router.get('/tiktok/login', (_req: Request, res: Response): void => {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY || 'aw24z5truoqnbpco';
+  const clientKey = process.env.TIKTOK_CLIENT_KEY || 'sbawpqeq4f9iwpxhhe';
   const redirectUri = encodeURIComponent('https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback');
-  // Must match exactly the products/scopes configured on the TikTok Developer App
+  // Must match the products/scopes configured on the TikTok Developer App
   const scopes = encodeURIComponent('user.info.basic,video.upload,video.manage');
   const csrfState = Math.random().toString(36).substring(2);
 
@@ -194,8 +194,8 @@ router.get('/tiktok/callback', async (req: Request, res: Response): Promise<void
   }
 
   try {
-    const clientKey = process.env.TIKTOK_CLIENT_KEY || 'aw24z5truoqnbpco';
-    const clientSecret = process.env.TIKTOK_CLIENT_SECRET || 'Tai3ArPN3tszjV9dhDpzTeRpkeVHNwup';
+    const clientKey = process.env.TIKTOK_CLIENT_KEY || 'sbawpqeq4f9iwpxhhe';
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET || 'cdxnQ15grzZKg2fl5u1rOL4lVVzd05Cb';
     const redirectUri = 'https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback';
 
     console.log('[TikTok OAuth] Exchanging authorization code for access token...');
