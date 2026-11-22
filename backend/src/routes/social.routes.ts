@@ -158,14 +158,18 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
  * Initiates the TikTok OAuth 2.0 authorization code flow
  */
 router.get('/tiktok/login', (_req: Request, res: Response): void => {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY || 'sbawpqeq4f9iwpxhhe';
+  const clientKey = process.env.TIKTOK_CLIENT_KEY;
+  if (!clientKey) {
+    res.status(500).send('Error: TIKTOK_CLIENT_KEY is not configured in environment.');
+    return;
+  }
   const redirectUri = encodeURIComponent('https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback');
   // Must match the products/scopes configured on the TikTok Developer App
   const scopes = encodeURIComponent('user.info.basic,video.upload,video.manage');
   const csrfState = Math.random().toString(36).substring(2);
 
   const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${scopes}&response_type=code&redirect_uri=${redirectUri}&state=${csrfState}`;
-  console.log(`[TikTok OAuth] Redirecting to authorization URL: ${authUrl}`);
+  console.log(`[TikTok OAuth] Redirecting to authorization URL`);
   res.redirect(authUrl);
 });
 
@@ -194,8 +198,11 @@ router.get('/tiktok/callback', async (req: Request, res: Response): Promise<void
   }
 
   try {
-    const clientKey = process.env.TIKTOK_CLIENT_KEY || 'sbawpqeq4f9iwpxhhe';
-    const clientSecret = process.env.TIKTOK_CLIENT_SECRET || 'cdxnQ15grzZKg2fl5u1rOL4lVVzd05Cb';
+    const clientKey = process.env.TIKTOK_CLIENT_KEY;
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
+    if (!clientKey || !clientSecret) {
+      throw new Error('TikTok credentials are not configured in environment variables.');
+    }
     const redirectUri = 'https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback';
 
     console.log('[TikTok OAuth] Exchanging authorization code for access token...');

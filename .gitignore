@@ -9,6 +9,7 @@ node_modules/
 *.local
 credentials.json
 service-account*.json
+social_tokens.json
 *.pem
 *.key
 *.cert
