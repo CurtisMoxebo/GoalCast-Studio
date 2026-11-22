@@ -108,10 +108,10 @@ router.get('/progress/:jobId', (req: Request, res: Response): void => {
 });
 
 /**
- * GET /api/video/download/:jobId
- * Streams video file with full HTTP Range (206) support for mobile video players
+ * GET or POST /api/video/download/:jobId
+ * Streams or downloads video file with full HTTP Range (206) support and Content-Disposition header
  */
-router.get('/download/:jobId', (req: Request, res: Response): void => {
+const handleDownloadRoute = (req: Request, res: Response): void => {
   const jobId = req.params.jobId as string;
   const videoPath = resolveVideoPath(jobId);
 
@@ -122,6 +122,7 @@ router.get('/download/:jobId', (req: Request, res: Response): void => {
 
   const stat = fs.statSync(videoPath);
   const fileSize = stat.size;
+  const filename = path.basename(videoPath) || `goalcast_${jobId}.mp4`;
   const range = req.headers.range;
 
   if (range) {
@@ -140,18 +141,23 @@ router.get('/download/:jobId', (req: Request, res: Response): void => {
       'Content-Range': `bytes ${start}-${end}/${fileSize}`,
       'Accept-Ranges': 'bytes',
       'Content-Length': chunksize,
-      'Content-Type': 'video/mp4'
+      'Content-Type': 'video/mp4',
+      'Content-Disposition': `inline; filename="${filename}"`
     });
     file.pipe(res);
   } else {
     res.writeHead(200, {
       'Content-Length': fileSize,
       'Content-Type': 'video/mp4',
-      'Accept-Ranges': 'bytes'
+      'Accept-Ranges': 'bytes',
+      'Content-Disposition': `attachment; filename="${filename}"`
     });
     fs.createReadStream(videoPath).pipe(res);
   }
-});
+};
+
+router.get('/download/:jobId', handleDownloadRoute);
+router.post('/download/:jobId', handleDownloadRoute);
 
 /**
  * GET /api/video/thumbnail/:jobId
