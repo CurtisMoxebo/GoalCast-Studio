@@ -819,95 +819,61 @@ export class OverlayGenerator {
 
       let badgeContent = '';
 
+      const checkRadius = 26;
+      const checkCx = badgeWidth - checkRadius - 16;
+      const checkCy = Math.round(badgeHeight / 2);
+      const pillWidth = checkCx - checkRadius - 20;
+      const pillHeight = Math.min(68, Math.round(badgeHeight * 0.55));
+      const pillY = Math.round((badgeHeight - pillHeight) / 2);
+      const pillFontSize = shortPred.length > 12 ? 20 : shortPred.length > 7 ? 24 : 28;
+
       if (outcome === 'HIT') {
-        // SIMILAR / HIT: Display ONLY ONE in GREEN!
-        const checkRadius = 26;
-        const checkCx = badgeWidth - checkRadius - 16;
-        const checkCy = Math.round(badgeHeight / 2);
-        const pillWidth = checkCx - checkRadius - 20;
-        const pillHeight = Math.min(68, Math.round(badgeHeight * 0.55));
-        const pillY = Math.round((badgeHeight - pillHeight) / 2);
-        const pillFontSize = shortPred.length > 12 ? 20 : shortPred.length > 7 ? 24 : 28;
-
-        const scoreText = game.realScore ? `FT: ${game.realScore}` : '';
-
+        // HIT: Show prediction in green with green checkmark
         badgeContent = `
           <!-- Section Container on Right -->
           <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f0fdf4" fill-opacity="0.95" stroke="#bbf7d0" stroke-width="1.5"/>
 
           <!-- Green Prediction Pill -->
           <rect x="14" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="14" fill="#22c55e"/>
-          <text x="${14 + pillWidth / 2}" y="${Math.round(pillY + pillHeight / 2 + (scoreText ? -4 : pillFontSize * 0.35))}" fill="#000000" font-size="${pillFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+          <text x="${14 + pillWidth / 2}" y="${Math.round(pillY + pillHeight / 2 + pillFontSize * 0.35)}" fill="#000000" font-size="${pillFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${this.escapeXml(shortPred)}
           </text>
-          ${scoreText ? `
-            <text x="${14 + pillWidth / 2}" y="${Math.round(pillY + pillHeight - 6)}" fill="#064e3b" font-size="14" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
-              ${this.escapeXml(scoreText)}
-            </text>
-          ` : ''}
 
           <!-- Green Check Circle on Right -->
           <circle cx="${checkCx}" cy="${checkCy}" r="${checkRadius}" fill="#16a34a"/>
           <path d="M${checkCx - 10} ${checkCy} L${checkCx - 3} ${checkCy + 8} L${checkCx + 10} ${checkCy - 8}" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
         `;
       } else if (outcome === 'MISS') {
-        // DIFFERENT / MISS: Display BOTH predicted and real outcome!
-        const pillHeight = Math.round((badgeHeight - 20) / 2);
-        const pill1Y = 8;
-        const pill2Y = pill1Y + pillHeight + 4;
-        const innerWidth = badgeWidth - 24;
-        const scoreDisplay = game.realScore ? `FT: ${game.realScore}` : 'MISSED';
-
+        // MISS: Show prediction in red with red cross
         badgeContent = `
           <!-- Section Container on Right -->
           <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#fef2f2" fill-opacity="0.95" stroke="#fecaca" stroke-width="1.5"/>
 
-          <!-- 1. Predicted Pill (Top) -->
-          <rect x="12" y="${pill1Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
-          <text x="24" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#64748b" font-size="14" font-weight="bold" font-family="Arial, sans-serif">
-            PRED:
-          </text>
-          <text x="${innerWidth}" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#0f172a" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="end">
+          <!-- Red Prediction Pill -->
+          <rect x="14" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="14" fill="#dc2626"/>
+          <text x="${14 + pillWidth / 2}" y="${Math.round(pillY + pillHeight / 2 + pillFontSize * 0.35)}" fill="#ffffff" font-size="${pillFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${this.escapeXml(shortPred)}
           </text>
 
-          <!-- 2. Real Outcome Pill (Bottom - Red with Cross) -->
-          <rect x="12" y="${pill2Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#fee2e2" stroke="#fca5a5" stroke-width="1"/>
-          <text x="24" y="${Math.round(pill2Y + pillHeight / 2 + 5)}" fill="#dc2626" font-size="14" font-weight="900" font-family="Arial, sans-serif">
-            REAL:
-          </text>
-          <text x="${innerWidth - 22}" y="${Math.round(pill2Y + pillHeight / 2 + 5)}" fill="#dc2626" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="end">
-            ${this.escapeXml(scoreDisplay)}
-          </text>
-          <!-- Red cross icon -->
-          <circle cx="${innerWidth}" cy="${Math.round(pill2Y + pillHeight / 2)}" r="9" fill="#dc2626"/>
-          <path d="M${innerWidth - 4} ${Math.round(pill2Y + pillHeight / 2) - 4} L${innerWidth + 4} ${Math.round(pill2Y + pillHeight / 2) + 4} M${innerWidth + 4} ${Math.round(pill2Y + pillHeight / 2) - 4} L${innerWidth - 4} ${Math.round(pill2Y + pillHeight / 2) + 4}" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Red Cross Circle on Right -->
+          <circle cx="${checkCx}" cy="${checkCy}" r="${checkRadius}" fill="#dc2626"/>
+          <path d="M${checkCx - 8} ${checkCy - 8} L${checkCx + 8} ${checkCy + 8} M${checkCx + 8} ${checkCy - 8} L${checkCx - 8} ${checkCy + 8}" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
         `;
       } else {
-        // PENDING
-        const pillHeight = Math.round((badgeHeight - 20) / 2);
-        const pill1Y = 8;
-        const pill2Y = pill1Y + pillHeight + 4;
-        const innerWidth = badgeWidth - 24;
-
+        // PENDING: Show prediction in gray with gray "-"
         badgeContent = `
           <!-- Section Container on Right -->
           <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f8fafc" fill-opacity="0.95" stroke="#e2e8f0" stroke-width="1.5"/>
 
-          <!-- 1. Predicted Pill (Top) -->
-          <rect x="12" y="${pill1Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#e0f2fe" stroke="#bae6fd" stroke-width="1"/>
-          <text x="24" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#0284c7" font-size="14" font-weight="bold" font-family="Arial, sans-serif">
-            PRED:
-          </text>
-          <text x="${innerWidth}" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#0369a1" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="end">
+          <!-- Gray Prediction Pill -->
+          <rect x="14" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="14" fill="#64748b"/>
+          <text x="${14 + pillWidth / 2}" y="${Math.round(pillY + pillHeight / 2 + pillFontSize * 0.35)}" fill="#ffffff" font-size="${pillFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
             ${this.escapeXml(shortPred)}
           </text>
 
-          <!-- 2. Status Pill (Bottom) -->
-          <rect x="12" y="${pill2Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
-          <text x="${12 + innerWidth / 2}" y="${Math.round(pill2Y + pillHeight / 2 + 5)}" fill="#64748b" font-size="14" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
-            ⏳ PENDING
-          </text>
+          <!-- Gray Circle on Right with "-" -->
+          <circle cx="${checkCx}" cy="${checkCy}" r="${checkRadius}" fill="#64748b"/>
+          <line x1="${checkCx - 9}" y1="${checkCy}" x2="${checkCx + 9}" y2="${checkCy}" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
         `;
       }
 

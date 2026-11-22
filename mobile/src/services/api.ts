@@ -186,6 +186,22 @@ export class MobileApiService {
     const data = await res.json();
     return data.history || [];
   }
+
+  async updateGameOutcome(
+    gameId: string,
+    realOutcome: 'HIT' | 'MISS' | 'PENDING'
+  ): Promise<{ success: boolean; gameId: string; realOutcome: string; groupId: string; groupOutcome: string }> {
+    const res = await fetch(`${this.baseUrl}/api/predictions/game-outcome`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameId, realOutcome })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to update game outcome');
+    }
+    return data;
+  }
 }
 
 export const mobileApi = new MobileApiService();

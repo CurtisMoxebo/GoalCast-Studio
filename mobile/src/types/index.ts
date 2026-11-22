@@ -62,7 +62,6 @@ export interface HistoryItem {
   id: string;
   status: 'ACCEPTED' | 'PREVIEW' | 'CANCELLED' | 'DELETED';
   groupOutcome?: 'PENDING' | 'HIT' | 'MISS';
-  isHit?: boolean | null;
   targetDate: string;
   description: string;
   thumbnailTimestamp?: number;
@@ -77,8 +76,6 @@ export interface HistoryItem {
     competition?: string;
     kickoffTime?: string;
     realOutcome?: 'PENDING' | 'HIT' | 'MISS';
-    realScore?: string;
-    realOutcomeDetails?: string;
     selections: {
       code: string;
       label: string;

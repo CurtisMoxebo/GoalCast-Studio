@@ -245,10 +245,7 @@ export class OutcomeResolverService {
           await prisma.gamePrediction.update({
             where: { id: gameId },
             data: {
-              realOutcome: evalResult.realOutcome,
-              realScore: evalResult.realScore,
-              realOutcomeDetails: evalResult.realOutcomeDetails,
-              evaluatedAt: new Date()
+              realOutcome: evalResult.realOutcome
             }
           });
         } catch (dbErr) {
@@ -265,9 +262,7 @@ export class OutcomeResolverService {
         if (evalRes && (evalRes.realOutcome === 'HIT' || evalRes.realOutcome === 'MISS')) {
           return {
             ...game,
-            realOutcome: evalRes.realOutcome,
-            realScore: evalRes.realScore || game.realScore,
-            realOutcomeDetails: evalRes.realOutcomeDetails || game.realOutcomeDetails
+            realOutcome: evalRes.realOutcome
           };
         }
         return {
@@ -284,8 +279,7 @@ export class OutcomeResolverService {
           await prisma.predictionGroup.update({
             where: { id: group.id },
             data: {
-              groupOutcome: computedOutcome,
-              isHit: computedOutcome === 'HIT' ? true : computedOutcome === 'MISS' ? false : null
+              groupOutcome: computedOutcome
             }
           });
         } catch (grpDbErr) {

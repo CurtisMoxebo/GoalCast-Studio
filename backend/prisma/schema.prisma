@@ -34,9 +34,6 @@ model PredictionGroup {
   thumbnailTimestamp   Float                  @default(3.0)
   scheduledPostTime    DateTime?
   
-  // AI validation result of whether this entire group won
-  // null = never checked, true = all hit, false = not all hit
-  isHit                Boolean?
   groupOutcome         String                 @default("PENDING") // PENDING, HIT, MISS
   validationNotes      String?                @db.Text
   validationCheckedAt  DateTime?
@@ -99,11 +96,8 @@ model GamePrediction {
   kickoffTime          DateTime
   orderIndex           Int                    @default(0)
 
-  // Real outcome of the game prediction: PENDING, HIT, MISS
+  // Real outcome of the game prediction: PENDING, HIT, MISS (set manually from mobile history)
   realOutcome          String                 @default("PENDING") // PENDING, HIT, MISS
-  realScore            String?
-  realOutcomeDetails   String?                @db.Text
-  evaluatedAt          DateTime?
 
   selections           PredictionSelection[]
 
@@ -122,9 +116,6 @@ model PredictionSelection {
   code                 String
   label                String
   spokenText           String
-  
-  // Individual hit status if evaluated
-  isHit                Boolean?
 
   createdAt            DateTime               @default(now())
 

@@ -30,14 +30,12 @@ test('Mobile Outcome: evaluateGroupOutcome strictly enforces 1 miss = group miss
         homeTeam: 'Arsenal',
         awayTeam: 'Chelsea',
         realOutcome: 'HIT',
-        realScore: '2-1',
         selections: [{ code: '1', label: 'Arsenal Win' }]
       },
       {
         homeTeam: 'Real Madrid',
         awayTeam: 'Barcelona',
         realOutcome: 'MISS',
-        realScore: '0-2',
         selections: [{ code: '1', label: 'Real Madrid Win' }]
       },
       {
@@ -65,14 +63,12 @@ test('Mobile Outcome: evaluateGroupOutcome returns HIT only when all games are H
         homeTeam: 'Arsenal',
         awayTeam: 'Chelsea',
         realOutcome: 'HIT',
-        realScore: '3-1',
         selections: [{ code: '1', label: 'Arsenal Win' }]
       },
       {
         homeTeam: 'Milan',
         awayTeam: 'Inter',
         realOutcome: 'HIT',
-        realScore: '2-2',
         selections: [{ code: 'BTTS', label: 'Both Teams to Score' }]
       }
     ]
@@ -93,7 +89,6 @@ test('Mobile Outcome: evaluateGroupOutcome returns PENDING when games pending an
         homeTeam: 'Arsenal',
         awayTeam: 'Chelsea',
         realOutcome: 'HIT',
-        realScore: '1-0',
         selections: [{ code: '1', label: 'Arsenal Win' }]
       },
       {
@@ -115,4 +110,8 @@ test('Mobile Outcome: MobileApiService builds recap image URL correctly', () => 
 
   const downloadUrl = mobileApi.getRecapImageUrl('group_123', true);
   assert.ok(downloadUrl.includes('/api/predictions/recap-image/group_123?download=1'));
+});
+
+test('Mobile Outcome: MobileApiService exposes updateGameOutcome method', () => {
+  assert.equal(typeof mobileApi.updateGameOutcome, 'function');
 });

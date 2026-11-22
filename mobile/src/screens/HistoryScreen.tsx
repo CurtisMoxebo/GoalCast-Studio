@@ -22,6 +22,7 @@ import { deviceStorage } from '../services/deviceStorage';
 import { sessionStore } from '../services/sessionStore';
 import { sharePredictionVideo, shareMultiplePredictionVideos } from '../services/socialShare';
 import { formatCreationDateTime, formatKickoffTime } from '../utils/dateUtils';
+import { triggerHaptic } from '../utils/haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -92,6 +93,10 @@ export const HistoryScreen: React.FC = () => {
   const [isGeneratingRecap, setIsGeneratingRecap] = useState(false);
   const [isDownloadingRecap, setIsDownloadingRecap] = useState(false);
   const [isSharingRecap, setIsSharingRecap] = useState(false);
+
+  // Outcome Dropdown & Autosave State
+  const [openDropdownGameId, setOpenDropdownGameId] = useState<string | null>(null);
+  const [savedOutcomeToast, setSavedOutcomeToast] = useState<string | null>(null);
 
   const loadHistory = async (forceRefresh = false) => {
     if (!forceRefresh && sessionStore.hasHistory()) {
@@ -388,13 +393,71 @@ export const HistoryScreen: React.FC = () => {
     return 'PENDING';
   };
 
+  // --- Manual Outcome Autosave Handler ---
+  const handleSelectOutcome = async (game: any, newOutcome: 'PENDING' | 'HIT' | 'MISS') => {
+    setOpenDropdownGameId(null);
+    if (!detailItem || !game) return;
+
+    triggerHaptic();
+
+    const gameId = game.id;
+    const updatedGames = (detailItem.games || []).map((g) => {
+      const isTarget = gameId
+        ? g.id === gameId
+        : g.homeTeam === game.homeTeam && g.awayTeam === game.awayTeam;
+      return isTarget ? { ...g, realOutcome: newOutcome } : g;
+    });
+
+    let newGroupOutcome: 'PENDING' | 'HIT' | 'MISS' = 'PENDING';
+    if (updatedGames.some((g) => (g.realOutcome || '').toUpperCase() === 'MISS')) {
+      newGroupOutcome = 'MISS';
+    } else if (
+      updatedGames.length > 0 &&
+      updatedGames.every((g) => (g.realOutcome || '').toUpperCase() === 'HIT')
+    ) {
+      newGroupOutcome = 'HIT';
+    } else {
+      newGroupOutcome = 'PENDING';
+    }
+
+    const updatedDetailItem: HistoryItem = {
+      ...detailItem,
+      groupOutcome: newGroupOutcome,
+      games: updatedGames
+    };
+
+    setDetailItem(updatedDetailItem);
+
+    // Update in history list and session store
+    setHistory((prev) =>
+      prev.map((item) => (item.id === detailItem.id ? updatedDetailItem : item))
+    );
+    sessionStore.setHistory(
+      history.map((item) => (item.id === detailItem.id ? updatedDetailItem : item))
+    );
+
+    // Autosave to backend if game ID exists
+    if (gameId) {
+      setSavedOutcomeToast(`Saved: ${newOutcome}`);
+      try {
+        await mobileApi.updateGameOutcome(gameId, newOutcome);
+      } catch (err) {
+        console.warn('[HistoryScreen] Failed to autosave outcome to backend:', err);
+      } finally {
+        setTimeout(() => setSavedOutcomeToast(null), 1500);
+      }
+    }
+  };
+
   // --- Recap Image Handlers ---
   const handleOpenRecapImage = async (item: HistoryItem) => {
     try {
       setIsGeneratingRecap(true);
       setRecapTargetItem(item);
       const url = mobileApi.getRecapImageUrl(item.id);
-      setRecapImageUri(url);
+      // Cache buster ensures any newly set outcomes are immediately rendered fresh
+      const separator = url.includes('?') ? '&' : '?';
+      setRecapImageUri(`${url}${separator}_t=${Date.now()}`);
       setRecapModalVisible(true);
     } catch (err: any) {
       console.warn('[HistoryScreen] Error generating recap image:', err);
@@ -694,6 +757,13 @@ export const HistoryScreen: React.FC = () => {
               );
             })()}
 
+            {/* Autosave Toast Feedback */}
+            {savedOutcomeToast && (
+              <View style={styles.toastContainer}>
+                <Text style={styles.toastText}>✓ {savedOutcomeToast} (Autosaved to database)</Text>
+              </View>
+            )}
+
             {/* Games and Predictions List */}
             <ScrollView
               style={styles.detailModalScroll}
@@ -703,10 +773,13 @@ export const HistoryScreen: React.FC = () => {
               {detailItem?.games?.map((game, idx) => {
                 const selections = game.selections || [];
                 const formattedCombined = selections.map((s) => s.label).join(' & ');
+                const gameKey = game.id || `idx_${idx}`;
+                const outcomeVal = (game.realOutcome || 'PENDING').toUpperCase();
+                const isOpen = openDropdownGameId === gameKey;
 
                 return (
                   <View key={idx} style={styles.gameCard}>
-                    {/* Game header: match index & competition & time & REAL OUTCOME */}
+                    {/* Game header: match index & competition & time */}
                     <View style={styles.gameCardTop}>
                       <View style={styles.gameCardTopLeft}>
                         <Text style={styles.gameCardIndex}>Game #{idx + 1}</Text>
@@ -719,34 +792,89 @@ export const HistoryScreen: React.FC = () => {
                         ) : null}
                       </View>
 
-                      {/* Real outcome badge: Green (HIT), Red (MISS), Gray (PENDING) */}
                       <View style={styles.gameCardTopRight}>
-                        {game.realOutcome === 'HIT' && (
-                          <View style={[styles.gameOutcomeBadge, styles.gameOutcomeBadgeHit]}>
-                            <Text style={styles.gameOutcomeBadgeTextHit}>
-                              ✓ HIT {game.realScore ? `(${game.realScore})` : ''}
-                            </Text>
-                          </View>
-                        )}
-                        {game.realOutcome === 'MISS' && (
-                          <View style={[styles.gameOutcomeBadge, styles.gameOutcomeBadgeMiss]}>
-                            <Text style={styles.gameOutcomeBadgeTextMiss}>
-                              ✗ MISS {game.realScore ? `(${game.realScore})` : ''}
-                            </Text>
-                          </View>
-                        )}
-                        {(!game.realOutcome || game.realOutcome === 'PENDING') && (
-                          <View style={[styles.gameOutcomeBadge, styles.gameOutcomeBadgePending]}>
-                            <Text style={styles.gameOutcomeBadgeTextPending}>
-                              ⏳ PENDING
-                            </Text>
-                          </View>
-                        )}
                         {game.kickoffTime ? (
                           <Text style={styles.gameKickoffTime}>
                             {formatKickoffTime(game.kickoffTime)}
                           </Text>
                         ) : null}
+                      </View>
+                    </View>
+
+                    {/* Manual Real Outcome Dropbox Selector */}
+                    <View style={styles.outcomeSelectorRow}>
+                      <Text style={styles.outcomeSelectorLabel}>Real Outcome:</Text>
+
+                      <View style={styles.outcomeDropdownWrapper}>
+                        <TouchableOpacity
+                          style={[
+                            styles.outcomeDropdownBtn,
+                            outcomeVal === 'HIT' && styles.outcomeDropdownBtnHit,
+                            outcomeVal === 'MISS' && styles.outcomeDropdownBtnMiss,
+                            outcomeVal === 'PENDING' && styles.outcomeDropdownBtnPending
+                          ]}
+                          onPress={() => setOpenDropdownGameId(isOpen ? null : gameKey)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.outcomeDropdownBtnText,
+                              outcomeVal === 'HIT' && styles.outcomeDropdownBtnTextHit,
+                              outcomeVal === 'MISS' && styles.outcomeDropdownBtnTextMiss,
+                              outcomeVal === 'PENDING' && styles.outcomeDropdownBtnTextPending
+                            ]}
+                          >
+                            {outcomeVal === 'HIT' ? '✓ Hit' : outcomeVal === 'MISS' ? '✗ Miss' : '⏳ Pending'}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.outcomeDropdownChevron,
+                              outcomeVal === 'HIT' && styles.outcomeDropdownBtnTextHit,
+                              outcomeVal === 'MISS' && styles.outcomeDropdownBtnTextMiss,
+                              outcomeVal === 'PENDING' && styles.outcomeDropdownBtnTextPending
+                            ]}
+                          >
+                            {isOpen ? '▲' : '▼'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Dropdown Menu Options */}
+                        {isOpen && (
+                          <View style={styles.outcomeDropdownMenu}>
+                            <TouchableOpacity
+                              style={[
+                                styles.outcomeDropdownItem,
+                                outcomeVal === 'PENDING' && styles.outcomeDropdownItemActive
+                              ]}
+                              onPress={() => handleSelectOutcome(game, 'PENDING')}
+                            >
+                              <Text style={styles.outcomeDropdownItemTextPending}>⏳ Pending (Default)</Text>
+                              {outcomeVal === 'PENDING' && <Text style={styles.checkmarkIcon}>✓</Text>}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[
+                                styles.outcomeDropdownItem,
+                                outcomeVal === 'HIT' && styles.outcomeDropdownItemActive
+                              ]}
+                              onPress={() => handleSelectOutcome(game, 'HIT')}
+                            >
+                              <Text style={styles.outcomeDropdownItemTextHit}>✓ Hit</Text>
+                              {outcomeVal === 'HIT' && <Text style={styles.checkmarkIcon}>✓</Text>}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[
+                                styles.outcomeDropdownItem,
+                                outcomeVal === 'MISS' && styles.outcomeDropdownItemActive
+                              ]}
+                              onPress={() => handleSelectOutcome(game, 'MISS')}
+                            >
+                              <Text style={styles.outcomeDropdownItemTextMiss}>✗ Miss</Text>
+                              {outcomeVal === 'MISS' && <Text style={styles.checkmarkIcon}>✓</Text>}
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
                     </View>
 
@@ -1577,6 +1705,122 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8
+  },
+  toastContainer: {
+    backgroundColor: '#064e3b',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    marginHorizontal: 16,
+    marginTop: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  toastText: {
+    color: '#34d399',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  outcomeSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 6,
+    paddingHorizontal: 4
+  },
+  outcomeSelectorLabel: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  outcomeDropdownWrapper: {
+    position: 'relative',
+    minWidth: 140
+  },
+  outcomeDropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    backgroundColor: '#1e293b'
+  },
+  outcomeDropdownBtnHit: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderColor: '#22c55e'
+  },
+  outcomeDropdownBtnMiss: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#ef4444'
+  },
+  outcomeDropdownBtnPending: {
+    backgroundColor: '#1e293b',
+    borderColor: '#475569'
+  },
+  outcomeDropdownBtnText: {
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  outcomeDropdownBtnTextHit: {
+    color: '#22c55e'
+  },
+  outcomeDropdownBtnTextMiss: {
+    color: '#ef4444'
+  },
+  outcomeDropdownBtnTextPending: {
+    color: '#cbd5e1'
+  },
+  outcomeDropdownChevron: {
+    fontSize: 10,
+    marginLeft: 6
+  },
+  outcomeDropdownMenu: {
+    marginTop: 4,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8
+  },
+  outcomeDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b'
+  },
+  outcomeDropdownItemActive: {
+    backgroundColor: '#1e293b'
+  },
+  outcomeDropdownItemTextPending: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  outcomeDropdownItemTextHit: {
+    color: '#22c55e',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  outcomeDropdownItemTextMiss: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  checkmarkIcon: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: 'bold'
   },
   gameOutcomeBadge: {
     paddingHorizontal: 7,

@@ -1,21 +1,14 @@
 import prisma from '../../db/prisma';
-import { outcomeResolverService } from './outcomeResolverService';
 import { OverlayGameData } from '../video/overlayGenerator';
 
 export const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
-/**
- * Checks if a game is at least 2 hours past its start time (i.e. match is finished)
- */
 export function isGameFinished(kickoffTime: Date | string, currentTimeMs = Date.now()): boolean {
   const kickoffMs = new Date(kickoffTime).getTime();
   if (isNaN(kickoffMs)) return false;
   return currentTimeMs - kickoffMs >= TWO_HOURS_MS;
 }
 
-/**
- * Verifies that all games in a group have started at least 2 hours ago
- */
 export function areAllGamesFinished(games: { kickoffTime: Date | string }[], currentTimeMs = Date.now()): boolean {
   if (!games || games.length === 0) return false;
   return games.every((g) => isGameFinished(g.kickoffTime, currentTimeMs));
@@ -39,32 +32,18 @@ export function mapGroupToOverlayGames(games: any[]): OverlayGameData[] {
 }
 
 /**
- * When generating a video, retrieves the previous game group that was a hit:
- * 1. Queries the database to find the latest game group with status ACCEPTED where ALL games
- *    in it are at least 2 hours above their start time.
- * 2. If the group was already saved as a hit (groupOutcome === 'HIT' or isHit === true), returns it.
- * 3. Else, resolves real outcomes using the unified outcome resolver service and saves them to DB.
- * 4. If all games in that group hit, returns the game group; else returns null.
+ * When generating a video, checks if the previous game group has all its games as (HIT).
+ * If all games in that previous group were marked as HIT, returns the games for celebration overlay;
+ * otherwise returns null.
  */
-export async function getPreviousHitGameGroup(currentTimeMs = Date.now()): Promise<{ games: OverlayGameData[] } | null> {
+export async function getPreviousHitGameGroup(_currentTimeMs = Date.now()): Promise<{ games: OverlayGameData[] } | null> {
   try {
-    const twoHoursAgo = new Date(currentTimeMs - TWO_HOURS_MS);
-
-    // Query candidate accepted groups where games have started at least 2 hours ago
     const acceptedGroups = await prisma.predictionGroup.findMany({
       where: {
-        status: 'ACCEPTED',
-        games: {
-          some: {}, // ensures group has games
-          none: {
-            kickoffTime: {
-              gt: twoHoursAgo
-            }
-          }
-        }
+        status: 'ACCEPTED'
       },
       orderBy: { createdAt: 'desc' },
-      take: 10,
+      take: 5,
       include: {
         games: {
           include: { selections: true },
@@ -73,44 +52,29 @@ export async function getPreviousHitGameGroup(currentTimeMs = Date.now()): Promi
       }
     });
 
-    // In-memory verification: all games in the group must be >= 2 hours above their kickoff time
-    const lastAcceptedGroup = acceptedGroups.find((group) => areAllGamesFinished(group.games, currentTimeMs));
-
-    if (!lastAcceptedGroup || !lastAcceptedGroup.games || lastAcceptedGroup.games.length === 0) {
-      console.log('[PreviousHit] No accepted previous prediction group found with all games >= 2 hours past start time.');
+    // Find the latest accepted group that has games
+    const prevGroup = acceptedGroups.find((g) => g.games && g.games.length > 0);
+    if (!prevGroup) {
+      console.log('[PreviousHit] No previous accepted prediction group found.');
       return null;
     }
 
-    // If the group was already saved as a hit, return it
-    if (lastAcceptedGroup.groupOutcome === 'HIT' || lastAcceptedGroup.isHit === true) {
-      console.log(`[PreviousHit] Group ${lastAcceptedGroup.id} was already saved as a hit in DB. Using it.`);
+    // Check if the previous game group has ALL its games marked as HIT
+    const allGamesHit =
+      prevGroup.games.length > 0 &&
+      prevGroup.games.every((g) => (g.realOutcome || '').toUpperCase() === 'HIT');
+
+    if (allGamesHit) {
+      console.log(`[PreviousHit] Previous group ${prevGroup.id} has all games as HIT! Displaying celebration table in video.`);
       return {
-        games: mapGroupToOverlayGames(lastAcceptedGroup.games)
+        games: mapGroupToOverlayGames(prevGroup.games)
       };
     }
 
-    // If already marked as MISS, skip
-    if (lastAcceptedGroup.groupOutcome === 'MISS' || lastAcceptedGroup.isHit === false) {
-      console.log(`[PreviousHit] Group ${lastAcceptedGroup.id} was already evaluated as MISS. Skipping celebration.`);
-      return null;
-    }
-
-    // Resolve real outcomes using unified service
-    console.log(`[PreviousHit] Group ${lastAcceptedGroup.id} pending outcome. Resolving with outcomeResolverService...`);
-    const resolvedList = await outcomeResolverService.resolveGroups([lastAcceptedGroup], new Date(currentTimeMs));
-    const resolvedGroup = resolvedList[0];
-
-    if (resolvedGroup?.groupOutcome === 'HIT') {
-      console.log(`[PreviousHit] AI confirmed group ${lastAcceptedGroup.id} was a HIT. Using it in video.`);
-      return {
-        games: mapGroupToOverlayGames(resolvedGroup.games)
-      };
-    }
-
-    console.log(`[PreviousHit] AI determined group ${lastAcceptedGroup.id} was NOT a hit (${resolvedGroup?.groupOutcome}). Skipping celebration.`);
+    console.log(`[PreviousHit] Previous group ${prevGroup.id} does not have all games as HIT (groupOutcome=${prevGroup.groupOutcome}). Skipping celebration.`);
     return null;
   } catch (err: any) {
-    console.warn(`[PreviousHit] Could not check previous hit game group:`, err?.message || err);
+    console.warn('[PreviousHit] Could not check previous hit game group:', err?.message || err);
     return null;
   }
 }

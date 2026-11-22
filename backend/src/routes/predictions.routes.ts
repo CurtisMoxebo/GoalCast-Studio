@@ -13,7 +13,6 @@ import {
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
 import { getPreviousHitGameGroup } from '../services/predictions/previousHitService';
-import { outcomeResolverService } from '../services/predictions/outcomeResolverService';
 import { overlayGenerator } from '../services/video/overlayGenerator';
 
 const router = Router();
@@ -308,7 +307,7 @@ router.post('/status', async (req: Request, res: Response): Promise<void> => {
  */
 router.get('/history', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const rawHistory = await prisma.predictionGroup.findMany({
+    const history = await prisma.predictionGroup.findMany({
       where: { status: 'ACCEPTED' },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -323,9 +322,6 @@ router.get('/history', async (_req: Request, res: Response): Promise<void> => {
       }
     });
 
-    // Automatically resolve real outcomes for any started games with grouped AI prompt
-    const history = await outcomeResolverService.resolveGroups(rawHistory);
-
     res.json({
       success: true,
       count: history.length,
@@ -338,6 +334,63 @@ router.get('/history', async (_req: Request, res: Response): Promise<void> => {
       count: 0,
       history: []
     });
+  }
+});
+
+/**
+ * POST /api/predictions/game-outcome
+ * Manually updates the real outcome for a single game (HIT, MISS, PENDING),
+ * recalculates the parent group's groupOutcome, and persists to MariaDB.
+ */
+router.post('/game-outcome', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { gameId, realOutcome } = req.body;
+    if (!gameId) {
+      res.status(400).json({ error: 'Missing required field: gameId' });
+      return;
+    }
+
+    const normalizedOutcome = (realOutcome || 'PENDING').toUpperCase();
+    if (!['HIT', 'MISS', 'PENDING'].includes(normalizedOutcome)) {
+      res.status(400).json({ error: 'Invalid realOutcome. Allowed: HIT, MISS, PENDING' });
+      return;
+    }
+
+    // Update game outcome
+    const game = await prisma.gamePrediction.update({
+      where: { id: gameId },
+      data: { realOutcome: normalizedOutcome }
+    });
+
+    // Fetch all sibling games in the same group to recompute groupOutcome
+    const allGames = await prisma.gamePrediction.findMany({
+      where: { groupId: game.groupId }
+    });
+
+    let groupOutcome: 'PENDING' | 'HIT' | 'MISS' = 'PENDING';
+    if (allGames.some((g) => (g.realOutcome || '').toUpperCase() === 'MISS')) {
+      groupOutcome = 'MISS';
+    } else if (allGames.length > 0 && allGames.every((g) => (g.realOutcome || '').toUpperCase() === 'HIT')) {
+      groupOutcome = 'HIT';
+    } else {
+      groupOutcome = 'PENDING';
+    }
+
+    await prisma.predictionGroup.update({
+      where: { id: game.groupId },
+      data: { groupOutcome }
+    });
+
+    res.json({
+      success: true,
+      gameId: game.id,
+      realOutcome: game.realOutcome,
+      groupId: game.groupId,
+      groupOutcome
+    });
+  } catch (error: any) {
+    console.error('[PredictionsRoute] Error updating game outcome:', error);
+    res.status(500).json({ error: 'Failed to update game outcome', details: error?.message });
   }
 });
 
@@ -365,16 +418,13 @@ router.get('/recap-image/:groupId', async (req: Request, res: Response): Promise
       return;
     }
 
-    // Resolve any started pending games if needed
-    const [resolvedGroup] = await outcomeResolverService.resolveGroups([group]);
-
     const recapsDir = path.join(os.tmpdir(), 'goalcast_render', 'recaps');
     if (!fs.existsSync(recapsDir)) {
       fs.mkdirSync(recapsDir, { recursive: true });
     }
 
     const outputPath = path.join(recapsDir, `recap_${groupId}.png`);
-    await overlayGenerator.generateGroupRecapImage(resolvedGroup, outputPath);
+    await overlayGenerator.generateGroupRecapImage(group, outputPath);
 
     if (download) {
       res.download(outputPath, `goalcast_recap_${groupId}.png`);
@@ -410,20 +460,18 @@ router.post('/recap-image/:groupId', async (req: Request, res: Response): Promis
       return;
     }
 
-    const [resolvedGroup] = await outcomeResolverService.resolveGroups([group]);
-
     const recapsDir = path.join(os.tmpdir(), 'goalcast_render', 'recaps');
     if (!fs.existsSync(recapsDir)) {
       fs.mkdirSync(recapsDir, { recursive: true });
     }
 
     const outputPath = path.join(recapsDir, `recap_${groupId}.png`);
-    await overlayGenerator.generateGroupRecapImage(resolvedGroup, outputPath);
+    await overlayGenerator.generateGroupRecapImage(group, outputPath);
 
     res.json({
       success: true,
       groupId,
-      groupOutcome: resolvedGroup.groupOutcome,
+      groupOutcome: group.groupOutcome,
       imageUrl: `/api/predictions/recap-image/${groupId}`
     });
   } catch (error: any) {
