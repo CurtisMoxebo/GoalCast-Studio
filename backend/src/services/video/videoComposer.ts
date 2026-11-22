@@ -280,7 +280,7 @@ export class VideoComposer {
       text: introText,
       startTime: phraseOffset,
       duration: introSpeech.durationSeconds,
-      marginV: 120
+      marginV: 100
     });
     phraseOffset += introDuration;
 
@@ -290,7 +290,7 @@ export class VideoComposer {
         text: 'Congratulations everyone! Our last prediction was a success! We won big!',
         startTime: phraseOffset,
         duration: celebrationSpeech.durationSeconds,
-        marginV: 120
+        marginV: 100
       });
       phraseOffset += celebrationDuration;
     }
@@ -300,7 +300,7 @@ export class VideoComposer {
       text: 'Save this video for later and enjoy!',
       startTime: phraseOffset,
       duration: transSpeech.durationSeconds,
-      marginV: 260
+      marginV: 100
     });
     phraseOffset += transDuration;
 
@@ -327,7 +327,7 @@ export class VideoComposer {
         text: matchIntroText,
         startTime: phraseOffset + 0.35,
         duration: matchIntroSpeeches[i].durationSeconds,
-        marginV: 260
+        marginV: 100
       });
 
       const predRevealTime = phraseOffset + m.predRevealOffset;
@@ -335,7 +335,7 @@ export class VideoComposer {
         text: matchPredText,
         startTime: predRevealTime + 0.1,
         duration: matchPredSpeeches[i].durationSeconds,
-        marginV: 260
+        marginV: 100
       });
 
       phraseOffset += m.sceneDuration;
@@ -346,7 +346,7 @@ export class VideoComposer {
       text: 'Like, share and subscribe to get more daily predictions.',
       startTime: phraseOffset,
       duration: outroSpeech.durationSeconds,
-      marginV: 260
+      marginV: 100
     });
 
     const assSubtitlesPath = path.join(workDir, 'subtitles_karaoke.ass');
@@ -760,9 +760,9 @@ export class VideoComposer {
 
   /**
    * Generate ASS subtitles file with dynamic active-word highlighting
-   * positioned at the top of the video canvas (MarginV: 260 / 120)
+   * positioned at the top of the video canvas (MarginV: 100, Alignment: 8 / \an8)
    */
-  private generateKaraokeAssFile(
+  public generateKaraokeAssFile(
     phrases: { text: string; startTime: number; duration: number; marginV?: number }[],
     outputPath: string
   ): void {
@@ -789,7 +789,7 @@ export class VideoComposer {
       });
       const totalWeight = weights.reduce((a, b) => a + b, 0);
 
-      const marginV = phrase.marginV !== undefined ? phrase.marginV : 260;
+      const marginV = phrase.marginV !== undefined ? phrase.marginV : 100;
       let elapsed = 0;
 
       for (let i = 0; i < words.length; i++) {
@@ -803,7 +803,7 @@ export class VideoComposer {
           i === words.length - 1 ? phrase.startTime + phrase.duration : wStart + wordDur;
         elapsed += wordDur;
 
-        // Render full phrase with currently spoken word in vibrant green highlight
+        // Render full phrase with currently spoken word in vibrant green highlight, explicitly anchored at top center (\an8)
         const line = words
           .map((w, idx) => {
             if (idx === i) {
@@ -814,15 +814,15 @@ export class VideoComposer {
           .join(' ');
 
         dialogues.push(
-          `Dialogue: 0,${this.formatAssTime(wStart)},${this.formatAssTime(wEnd)},TopKaraoke,,0,0,${marginV},,${line}`
+          `Dialogue: 0,${this.formatAssTime(wStart)},${this.formatAssTime(wEnd)},TopKaraoke,,0,0,${marginV},,{\\an8}${line}`
         );
       }
 
-      // Hold complete phrase in crisp white for 0.35s after audio ends before clearing
+      // Hold complete phrase in crisp white for 0.35s after audio ends before clearing, explicitly anchored at top center (\an8)
       const holdStart = phrase.startTime + phrase.duration;
       const holdEnd = holdStart + 0.35;
       dialogues.push(
-        `Dialogue: 0,${this.formatAssTime(holdStart)},${this.formatAssTime(holdEnd)},TopKaraoke,,0,0,${marginV},,${words.join(' ')}`
+        `Dialogue: 0,${this.formatAssTime(holdStart)},${this.formatAssTime(holdEnd)},TopKaraoke,,0,0,${marginV},,{\\an8}${words.join(' ')}`
       );
     }
 
@@ -835,12 +835,15 @@ export class VideoComposer {
       '',
       '[V4+ Styles]',
       'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-      'Style: TopKaraoke,Arial,48,&H00FFFFFF&,&H00000000&,&H00000000&,&H90000000&,-1,0,0,0,100,100,1,0,1,4.5,2.5,8,60,60,260,1',
+      'Style: TopKaraoke,Arial,48,&H00FFFFFF&,&H00000000&,&H00000000&,&H90000000&,-1,0,0,0,100,100,1,0,1,4.5,2.5,8,60,60,100,1',
       '',
       '[Events]',
       'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
       ...dialogues
     ].join('\r\n');
+
+    const dir = path.dirname(outputPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
     fs.writeFileSync(outputPath, assContent, 'utf-8');
   }

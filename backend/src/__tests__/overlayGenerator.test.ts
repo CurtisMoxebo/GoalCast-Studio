@@ -6,6 +6,7 @@ import os from 'os';
 import sharp from 'sharp';
 import { overlayGenerator } from '../services/video/overlayGenerator';
 import { teamLogoService } from '../services/video/teamLogoService';
+import { videoComposer } from '../services/video/videoComposer';
 
 test('Regression: OverlayGenerator generates Intro Table PNG with correct dimensions', async () => {
   const tmpDir = path.join(os.tmpdir(), 'goalcast_tests_overlay');
@@ -150,4 +151,49 @@ test('Regression: TeamLogoService caches different ESPN URLs separately without 
   const uriArsenal = await teamLogoService.getLogoDataUri('Arsenal', 'https://a.espncdn.com/i/teamlogos/soccer/500/359.png', 80);
   const uriChelsea = await teamLogoService.getLogoDataUri('Chelsea', 'https://a.espncdn.com/i/teamlogos/soccer/500/363.png', 80);
   assert.notEqual(uriArsenal, uriChelsea, 'Arsenal and Chelsea logos must be completely distinct');
+});
+
+test('Regression: VideoComposer generates Top-Positioned ASS subtitles with \\an8 and MarginV=100', async () => {
+  const tmpDir = path.join(os.tmpdir(), 'goalcast_tests_video');
+  const assPath = path.join(tmpDir, 'test_subtitles_karaoke.ass');
+
+  const phrases = [
+    {
+      text: 'Match 1, Arsenal versus Chelsea.',
+      startTime: 1.0,
+      duration: 2.5
+    },
+    {
+      text: 'Both teams to score stands out as the strongest outcome.',
+      startTime: 4.0,
+      duration: 3.0,
+      marginV: 100
+    }
+  ];
+
+  videoComposer.generateKaraokeAssFile(phrases, assPath);
+
+  assert.ok(fs.existsSync(assPath), 'ASS subtitles file must exist');
+  const content = fs.readFileSync(assPath, 'utf-8');
+
+  // Verify resolution
+  assert.ok(content.includes('PlayResX: 1080'));
+  assert.ok(content.includes('PlayResY: 1920'));
+
+  // Verify TopKaraoke style has Alignment 8 and top MarginV 100
+  assert.ok(content.includes('Style: TopKaraoke,Arial,48,&H00FFFFFF&,&H00000000&,&H00000000&,&H90000000&,-1,0,0,0,100,100,1,0,1,4.5,2.5,8,60,60,100,1'));
+
+  // Verify every dialogue line includes \an8 top-center alignment override
+  const lines = content.split('\r\n').filter((l) => l.startsWith('Dialogue:'));
+  assert.ok(lines.length > 0, 'Must have dialogue lines');
+  for (const line of lines) {
+    assert.ok(line.includes('{\\an8}'), `Dialogue line must contain {\\an8} top-center tag: ${line}`);
+    assert.ok(line.includes(',100,,'), `Dialogue line must have MarginV 100: ${line}`);
+  }
+
+  // Verify karaoke active-word highlight
+  assert.ok(content.includes('{\\c&H0000FF00&}'), 'Must contain green highlight for active spoken word');
+
+  // Clean up
+  if (fs.existsSync(assPath)) fs.unlinkSync(assPath);
 });
