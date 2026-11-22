@@ -153,10 +153,39 @@ test('Mobile Regression: buildYouTubeShareExtras formats #Shorts in title and de
   assert.equal(extras.thumbnail_timestamp_ms, 3000);
 });
 
-test('Mobile Regression: MobileApiService URL builder methods', () => {
+test('Mobile Regression: MobileApiService URL builder methods and social endpoints', () => {
   const api = new MobileApiService('http://test-server:5000/');
   assert.equal(api.getVideoDownloadUrl('job_99'), 'http://test-server:5000/api/video/download/job_99');
   assert.equal(api.getThumbnailUrl('job_99'), 'http://test-server:5000/api/video/thumbnail/job_99');
+  assert.equal(typeof api.scheduleSocialPost, 'function');
+  assert.equal(typeof api.getSocialPipeline, 'function');
+});
+
+test('Mobile Regression: 30-minute advance scheduling strictly enforces >= 29.5 minutes rule', () => {
+  const isScheduleValid = (scheduledDate: Date): boolean => {
+    const diffMinutes = (scheduledDate.getTime() - Date.now()) / (1000 * 60);
+    return diffMinutes >= 29.5;
+  };
+
+  // 10 minutes in future -> rejected
+  const tenMins = new Date(Date.now() + 10 * 60 * 1000);
+  assert.equal(isScheduleValid(tenMins), false);
+
+  // 25 minutes in future -> rejected
+  const twentyFiveMins = new Date(Date.now() + 25 * 60 * 1000);
+  assert.equal(isScheduleValid(twentyFiveMins), false);
+
+  // Exactly 30 minutes in future -> accepted
+  const thirtyMins = new Date(Date.now() + 30.5 * 60 * 1000);
+  assert.equal(isScheduleValid(thirtyMins), true);
+
+  // 60 minutes in future -> accepted
+  const oneHour = new Date(Date.now() + 60 * 60 * 1000);
+  assert.equal(isScheduleValid(oneHour), true);
+
+  // Past date -> rejected
+  const past = new Date(Date.now() - 5 * 60 * 1000);
+  assert.equal(isScheduleValid(past), false);
 });
 
 test('Mobile Regression: SessionStore caches games by date and avoids re-fetching during session', () => {

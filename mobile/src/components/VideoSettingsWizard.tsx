@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   PanResponder,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -161,13 +162,55 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const [thumbnailSeconds, setThumbnailSeconds] = useState(3.0); // 00:03 default
   const [description, setDescription] = useState(defaultDesc);
 
+  // Scheduled Post Time: Defaults to 60 minutes in the future
+  const [scheduledDate, setScheduledDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 60);
+    return d;
+  });
+
+  // Strict Validation: Must be strictly at least 30 minutes in the future
+  const diffMinutes = useMemo(() => {
+    return (scheduledDate.getTime() - Date.now()) / (1000 * 60);
+  }, [scheduledDate]);
+
+  const isScheduleValid = diffMinutes >= 29.5;
+
+  const applyPreset = (minutesFromNow: number) => {
+    triggerHaptic();
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + minutesFromNow);
+    setScheduledDate(d);
+  };
+
+  const applyTomorrow = (hour: number) => {
+    triggerHaptic();
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(hour, 0, 0, 0);
+    setScheduledDate(d);
+  };
+
+  const adjustMinutes = (delta: number) => {
+    triggerHaptic();
+    setScheduledDate((prev) => new Date(prev.getTime() + delta * 60 * 1000));
+  };
+
   const handleStartGeneration = () => {
+    if (!isScheduleValid) {
+      Alert.alert(
+        'Invalid Scheduled Time',
+        'Scheduled post time must be strictly at least 30 minutes in the future for all social networks.'
+      );
+      return;
+    }
     onPreview({
       backgroundVideo: selectedVideo,
       backgroundAudio: selectedAudio,
       voiceActor: selectedVoice,
       thumbnailTimestamp: thumbnailSeconds,
-      description
+      description,
+      scheduledPostTime: scheduledDate.toISOString()
     });
   };
 
@@ -310,6 +353,88 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             onChange={setThumbnailSeconds}
           />
         </View>
+
+        {/* 6. Scheduled Post Date & Time Section */}
+        <View style={styles.section}>
+          <View style={styles.scheduleHeaderRow}>
+            <Text style={styles.sectionTitle}>📅 Scheduled Post Time</Text>
+            {isScheduleValid ? (
+              <View style={styles.validBadge}>
+                <Ionicons name="checkmark-circle" size={13} color="#10b981" style={{ marginRight: 4 }} />
+                <Text style={styles.validBadgeText}>Valid ({Math.round(diffMinutes)}m)</Text>
+              </View>
+            ) : (
+              <View style={styles.invalidBadge}>
+                <Ionicons name="alert-circle" size={13} color="#ef4444" style={{ marginRight: 4 }} />
+                <Text style={styles.invalidBadgeText}>Must be ≥ 30m</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.sectionSubtitle}>
+            When approved, video will schedule automatically to YouTube, Facebook, Instagram &amp; TikTok.
+          </Text>
+
+          {/* Current Scheduled Display Card */}
+          <View style={[styles.scheduleCard, !isScheduleValid && styles.scheduleCardError]}>
+            <Ionicons name="time" size={26} color={isScheduleValid ? THEME.colors.primary : '#ef4444'} />
+            <View style={styles.scheduleTimeInfo}>
+              <Text style={styles.scheduleTimeDisplay}>
+                {scheduledDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at{' '}
+                {scheduledDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+              </Text>
+              <Text style={[styles.scheduleSubText, !isScheduleValid && styles.scheduleSubTextError]}>
+                {isScheduleValid
+                  ? `Scheduled for ~${Math.round(diffMinutes)} minutes from now`
+                  : '⚠️ Strict Rule: Must be strictly at least 30 minutes in the future'}
+              </Text>
+            </View>
+          </View>
+
+          {!isScheduleValid && (
+            <View style={styles.warningBanner}>
+              <Ionicons name="warning" size={16} color="#ef4444" style={{ marginRight: 6 }} />
+              <Text style={styles.warningBannerText}>
+                Scheduled time is too soon. Social networks require at least 30 minutes advance scheduling.
+              </Text>
+            </View>
+          )}
+
+          {/* Presets */}
+          <Text style={styles.presetLabel}>Quick Presets:</Text>
+          <View style={styles.presetsRow}>
+            <TouchableOpacity style={styles.presetChip} onPress={() => applyPreset(31)}>
+              <Text style={styles.presetChipText}>+30m</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.presetChip} onPress={() => applyPreset(60)}>
+              <Text style={styles.presetChipText}>+1 Hour</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.presetChip} onPress={() => applyPreset(120)}>
+              <Text style={styles.presetChipText}>+2 Hours</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.presetChip} onPress={() => applyTomorrow(10)}>
+              <Text style={styles.presetChipText}>Tmrw 10 AM</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.presetChip} onPress={() => applyTomorrow(18)}>
+              <Text style={styles.presetChipText}>Tmrw 6 PM</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Fine Tuning Controls */}
+          <View style={styles.adjustRow}>
+            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(-15)}>
+              <Text style={styles.adjustBtnText}>-15m</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(15)}>
+              <Text style={styles.adjustBtnText}>+15m</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(-60)}>
+              <Text style={styles.adjustBtnText}>-1h</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(60)}>
+              <Text style={styles.adjustBtnText}>+1h</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Sticky Bottom Bar with Back to Games on the left and Generate Video on the right */}
@@ -332,13 +457,15 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.previewBtn, isLoading && styles.previewBtnDisabled]}
+          style={[styles.previewBtn, (!isScheduleValid || isLoading) && styles.previewBtnDisabled]}
           onPress={handleStartGeneration}
-          disabled={isLoading}
+          disabled={isLoading || !isScheduleValid}
           activeOpacity={0.8}
         >
           {isLoading ? (
             <ActivityIndicator color="#020617" size="small" />
+          ) : !isScheduleValid ? (
+            <Text style={styles.previewBtnText}>Schedule Time &lt; 30m ⚠️</Text>
           ) : (
             <Text style={styles.previewBtnText}>Generate Video ✨</Text>
           )}
@@ -636,5 +763,133 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.5
+  },
+  scheduleHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6
+  },
+  validBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  validBadgeText: {
+    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  invalidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)'
+  },
+  invalidBadgeText: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  scheduleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 10
+  },
+  scheduleCardError: {
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)'
+  },
+  scheduleTimeInfo: {
+    marginLeft: 12,
+    flex: 1
+  },
+  scheduleTimeDisplay: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#f8fafc',
+    marginBottom: 2
+  },
+  scheduleSubText: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '500'
+  },
+  scheduleSubTextError: {
+    color: '#ef4444'
+  },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+    marginBottom: 12
+  },
+  warningBannerText: {
+    color: '#fca5a5',
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16
+  },
+  presetLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8',
+    marginBottom: 8
+  },
+  presetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12
+  },
+  presetChip: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  presetChipText: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  adjustRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  adjustBtn: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  adjustBtnText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '700'
   }
 });

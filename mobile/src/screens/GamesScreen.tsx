@@ -125,6 +125,7 @@ export const GamesScreen: React.FC = () => {
   const [previewGroupId, setPreviewGroupId] = useState<string | null>(null);
   const [previewDescription, setPreviewDescription] = useState('');
   const [previewThumbTime, setPreviewThumbTime] = useState(3.0);
+  const [previewScheduledTime, setPreviewScheduledTime] = useState<string | undefined>(undefined);
   const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
 
   // Load betting options and media assets on mount
@@ -345,13 +346,15 @@ export const GamesScreen: React.FC = () => {
         backgroundAudio: settings.backgroundAudio,
         voiceActor: settings.voiceActor,
         thumbnailTimestamp: settings.thumbnailTimestamp,
-        description: settings.description
+        description: settings.description,
+        scheduledPostTime: settings.scheduledPostTime
       });
 
       setPreviewJobId(res.jobId);
       setPreviewGroupId(res.groupId);
       setPreviewDescription(settings.description);
       setPreviewThumbTime(settings.thumbnailTimestamp);
+      setPreviewScheduledTime(settings.scheduledPostTime);
       setIsPreviewModalVisible(true);
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Could not start video generation');
@@ -380,6 +383,7 @@ export const GamesScreen: React.FC = () => {
           groupId={previewGroupId}
           description={previewDescription}
           thumbnailTimestamp={previewThumbTime}
+          scheduledPostTime={previewScheduledTime}
           onModify={() => setIsPreviewModalVisible(false)}
           onCancelled={() => {
             setIsPreviewModalVisible(false);

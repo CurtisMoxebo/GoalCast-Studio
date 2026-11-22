@@ -65,6 +65,7 @@ export class MobileApiService {
     voiceActor: string;
     thumbnailTimestamp: number;
     description: string;
+    scheduledPostTime?: string;
   }): Promise<{ jobId: string; groupId: string; status: string }> {
     const res = await fetch(`${this.baseUrl}/api/predictions/preview`, {
       method: 'POST',
@@ -76,6 +77,32 @@ export class MobileApiService {
       throw new Error(err.error || 'Failed to start video preview generation');
     }
     return res.json();
+  }
+
+  async scheduleSocialPost(payload: {
+    groupId: string;
+    scheduledPostTime: string;
+    description?: string;
+  }): Promise<{ success: boolean; message: string; pipeline: any }> {
+    const res = await fetch(`${this.baseUrl}/api/social/schedule`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || data.details || 'Failed to schedule social media post');
+    }
+    return data;
+  }
+
+  async getSocialPipeline(groupId: string): Promise<{ success: boolean; pipeline: any }> {
+    const res = await fetch(`${this.baseUrl}/api/social/pipeline/${groupId}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to fetch social pipeline');
+    }
+    return data;
   }
 
   async getJobProgress(jobId: string): Promise<{

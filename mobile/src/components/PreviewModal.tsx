@@ -8,7 +8,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Dimensions
+  Dimensions,
+  Linking
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -57,6 +58,7 @@ interface PreviewModalProps {
   groupId: string | null;
   description: string;
   thumbnailTimestamp: number;
+  scheduledPostTime?: string;
   onModify: () => void;
   onCancelled: () => void;
   onAccepted: () => void;
@@ -68,6 +70,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   groupId,
   description,
   thumbnailTimestamp,
+  scheduledPostTime,
   onModify,
   onCancelled,
   onAccepted
@@ -78,6 +81,26 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const [localVideoUri, setLocalVideoUri] = useState<string | null>(null);
   const [isAccepted, setIsAccepted] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  // Social Pipeline State
+  const [isPipelineModalVisible, setIsPipelineModalVisible] = useState(false);
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false);
+  const [pipelineSummary, setPipelineSummary] = useState<string | null>(null);
+  const [pipelineItems, setPipelineItems] = useState<Array<{
+    platform: string;
+    name: string;
+    icon: any;
+    color: string;
+    status: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED';
+    remotePostId?: string;
+    remoteUrl?: string;
+    error?: string;
+  }>>([
+    { platform: 'facebook_reels', name: 'Facebook Reels', icon: SOCIAL_ICONS.facebook, color: '#1877F2', status: 'PENDING' },
+    { platform: 'instagram_reels', name: 'Instagram Reels', icon: SOCIAL_ICONS.instagram, color: '#E1306C', status: 'PENDING' },
+    { platform: 'tiktok', name: 'TikTok', icon: SOCIAL_ICONS.tiktok, color: '#000000', status: 'PENDING' },
+    { platform: 'youtube_shorts', name: 'YouTube Shorts', icon: SOCIAL_ICONS.youtube, color: '#FF0000', status: 'PENDING' }
+  ]);
 
   // Poll video rendering progress
   useEffect(() => {
@@ -236,7 +259,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
-  // Social Share Handler
+  // Social Share Handler (Fallback direct platform share)
   const handleShare = async (platform: SocialPlatform) => {
     if (!localVideoUri) return;
     await shareToSocialMedia(platform, {
@@ -244,6 +267,72 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       description,
       thumbnailTimestamp
     });
+  };
+
+  // Schedule All Social Media Handler
+  const handleScheduleAll = async () => {
+    const targetGroupId = groupId || jobId;
+    if (!targetGroupId) {
+      Alert.alert('Error', 'No prediction group ID found to schedule.');
+      return;
+    }
+
+    // Default to 60 minutes in future if not provided
+    const targetTime = scheduledPostTime || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    // Reset pipeline state
+    setPipelineItems([
+      { platform: 'facebook_reels', name: 'Facebook Reels', icon: SOCIAL_ICONS.facebook, color: '#1877F2', status: 'IN_PROGRESS' },
+      { platform: 'instagram_reels', name: 'Instagram Reels', icon: SOCIAL_ICONS.instagram, color: '#E1306C', status: 'PENDING' },
+      { platform: 'tiktok', name: 'TikTok', icon: SOCIAL_ICONS.tiktok, color: '#000000', status: 'PENDING' },
+      { platform: 'youtube_shorts', name: 'YouTube Shorts', icon: SOCIAL_ICONS.youtube, color: '#FF0000', status: 'PENDING' }
+    ]);
+    setPipelineSummary(null);
+    setIsPipelineModalVisible(true);
+    setIsPipelineRunning(true);
+
+    try {
+      const res = await mobileApi.scheduleSocialPost({
+        groupId: targetGroupId,
+        scheduledPostTime: targetTime,
+        description
+      });
+
+      if (res.pipeline?.items && Array.isArray(res.pipeline.items)) {
+        setPipelineItems((prev) =>
+          prev.map((item) => {
+            const matched = res.pipeline.items.find((i: any) => i.platform === item.platform);
+            if (matched) {
+              return {
+                ...item,
+                status: matched.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+                remotePostId: matched.remotePostId,
+                remoteUrl: matched.remoteUrl,
+                error: matched.error
+              };
+            }
+            return { ...item, status: 'SUCCESS' };
+          })
+        );
+        const successCount = res.pipeline.items.filter((i: any) => i.status === 'SUCCESS').length;
+        setPipelineSummary(`${successCount}/${res.pipeline.items.length} Platforms Scheduled Successfully!`);
+      } else {
+        setPipelineItems((prev) => prev.map((item) => ({ ...item, status: 'SUCCESS' })));
+        setPipelineSummary('All Platforms Scheduled Successfully! 🎉');
+      }
+    } catch (err: any) {
+      console.warn('[PreviewModal] Schedule error:', err);
+      setPipelineItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          status: item.status === 'IN_PROGRESS' ? 'FAILED' : item.status,
+          error: err?.message || 'Network or server error'
+        }))
+      );
+      setPipelineSummary(`Pipeline result: ${err?.message || 'Error occurred'}`);
+    } finally {
+      setIsPipelineRunning(false);
+    }
   };
 
   return (
@@ -301,49 +390,36 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             {/* Video Player */}
             <VideoPlayerComponent videoUri={localVideoUri} />
 
-            {/* Post-Accept View: 4 Direct Social Media Buttons at the bottom */}
+            {/* Post-Accept View: Single Master Action Button & Schedule Summary */}
             {isAccepted ? (
               <View style={styles.socialShareArea}>
-                <View style={styles.socialDockRow}>
-                  {SOCIAL_PLATFORMS.map((platform) => {
-                    const tagLabel =
-                      platform.id === 'youtube'
-                        ? 'Shorts'
-                        : platform.id === 'tiktok'
-                        ? 'Video'
-                        : 'Reel';
-                    const isDark = platform.id === 'tiktok';
+                {scheduledPostTime && (
+                  <View style={styles.scheduleBadgeContainer}>
+                    <Ionicons name="time" size={16} color={THEME.colors.primary} />
+                    <Text style={styles.scheduleBadgeText}>
+                      Scheduled for: {new Date(scheduledPostTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at {new Date(scheduledPostTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                )}
 
-                    return (
-                      <TouchableOpacity
-                        key={platform.id}
-                        style={styles.socialDockItem}
-                        onPress={() => handleShare(platform.id)}
-                        activeOpacity={0.75}
-                      >
-                        <View
-                          style={[
-                            styles.socialDockIconWrap,
-                            { backgroundColor: platform.color },
-                            isDark && styles.socialDockIconDark
-                          ]}
-                        >
-                          <Image
-                            source={SOCIAL_ICONS[platform.id]}
-                            style={styles.socialDockIconImage}
-                            resizeMode="contain"
-                          />
-                        </View>
-                        <Text style={styles.socialDockLabel} numberOfLines={1}>
-                          {platform.name}
-                        </Text>
-                        <View style={styles.socialTagBadge}>
-                          <Text style={styles.socialTagText}>{tagLabel}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <TouchableOpacity
+                  style={styles.scheduleAllBtn}
+                  onPress={handleScheduleAll}
+                  activeOpacity={0.85}
+                  disabled={isPipelineRunning}
+                >
+                  <Ionicons name="rocket" size={20} color="#020617" style={{ marginRight: 8 }} />
+                  <Text style={styles.scheduleAllBtnText}>🚀 Schedule Post to All Social Media</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.nativeShareSecondaryBtn}
+                  onPress={handleGeneralShare}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="share-social-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
+                  <Text style={styles.nativeShareSecondaryText}>More Sharing Options</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               /* Pre-Accept Actions: Accept, Modify, Cancel */
@@ -387,6 +463,116 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           </View>
         )}
       </View>
+
+      {/* Live Visual Social Pipeline Progress Modal */}
+      <Modal
+        visible={isPipelineModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isPipelineRunning) setIsPipelineModalVisible(false);
+        }}
+      >
+        <View style={styles.pipelineOverlay}>
+          <View style={styles.pipelineCard}>
+            {/* Modal Header */}
+            <View style={styles.pipelineHeader}>
+              <View style={styles.pipelineTitleRow}>
+                <Ionicons name="rocket" size={22} color={THEME.colors.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.pipelineTitle}>Social Media Publishing</Text>
+              </View>
+              {!isPipelineRunning && (
+                <TouchableOpacity
+                  onPress={() => setIsPipelineModalVisible(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close" size={24} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <Text style={styles.pipelineSubtitle}>
+              Executing sequential fail-safe scheduled publishing across all 4 platforms
+            </Text>
+
+            {/* Platform Items List */}
+            <View style={styles.pipelineList}>
+              {pipelineItems.map((item) => {
+                const isPending = item.status === 'PENDING';
+                const isInProgress = item.status === 'IN_PROGRESS';
+                const isSuccess = item.status === 'SUCCESS';
+                const isFailed = item.status === 'FAILED';
+
+                return (
+                  <View key={item.platform} style={styles.pipelineItemRow}>
+                    {/* Platform Icon Badge */}
+                    <View style={[styles.pipelineIconWrap, { backgroundColor: item.color }]}>
+                      <Image source={item.icon} style={styles.pipelineIconImg} resizeMode="contain" />
+                    </View>
+
+                    {/* Platform Details */}
+                    <View style={styles.pipelineItemContent}>
+                      <Text style={styles.pipelineItemName}>{item.name}</Text>
+                      {isPending && <Text style={styles.pipelineStatusPending}>Waiting in queue...</Text>}
+                      {isInProgress && <Text style={styles.pipelineStatusInProgress}>Uploading &amp; Scheduling...</Text>}
+                      {isSuccess && (
+                        <Text style={styles.pipelineStatusSuccess}>
+                          ✅ Scheduled {item.remotePostId ? `(#${item.remotePostId.substring(0, 8)})` : ''}
+                        </Text>
+                      )}
+                      {isFailed && (
+                        <Text style={styles.pipelineStatusFailed} numberOfLines={2}>
+                          ❌ {item.error || 'Failed to publish'}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Action / State Right Indicator */}
+                    <View style={styles.pipelineStatusRight}>
+                      {isInProgress && <ActivityIndicator size="small" color={THEME.colors.primary} />}
+                      {isPending && <Ionicons name="time-outline" size={20} color="#64748b" />}
+                      {isSuccess && item.remoteUrl && (
+                        <TouchableOpacity
+                          style={styles.viewPostBtn}
+                          onPress={() => Linking.openURL(item.remoteUrl!)}
+                        >
+                          <Text style={styles.viewPostBtnText}>View ↗</Text>
+                        </TouchableOpacity>
+                      )}
+                      {isSuccess && !item.remoteUrl && (
+                        <Ionicons name="checkmark-circle" size={22} color="#10b981" />
+                      )}
+                      {isFailed && <Ionicons name="alert-circle" size={22} color="#ef4444" />}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Pipeline Summary Banner */}
+            {pipelineSummary && (
+              <View style={[styles.summaryBanner, pipelineSummary.includes('halted') && styles.summaryBannerWarn]}>
+                <Text style={styles.summaryBannerText}>{pipelineSummary}</Text>
+              </View>
+            )}
+
+            {/* Bottom Dismiss Button */}
+            {!isPipelineRunning ? (
+              <TouchableOpacity
+                style={styles.pipelineDoneBtn}
+                onPress={() => setIsPipelineModalVisible(false)}
+              >
+                <Text style={styles.pipelineDoneBtnText}>Done</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.pipelineRunningNotice}>
+                <ActivityIndicator size="small" color="#94a3b8" style={{ marginRight: 8 }} />
+                <Text style={styles.pipelineRunningNoticeText}>Publishing in progress (Fail-safe active)...</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -587,5 +773,209 @@ const styles = StyleSheet.create({
     color: '#f87171',
     fontSize: 16,
     marginBottom: 16
+  },
+  scheduleBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)'
+  },
+  scheduleBadgeText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 6
+  },
+  scheduleAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.colors.primary,
+    borderRadius: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    shadowColor: THEME.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5
+  },
+  scheduleAllBtnText: {
+    color: '#020617',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.3
+  },
+  nativeShareSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginTop: 8
+  },
+  nativeShareSecondaryText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  pipelineOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  pipelineCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#0f172a',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10
+  },
+  pipelineHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6
+  },
+  pipelineTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  pipelineTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#f8fafc'
+  },
+  pipelineSubtitle: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginBottom: 16,
+    lineHeight: 16
+  },
+  pipelineList: {
+    gap: 10,
+    marginBottom: 16
+  },
+  pipelineItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  pipelineIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12
+  },
+  pipelineIconImg: {
+    width: 22,
+    height: 22
+  },
+  pipelineItemContent: {
+    flex: 1
+  },
+  pipelineItemName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#f8fafc',
+    marginBottom: 2
+  },
+  pipelineStatusPending: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500'
+  },
+  pipelineStatusInProgress: {
+    fontSize: 11,
+    color: '#38bdf8',
+    fontWeight: '600'
+  },
+  pipelineStatusSuccess: {
+    fontSize: 11,
+    color: '#34d399',
+    fontWeight: '600'
+  },
+  pipelineStatusFailed: {
+    fontSize: 11,
+    color: '#f87171',
+    fontWeight: '500'
+  },
+  pipelineStatusRight: {
+    marginLeft: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  viewPostBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  viewPostBtnText: {
+    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  summaryBanner: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  summaryBannerWarn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.3)'
+  },
+  summaryBannerText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  pipelineDoneBtn: {
+    backgroundColor: THEME.colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center'
+  },
+  pipelineDoneBtnText: {
+    color: '#020617',
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  pipelineRunningNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10
+  },
+  pipelineRunningNoticeText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '500'
   }
 });

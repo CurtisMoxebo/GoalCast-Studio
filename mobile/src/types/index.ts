@@ -36,6 +36,7 @@ export interface VideoSettings {
   voiceActor: string;
   thumbnailTimestamp: number; // e.g. 3.0
   description: string;
+  scheduledPostTime?: string; // ISO 8601 string, must be >= now + 30 mins
 }
 
 export interface SelectedGamePrediction {
