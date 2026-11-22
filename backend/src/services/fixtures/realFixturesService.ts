@@ -6,6 +6,17 @@ export interface LeagueConfig {
   priority: number;
 }
 
+export interface OfficialMatchScore {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  completed: boolean;
+  statusText: string;
+  competition: string;
+}
+
 export const SUPPORTED_LEAGUES: LeagueConfig[] = [
   // Top European Domestic Leagues
   { code: 'eng.1', name: 'English Premier League', priority: 1 },
@@ -155,5 +166,70 @@ export class RealFixturesService {
 
     console.log(`[RealFixturesService] ✅ Discovered ${finalGames.length} real official matches for ${targetDate}`);
     return finalGames;
+  }
+
+  /**
+   * Fetches official match scores across supported leagues for a given date (YYYY-MM-DD or YYYYMMDD)
+   */
+  public static async fetchOfficialMatchScores(targetDate: string): Promise<OfficialMatchScore[]> {
+    const formattedDate = targetDate.replace(/-/g, '').slice(0, 8);
+    const fetchPromises = SUPPORTED_LEAGUES.map(async (league) => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.code}/scoreboard?dates=${formattedDate}`;
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) return [];
+
+        const data: any = await res.json();
+        const compName = data.leagues?.[0]?.name || league.name;
+        const events = data.events || [];
+        const results: OfficialMatchScore[] = [];
+
+        for (const ev of events) {
+          const comps = ev.competitions?.[0]?.competitors || [];
+          const homeComp = comps.find((c: any) => c.homeAway === 'home') || comps[0];
+          const awayComp = comps.find((c: any) => c.homeAway === 'away') || comps[1];
+          if (!homeComp || !awayComp) continue;
+
+          const homeTeam = homeComp.team?.displayName || homeComp.team?.name || '';
+          const awayTeam = awayComp.team?.displayName || awayComp.team?.name || '';
+          const homeScore = parseInt(homeComp.score || '0', 10);
+          const awayScore = parseInt(awayComp.score || '0', 10);
+
+          const statusType = ev.status?.type;
+          const isCompleted = statusType?.completed === true || statusType?.name === 'STATUS_FULL_TIME';
+          const statusText = statusType?.description || statusType?.shortDetail || 'FT';
+
+          if (homeTeam && awayTeam) {
+            results.push({
+              id: ev.id || `${homeTeam}_${awayTeam}`,
+              homeTeam,
+              awayTeam,
+              homeScore: isNaN(homeScore) ? 0 : homeScore,
+              awayScore: isNaN(awayScore) ? 0 : awayScore,
+              completed: isCompleted,
+              statusText,
+              competition: compName
+            });
+          }
+        }
+        return results;
+      } catch {
+        return [];
+      }
+    });
+
+    const settled = await Promise.allSettled(fetchPromises);
+    const allScores: OfficialMatchScore[] = [];
+    for (const s of settled) {
+      if (s.status === 'fulfilled') {
+        allScores.push(...s.value);
+      }
+    }
+    return allScores;
   }
 }
