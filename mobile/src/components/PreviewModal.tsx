@@ -231,31 +231,72 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
-  // Download Video Handler
+  // Download Video Handler (Saves directly to device Gallery / Camera Roll)
   const handleDownloadVideo = async () => {
     if (!localVideoUri) return;
     try {
       const { Platform, ToastAndroid, Alert } = await import('react-native');
-      const Sharing = await import('expo-sharing');
-      const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+      const MediaLibrary = await import('expo-media-library');
 
-      if (Platform.OS === 'android') {
+      // Request media library permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+
+      if (status === 'granted') {
+        const asset = await MediaLibrary.createAssetAsync(localVideoUri);
+
         try {
-          ToastAndroid.show('Video ready! Save or choose download location.', ToastAndroid.SHORT);
-        } catch {}
-      }
+          const album = await MediaLibrary.getAlbumAsync('GoalCast Studio');
+          if (album == null) {
+            await MediaLibrary.createAlbumAsync('GoalCast Studio', asset, false);
+          } else {
+            await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+          }
+        } catch (albumErr) {
+          // Album creation fallback - asset is already created in main gallery
+          console.warn('[PreviewModal] Album organization fallback:', albumErr);
+        }
 
-      if (isAvailable) {
-        await Sharing.shareAsync(localVideoUri, {
-          mimeType: 'video/mp4',
-          dialogTitle: 'Download / Save Video',
-          UTI: 'public.movie'
-        });
+        if (Platform.OS === 'android') {
+          try {
+            ToastAndroid.show('✅ Video saved to your Gallery!', ToastAndroid.LONG);
+          } catch {}
+        }
+        Alert.alert(
+          '✅ Video Saved',
+          'The video has been saved directly to your phone’s Photos / Gallery in the "GoalCast Studio" album!'
+        );
       } else {
-        Alert.alert('Video Downloaded', 'The video is saved on your device storage.');
+        // Fallback to sharing / file save dialog if permission denied
+        const Sharing = await import('expo-sharing');
+        const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+        if (isAvailable) {
+          await Sharing.shareAsync(localVideoUri, {
+            mimeType: 'video/mp4',
+            dialogTitle: 'Save Video to Device',
+            UTI: 'public.movie'
+          });
+        } else {
+          Alert.alert(
+            'Permission Required',
+            'Storage permission is required to save videos directly to your device gallery.'
+          );
+        }
       }
     } catch (err: any) {
       console.warn('[PreviewModal] Error downloading video:', err);
+      // Graceful fallback to native share
+      try {
+        const Sharing = await import('expo-sharing');
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(localVideoUri, {
+            mimeType: 'video/mp4',
+            dialogTitle: 'Save Video',
+            UTI: 'public.movie'
+          });
+        }
+      } catch (fallbackErr) {
+        Alert.alert('Download Error', `Could not save video: ${err?.message || 'Unknown error'}`);
+      }
     }
   };
 
