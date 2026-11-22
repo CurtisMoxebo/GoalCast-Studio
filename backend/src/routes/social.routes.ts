@@ -160,7 +160,8 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
 router.get('/tiktok/login', (_req: Request, res: Response): void => {
   const clientKey = process.env.TIKTOK_CLIENT_KEY || 'aw24z5truoqnbpco';
   const redirectUri = encodeURIComponent('https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback');
-  const scopes = encodeURIComponent('user.info.basic,video.upload,video.publish');
+  // Must match exactly the products/scopes configured on the TikTok Developer App
+  const scopes = encodeURIComponent('user.info.basic,video.upload,video.manage');
   const csrfState = Math.random().toString(36).substring(2);
 
   const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${scopes}&response_type=code&redirect_uri=${redirectUri}&state=${csrfState}`;
