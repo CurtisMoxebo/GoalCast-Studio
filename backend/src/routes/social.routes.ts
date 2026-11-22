@@ -74,7 +74,7 @@ function resolveVideoPath(groupId: string): string | null {
  */
 router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId, scheduledPostTime, description } = req.body;
+    const { groupId, scheduledPostTime, description, thumbnailTimestamp } = req.body;
 
     if (!groupId) {
       res.status(400).json({ error: 'Missing groupId in request body.' });
@@ -105,6 +105,12 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
     // Resolve group details from DB or fallbacks
     let targetDate = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     let finalDesc = description || '';
+    let finalThumbnailTimestamp: number | undefined =
+      typeof thumbnailTimestamp === 'number' && !isNaN(thumbnailTimestamp)
+        ? thumbnailTimestamp
+        : (typeof thumbnailTimestamp === 'string' && !isNaN(parseFloat(thumbnailTimestamp))
+            ? parseFloat(thumbnailTimestamp)
+            : undefined);
 
     try {
       const group = await prisma.predictionGroup.findUnique({
@@ -113,6 +119,9 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       if (group) {
         targetDate = group.targetDate.toISOString().split('T')[0];
         if (!finalDesc) finalDesc = group.description;
+        if (finalThumbnailTimestamp === undefined && typeof group.thumbnailTimestamp === 'number') {
+          finalThumbnailTimestamp = group.thumbnailTimestamp;
+        }
 
         // Persist scheduledPostTime on group
         await prisma.predictionGroup.update({
@@ -136,7 +145,8 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       videoPath,
       description: finalDesc,
       targetDate,
-      scheduledPostTime: scheduledDate
+      scheduledPostTime: scheduledDate,
+      thumbnailTimestamp: finalThumbnailTimestamp ?? 3.0
     });
 
     res.json({

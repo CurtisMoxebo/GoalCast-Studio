@@ -107,6 +107,7 @@ export class MobileApiService {
     groupId: string;
     scheduledPostTime: string;
     description?: string;
+    thumbnailTimestamp?: number;
   }): Promise<{ success: boolean; message: string; pipeline: any }> {
     const res = await fetch(`${this.baseUrl}/api/social/schedule`, {
       method: 'POST',

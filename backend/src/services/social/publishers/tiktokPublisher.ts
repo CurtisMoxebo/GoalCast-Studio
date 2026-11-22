@@ -22,7 +22,9 @@ export class TikTokPublisher implements ISocialPublisher {
 
   public async publish(options: PublishOptions): Promise<PublishResult> {
     const logs: string[] = [];
-    logs.push(`[TikTok] Initializing TikTok scheduled upload for group "${options.groupId}"`);
+    const thumbSeconds = typeof options.thumbnailTimestamp === 'number' && !isNaN(options.thumbnailTimestamp) ? options.thumbnailTimestamp : 3.0;
+    const thumbOffsetMs = Math.round(thumbSeconds * 1000);
+    logs.push(`[TikTok] Initializing TikTok scheduled upload for group "${options.groupId}" (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
 
     const clientKey = process.env.TIKTOK_CLIENT_KEY || '';
     const accessToken = this.getAccessToken();
@@ -32,7 +34,7 @@ export class TikTokPublisher implements ISocialPublisher {
       logs.push('[TikTok] ℹ Client credentials present; executing in safe staging/simulated mode (pending OAuth token)');
       const simulatedId = `tiktok_post_${Date.now()}`;
       const remoteUrl = `https://www.tiktok.com/@goalcastxi/video/${simulatedId}`;
-      logs.push(`[TikTok] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl}`);
+      logs.push(`[TikTok] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl} (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
       return {
         success: true,
         platform: this.id,
@@ -43,7 +45,7 @@ export class TikTokPublisher implements ISocialPublisher {
     }
 
     try {
-      logs.push(`[TikTok] Initializing Content Posting API with Client Key: ${clientKey}...`);
+      logs.push(`[TikTok] Initializing Content Posting API with Client Key: ${clientKey}, cover_clip_timestamp_ms: ${thumbOffsetMs} (${thumbSeconds}s)...`);
       const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
       const videoUrl = `${publicBase}/api/video/download/${options.groupId}`;
 
@@ -62,7 +64,8 @@ export class TikTokPublisher implements ISocialPublisher {
             privacy_level: 'PUBLIC_TO_EVERYONE',
             disable_duet: false,
             disable_stitch: false,
-            disable_comment: false
+            disable_comment: false,
+            cover_clip_timestamp_ms: thumbOffsetMs
           },
           source_info: {
             source: 'PULL_FROM_URL',

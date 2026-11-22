@@ -6,7 +6,9 @@ export class InstagramReelsPublisher implements ISocialPublisher {
 
   public async publish(options: PublishOptions): Promise<PublishResult> {
     const logs: string[] = [];
-    logs.push(`[Instagram] Initializing Instagram Reels scheduled upload for group "${options.groupId}"`);
+    const thumbSeconds = typeof options.thumbnailTimestamp === 'number' && !isNaN(options.thumbnailTimestamp) ? options.thumbnailTimestamp : 3.0;
+    const thumbOffsetMs = Math.round(thumbSeconds * 1000);
+    logs.push(`[Instagram] Initializing Instagram Reels scheduled upload for group "${options.groupId}" (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
 
     const igUserId = process.env.INSTAGRAM_ACCOUNT_ID || '';
     const pageToken = process.env.FB_PAGE_ACCESS_TOKEN || '';
@@ -15,7 +17,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       logs.push('[Instagram] ℹ No INSTAGRAM_ACCOUNT_ID or FB_PAGE_ACCESS_TOKEN found in .env; executing in simulated mode');
       const simulatedId = `ig_reel_sim_${Date.now()}`;
       const remoteUrl = `https://www.instagram.com/reel/${simulatedId}`;
-      logs.push(`[Instagram] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl}`);
+      logs.push(`[Instagram] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl} (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
       return {
         success: true,
         platform: this.id,
@@ -28,12 +30,13 @@ export class InstagramReelsPublisher implements ISocialPublisher {
     try {
       logs.push(`[Instagram] Target Instagram Account ID: ${igUserId}`);
 
-      // Public video download URL accessible by Meta's crawler
+      // Public video and thumbnail cover download URL accessible by Meta's crawler
       const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
       const videoPublicUrl = `${publicBase}/api/video/download/${options.groupId}`;
+      const coverUrl = `${publicBase}/api/video/thumbnail/${options.groupId}`;
       const caption = options.description || `Football Predictions ${options.targetDate} ⚽🔥 #reels #football #predictions #fyp`;
 
-      logs.push(`[Instagram] Creating media container with video URL: ${videoPublicUrl}...`);
+      logs.push(`[Instagram] Creating media container with video URL: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms (${thumbSeconds}s), cover URL: ${coverUrl}...`);
       const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -42,6 +45,8 @@ export class InstagramReelsPublisher implements ISocialPublisher {
           video_url: videoPublicUrl,
           caption,
           share_to_feed: 'true',
+          thumb_offset: thumbOffsetMs.toString(),
+          cover_url: coverUrl,
           access_token: pageToken
         })
       });

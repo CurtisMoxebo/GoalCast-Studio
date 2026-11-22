@@ -7,7 +7,9 @@ export class FacebookReelsPublisher implements ISocialPublisher {
 
   public async publish(options: PublishOptions): Promise<PublishResult> {
     const logs: string[] = [];
-    logs.push(`[Facebook] Initializing Facebook Reels scheduled upload for group "${options.groupId}"`);
+    const thumbSeconds = typeof options.thumbnailTimestamp === 'number' && !isNaN(options.thumbnailTimestamp) ? options.thumbnailTimestamp : 3.0;
+    const thumbOffsetMs = Math.round(thumbSeconds * 1000);
+    logs.push(`[Facebook] Initializing Facebook Reels scheduled upload for group "${options.groupId}" (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
 
     const pageId = process.env.FB_PAGE_ID || '';
     const pageToken = process.env.FB_PAGE_ACCESS_TOKEN || '';
@@ -16,7 +18,7 @@ export class FacebookReelsPublisher implements ISocialPublisher {
       logs.push('[Facebook] ℹ No FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN found in .env; executing in simulated mode');
       const simulatedId = `fb_reel_sim_${Date.now()}`;
       const remoteUrl = `https://www.facebook.com/reel/${simulatedId}`;
-      logs.push(`[Facebook] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl}`);
+      logs.push(`[Facebook] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl} (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
       return {
         success: true,
         platform: this.id,
@@ -77,7 +79,7 @@ export class FacebookReelsPublisher implements ISocialPublisher {
       logs.push('[Facebook] Phase 2 upload complete.');
 
       // 3. Phase 3: Finalize and Schedule Reel
-      logs.push(`[Facebook] Phase 3: Scheduling Reel publish for Unix timestamp ${scheduledEpoch}...`);
+      logs.push(`[Facebook] Phase 3: Scheduling Reel publish for Unix timestamp ${scheduledEpoch} (thumb_offset: ${thumbOffsetMs}ms / ${thumbSeconds}s)...`);
       const desc = options.description || `Football Predictions ${options.targetDate} #reels #football`;
       const finishRes = await fetch(initUrl, {
         method: 'POST',
@@ -88,7 +90,8 @@ export class FacebookReelsPublisher implements ISocialPublisher {
           video_id: videoId,
           video_state: 'SCHEDULED',
           scheduled_publish_time: scheduledEpoch.toString(),
-          description: desc
+          description: desc,
+          thumb_offset: thumbOffsetMs.toString()
         })
       });
 

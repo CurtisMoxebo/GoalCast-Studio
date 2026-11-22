@@ -336,7 +336,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       const res = await mobileApi.scheduleSocialPost({
         groupId: targetGroupId,
         scheduledPostTime: targetTime,
-        description
+        description,
+        thumbnailTimestamp
       });
 
       if (res.pipeline?.items && Array.isArray(res.pipeline.items)) {
