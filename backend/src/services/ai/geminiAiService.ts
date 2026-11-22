@@ -5,7 +5,9 @@ import {
   GamePredictionResult,
   ValidatableGame,
   ValidationResult,
-  PredictionSuggestion
+  PredictionSuggestion,
+  GameOutcomeEvaluationInput,
+  GameOutcomeEvaluationResult
 } from './aiService.interface';
 import {
   findBettingOptionByCode,
@@ -343,6 +345,68 @@ Return a JSON object adhering to this schema:
     } catch (err: any) {
       console.error('[GeminiAIService] validatePreviousPredictions failed:', err?.message || err);
       throw err;
+    }
+  }
+
+  /**
+   * Evaluates a batched list of games to determine their real outcome (HIT, MISS, or PENDING).
+   * Grouping requests into a single prompt significantly limits AI API calls.
+   */
+  async resolveGameOutcomes(games: GameOutcomeEvaluationInput[]): Promise<GameOutcomeEvaluationResult[]> {
+    if (!games || games.length === 0) return [];
+
+    const ai = this.getClient();
+    const prompt = `
+You are an expert football results and betting verification engine.
+Verify the actual real-world outcome and score for each of the following games and evaluate whether their predicted selections HIT, MISSED, or are still PENDING.
+
+List of Games to verify:
+${JSON.stringify(games, null, 2)}
+
+Instructions:
+1. For each game, find or determine the real final score (e.g. "2 - 1" or "0 - 0").
+2. If the match is not finished or the outcome cannot yet be confirmed, set "realOutcome": "PENDING".
+3. If all predicted selections for the game were correct, set "realOutcome": "HIT".
+4. If at least one prediction for the game failed, set "realOutcome": "MISS".
+5. Provide a concise explanation in "realOutcomeDetails" (e.g., "Full Time 2-1: Arsenal Win & Over 2.5 HIT").
+
+Return a JSON array adhering to this schema:
+[
+  {
+    "gameId": string,
+    "realOutcome": "HIT" | "MISS" | "PENDING",
+    "realScore": string,
+    "realOutcomeDetails": string
+  }
+]
+`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: this.modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1
+        }
+      });
+
+      const text = response.text || '[]';
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed.map((item: any) => ({
+        gameId: String(item.gameId),
+        realOutcome: item.realOutcome === 'HIT' ? 'HIT' : item.realOutcome === 'MISS' ? 'MISS' : 'PENDING',
+        realScore: item.realScore || undefined,
+        realOutcomeDetails: item.realOutcomeDetails || undefined
+      }));
+    } catch (err: any) {
+      console.error('[GeminiAIService] resolveGameOutcomes failed:', err?.message || err);
+      return games.map((g) => ({
+        gameId: g.gameId,
+        realOutcome: 'PENDING'
+      }));
     }
   }
 }

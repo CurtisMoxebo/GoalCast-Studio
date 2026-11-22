@@ -689,6 +689,320 @@ export class OverlayGenerator {
       </svg>
     `;
 
+    await sharp(Buffer.from(svg)).png().toFile(outputPath);
+    return outputPath;
+  }
+
+  /**
+   * Generates a 1080x1920 Matchday Predictions Recap Image.
+   * Matches the visual aesthetic of the celebration table:
+   * - Unified white card container with sharp borders & soft drop shadow
+   * - Real team logos for home and away
+   * - Outcome resolution logic:
+   *   * If predicted outcome and real outcome are similar / hit: display ONE in green.
+   *   * If different / miss: display BOTH predicted and real outcome (with red miss badge).
+   *   * If pending: display predicted and pending badge.
+   * - Top banner displays overall group outcome (Green HIT, Red MISS, Gray PENDING).
+   */
+  async generateGroupRecapImage(groupData: any, outputPath: string): Promise<string> {
+    const games: any[] = groupData.games || [];
+    const count = games.length || 1;
+    const targetDate = groupData.targetDate ? this.formatSlashDate(groupData.targetDate) : 'Matchday';
+    const groupOutcome: 'PENDING' | 'HIT' | 'MISS' = groupData.groupOutcome || 'PENDING';
+
+    let rowHeight = 190;
+    let logoSize = 68;
+    let nameFontSize = 32;
+
+    if (count <= 2) {
+      rowHeight = 250;
+      logoSize = 88;
+      nameFontSize = 36;
+    } else if (count === 3) {
+      rowHeight = 210;
+      logoSize = 78;
+      nameFontSize = 34;
+    } else if (count === 4) {
+      rowHeight = 180;
+      logoSize = 68;
+      nameFontSize = 30;
+    } else if (count >= 5) {
+      rowHeight = Math.min(170, Math.floor(1000 / count));
+      logoSize = 58;
+      nameFontSize = 26;
+    }
+
+    const tableWidth = 1000;
+    const tableX = Math.round((1080 - tableWidth) / 2); // 40
+    const titleHeight = 110;
+    const gapBetweenTitleAndTable = 24;
+
+    // Fetch real team logos concurrently
+    const [homeLogos, awayLogos] = await Promise.all([
+      Promise.all(
+        games.map((g) => teamLogoService.getLogoDataUri(g.homeTeam, g.homeTeamLogo, logoSize))
+      ),
+      Promise.all(
+        games.map((g) => teamLogoService.getLogoDataUri(g.awayTeam, g.awayTeamLogo, logoSize))
+      )
+    ]);
+
+    const totalTableHeight = count * rowHeight;
+    const combinedHeight = titleHeight + gapBetweenTitleAndTable + totalTableHeight;
+    const startY = Math.max(80, Math.round((1920 - combinedHeight) / 2));
+
+    const titleY = startY;
+    const tableStartY = titleY + titleHeight + gapBetweenTitleAndTable;
+
+    // Confetti particles if group is HIT
+    let confettiSvg = '';
+    if (groupOutcome === 'HIT') {
+      const confettiColors = ['#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#8b5cf6', '#eab308', '#22c55e', '#ffd700'];
+      const confettiElements: string[] = [];
+      for (let c = 0; c < 80; c++) {
+        const cx = Math.floor(Math.random() * 1040) + 20;
+        const cy = Math.floor(Math.random() * 1800) + 60;
+        const color = confettiColors[c % confettiColors.length];
+        const rot = Math.floor(Math.random() * 360);
+        const size = Math.floor(Math.random() * 14) + 8;
+        confettiElements.push(
+          `<rect x="${cx - size}" y="${cy - Math.round(size / 4)}" width="${size * 2}" height="${Math.round(size * 0.6)}" rx="3" fill="${color}" transform="rotate(${rot} ${cx} ${cy})"/>`
+        );
+      }
+      confettiSvg = confettiElements.join('\n');
+    }
+
+    // Determine Title & Header Badge based on groupOutcome
+    let headerTitle = 'MATCHDAY RECAP';
+    let headerBadgeText = 'PENDING';
+    let headerBadgeColor = '#64748b'; // Slate
+    let headerIcon = '⏳';
+
+    if (groupOutcome === 'HIT') {
+      headerTitle = '🎉 ALL PREDICTIONS HIT 🎉';
+      headerBadgeText = '100% SUCCESS';
+      headerBadgeColor = '#16a34a'; // Green
+      headerIcon = '🏆';
+    } else if (groupOutcome === 'MISS') {
+      headerTitle = 'MATCHDAY PREDICTIONS RECAP';
+      headerBadgeText = 'MISSED';
+      headerBadgeColor = '#dc2626'; // Red
+      headerIcon = '❌';
+    }
+
+    const rowsSvg = games.map((game, i) => {
+      const rowY = i * rowHeight;
+      const home = this.escapeXml(game.homeTeam);
+      const away = this.escapeXml(game.awayTeam);
+      const outcome = (game.realOutcome || 'PENDING').toUpperCase();
+
+      const shortPred =
+        game.selections && game.selections.length > 1
+          ? `${this.formatShortPrediction(game.selections[0].code, game.selections[0].label)} & ${this.formatShortPrediction(game.selections[1].code, game.selections[1].label)}`
+          : this.formatShortPrediction(game.selections?.[0]?.code, game.selections?.[0]?.label);
+
+      const rowHalf = rowHeight / 2;
+      const homeLogoY = rowY + Math.round((rowHalf - logoSize) / 2);
+      const awayLogoY = rowY + Math.round(rowHalf + (rowHalf - logoSize) / 2);
+
+      const homeTextBaselineY = Math.round(homeLogoY + logoSize / 2 + nameFontSize * 0.35);
+      const awayTextBaselineY = Math.round(awayLogoY + logoSize / 2 + nameFontSize * 0.35);
+
+      const logoX = 92;
+      const nameX = logoX + logoSize + 22;
+      const badgeWidth = 320;
+      const badgeHeight = rowHeight - 24;
+
+      let badgeContent = '';
+
+      if (outcome === 'HIT') {
+        // SIMILAR / HIT: Display ONLY ONE in GREEN!
+        const checkRadius = 26;
+        const checkCx = badgeWidth - checkRadius - 16;
+        const checkCy = Math.round(badgeHeight / 2);
+        const pillWidth = checkCx - checkRadius - 20;
+        const pillHeight = Math.min(68, Math.round(badgeHeight * 0.55));
+        const pillY = Math.round((badgeHeight - pillHeight) / 2);
+        const pillFontSize = shortPred.length > 12 ? 20 : shortPred.length > 7 ? 24 : 28;
+
+        const scoreText = game.realScore ? `FT: ${game.realScore}` : '';
+
+        badgeContent = `
+          <!-- Section Container on Right -->
+          <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f0fdf4" fill-opacity="0.95" stroke="#bbf7d0" stroke-width="1.5"/>
+
+          <!-- Green Prediction Pill -->
+          <rect x="14" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="14" fill="#22c55e"/>
+          <text x="${14 + pillWidth / 2}" y="${Math.round(pillY + pillHeight / 2 + (scoreText ? -4 : pillFontSize * 0.35))}" fill="#000000" font-size="${pillFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+            ${this.escapeXml(shortPred)}
+          </text>
+          ${scoreText ? `
+            <text x="${14 + pillWidth / 2}" y="${Math.round(pillY + pillHeight - 6)}" fill="#064e3b" font-size="14" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
+              ${this.escapeXml(scoreText)}
+            </text>
+          ` : ''}
+
+          <!-- Green Check Circle on Right -->
+          <circle cx="${checkCx}" cy="${checkCy}" r="${checkRadius}" fill="#16a34a"/>
+          <path d="M${checkCx - 10} ${checkCy} L${checkCx - 3} ${checkCy + 8} L${checkCx + 10} ${checkCy - 8}" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        `;
+      } else if (outcome === 'MISS') {
+        // DIFFERENT / MISS: Display BOTH predicted and real outcome!
+        const pillHeight = Math.round((badgeHeight - 20) / 2);
+        const pill1Y = 8;
+        const pill2Y = pill1Y + pillHeight + 4;
+        const innerWidth = badgeWidth - 24;
+        const scoreDisplay = game.realScore ? `FT: ${game.realScore}` : 'MISSED';
+
+        badgeContent = `
+          <!-- Section Container on Right -->
+          <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#fef2f2" fill-opacity="0.95" stroke="#fecaca" stroke-width="1.5"/>
+
+          <!-- 1. Predicted Pill (Top) -->
+          <rect x="12" y="${pill1Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+          <text x="24" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#64748b" font-size="14" font-weight="bold" font-family="Arial, sans-serif">
+            PRED:
+          </text>
+          <text x="${innerWidth}" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#0f172a" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="end">
+            ${this.escapeXml(shortPred)}
+          </text>
+
+          <!-- 2. Real Outcome Pill (Bottom - Red with Cross) -->
+          <rect x="12" y="${pill2Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#fee2e2" stroke="#fca5a5" stroke-width="1"/>
+          <text x="24" y="${Math.round(pill2Y + pillHeight / 2 + 5)}" fill="#dc2626" font-size="14" font-weight="900" font-family="Arial, sans-serif">
+            REAL:
+          </text>
+          <text x="${innerWidth - 22}" y="${Math.round(pill2Y + pillHeight / 2 + 5)}" fill="#dc2626" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="end">
+            ${this.escapeXml(scoreDisplay)}
+          </text>
+          <!-- Red cross icon -->
+          <circle cx="${innerWidth}" cy="${Math.round(pill2Y + pillHeight / 2)}" r="9" fill="#dc2626"/>
+          <path d="M${innerWidth - 4} ${Math.round(pill2Y + pillHeight / 2) - 4} L${innerWidth + 4} ${Math.round(pill2Y + pillHeight / 2) + 4} M${innerWidth + 4} ${Math.round(pill2Y + pillHeight / 2) - 4} L${innerWidth - 4} ${Math.round(pill2Y + pillHeight / 2) + 4}" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+        `;
+      } else {
+        // PENDING
+        const pillHeight = Math.round((badgeHeight - 20) / 2);
+        const pill1Y = 8;
+        const pill2Y = pill1Y + pillHeight + 4;
+        const innerWidth = badgeWidth - 24;
+
+        badgeContent = `
+          <!-- Section Container on Right -->
+          <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f8fafc" fill-opacity="0.95" stroke="#e2e8f0" stroke-width="1.5"/>
+
+          <!-- 1. Predicted Pill (Top) -->
+          <rect x="12" y="${pill1Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#e0f2fe" stroke="#bae6fd" stroke-width="1"/>
+          <text x="24" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#0284c7" font-size="14" font-weight="bold" font-family="Arial, sans-serif">
+            PRED:
+          </text>
+          <text x="${innerWidth}" y="${Math.round(pill1Y + pillHeight / 2 + 5)}" fill="#0369a1" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="end">
+            ${this.escapeXml(shortPred)}
+          </text>
+
+          <!-- 2. Status Pill (Bottom) -->
+          <rect x="12" y="${pill2Y}" width="${innerWidth}" height="${pillHeight}" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+          <text x="${12 + innerWidth / 2}" y="${Math.round(pill2Y + pillHeight / 2 + 5)}" fill="#64748b" font-size="14" font-weight="800" font-family="Arial, sans-serif" text-anchor="middle">
+            ⏳ PENDING
+          </text>
+        `;
+      }
+
+      const isLastRow = i === games.length - 1;
+      const dividerSvg = !isLastRow
+        ? `<line x1="20" y1="${rowY + rowHeight}" x2="${tableWidth - 20}" y2="${rowY + rowHeight}" stroke="#cbd5e1" stroke-width="2"/>`
+        : '';
+
+      return `
+        <!-- Game Row ${i + 1} -->
+        <g>
+          <!-- Match Index Circle on Left -->
+          <circle cx="48" cy="${rowY + Math.round(rowHeight / 2)}" r="28" fill="#f1f5f9" fill-opacity="0.9" stroke="#cbd5e1" stroke-width="1.5"/>
+          <text x="48" y="${rowY + Math.round(rowHeight / 2 + 8)}" fill="#0f172a" font-size="24" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">${i + 1}</text>
+
+          <!-- Vertical Divider between index badge and teams -->
+          <line x1="80" y1="${rowY + 12}" x2="80" y2="${rowY + rowHeight - 12}" stroke="#f1f5f9" stroke-width="2"/>
+
+          <!-- HOME TEAM -->
+          <image href="${homeLogos[i]}" x="${logoX}" y="${homeLogoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="${nameX}" y="${homeTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
+            ${home}
+          </text>
+
+          <!-- Divider between Home & Away inside row -->
+          <line x1="${logoX}" y1="${rowY + Math.round(rowHalf)}" x2="${tableWidth - (badgeWidth + 28)}" y2="${rowY + Math.round(rowHalf)}" stroke="#f1f5f9" stroke-width="1.5"/>
+
+          <!-- AWAY TEAM -->
+          <image href="${awayLogos[i]}" x="${logoX}" y="${awayLogoY}" width="${logoSize}" height="${logoSize}" preserveAspectRatio="xMidYMid meet"/>
+          <text x="${nameX}" y="${awayTextBaselineY}" fill="#0f172a" font-size="${nameFontSize}" font-weight="800" font-family="Arial, sans-serif" text-anchor="start">
+            ${away}
+          </text>
+
+          <!-- Outcome / Prediction Section on Right -->
+          <g transform="translate(${tableWidth - (badgeWidth + 18)}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
+            ${badgeContent}
+          </g>
+
+          ${dividerSvg}
+        </g>
+      `;
+    }).join('\n');
+
+    const svg = `
+      <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#0f172a"/>
+            <stop offset="50%" stop-color="#090d16"/>
+            <stop offset="100%" stop-color="#020617"/>
+          </linearGradient>
+          <filter id="recapShadow" x="-5%" y="-10%" width="110%" height="130%">
+            <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.6"/>
+          </filter>
+        </defs>
+
+        <!-- Background Gradient -->
+        <rect width="1080" height="1920" fill="url(#bgGrad)"/>
+
+        <!-- Festive Confetti Background (if HIT) -->
+        ${confettiSvg}
+
+        <!-- 1. TITLE & OUTCOME HEADER BOX -->
+        <g filter="url(#recapShadow)" transform="translate(${tableX}, ${titleY})">
+          <rect width="${tableWidth}" height="${titleHeight}" rx="24" fill="#ffffff" fill-opacity="0.95" stroke="#cbd5e1" stroke-width="2.5"/>
+          
+          <!-- Outcome Badge at Top of Title -->
+          <rect x="${tableWidth / 2 - 120}" y="12" width="240" height="32" rx="16" fill="${headerBadgeColor}"/>
+          <text x="${tableWidth / 2}" y="33" fill="#ffffff" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+            ${headerIcon} ${headerBadgeText}
+          </text>
+
+          <!-- Main Title Text -->
+          <text x="${tableWidth / 2}" y="74" fill="#0f172a" font-size="32" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
+            ${this.escapeXml(headerTitle)}
+          </text>
+
+          <!-- Target Date Subtitle -->
+          <text x="${tableWidth / 2}" y="98" fill="#64748b" font-size="18" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
+            📅 ${this.escapeXml(targetDate)}
+          </text>
+        </g>
+
+        <!-- 2. GAME RECAP TABLE -->
+        <g filter="url(#recapShadow)" transform="translate(${tableX}, ${tableStartY})">
+          <!-- Unified White Table Background -->
+          <rect width="${tableWidth}" height="${totalTableHeight}" rx="24" fill="#ffffff" fill-opacity="0.95" stroke="#cbd5e1" stroke-width="2.5"/>
+
+          <!-- Match Rows & Dividers -->
+          ${rowsSvg}
+        </g>
+
+        <!-- 3. BRANDING FOOTER -->
+        <text x="540" y="${Math.min(1880, tableStartY + totalTableHeight + 50)}" fill="#64748b" font-size="20" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
+          ⚽ GoalCast Studio • AI Match Predictions
+        </text>
+      </svg>
+    `;
+
     const dir = path.dirname(outputPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 

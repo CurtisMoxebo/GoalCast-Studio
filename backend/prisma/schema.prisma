@@ -37,6 +37,7 @@ model PredictionGroup {
   // AI validation result of whether this entire group won
   // null = never checked, true = all hit, false = not all hit
   isHit                Boolean?
+  groupOutcome         String                 @default("PENDING") // PENDING, HIT, MISS
   validationNotes      String?                @db.Text
   validationCheckedAt  DateTime?
 
@@ -97,6 +98,12 @@ model GamePrediction {
   competitionLogo      String?                @db.Text
   kickoffTime          DateTime
   orderIndex           Int                    @default(0)
+
+  // Real outcome of the game prediction: PENDING, HIT, MISS
+  realOutcome          String                 @default("PENDING") // PENDING, HIT, MISS
+  realScore            String?
+  realOutcomeDetails   String?                @db.Text
+  evaluatedAt          DateTime?
 
   selections           PredictionSelection[]
 

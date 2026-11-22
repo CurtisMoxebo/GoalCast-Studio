@@ -234,6 +234,15 @@ test('PreviousHitService: prompts AI if group finished but not marked as hit, sa
       providerName: 'mock',
       fetchUpcomingGames: async () => [],
       generatePredictions: async () => [],
+      resolveGameOutcomes: async (games: any[]) => {
+        aiValidated = true;
+        return games.map((g) => ({
+          gameId: g.gameId,
+          realOutcome: 'HIT',
+          realScore: '2-1',
+          realOutcomeDetails: 'Liverpool 2-1 Man City, Over 2.5 hit!'
+        }));
+      },
       validatePreviousPredictions: async () => {
         aiValidated = true;
         return { isHit: true, notes: 'Liverpool 2-1 Man City, Over 2.5 hit!' };
@@ -245,8 +254,7 @@ test('PreviousHitService: prompts AI if group finished but not marked as hit, sa
     assert.equal(aiValidated, true, 'AI should be prompted to verify if it was a hit');
     assert.ok(savedData, 'AI response should be saved in DB for future use');
     assert.equal(savedData.isHit, true);
-    assert.equal(savedData.validationNotes, 'Liverpool 2-1 Man City, Over 2.5 hit!');
-    assert.ok(savedData.validationCheckedAt instanceof Date);
+    assert.equal(savedData.groupOutcome, 'HIT');
 
     assert.ok(result, 'Must use game group because AI confirmed it was a hit');
     assert.equal(result?.games[0].homeTeam, 'Liverpool');
@@ -291,6 +299,14 @@ test('PreviousHitService: prompts AI, saves response, and returns null if AI say
       providerName: 'mock',
       fetchUpcomingGames: async () => [],
       generatePredictions: async () => [],
+      resolveGameOutcomes: async (games: any[]) => {
+        return games.map((g) => ({
+          gameId: g.gameId,
+          realOutcome: 'MISS',
+          realScore: '0-1',
+          realOutcomeDetails: 'Game ended 0-1, Juventus did not win.'
+        }));
+      },
       validatePreviousPredictions: async () => {
         return { isHit: false, notes: 'Game ended 0-1, Juventus did not win.' };
       }
@@ -300,6 +316,7 @@ test('PreviousHitService: prompts AI, saves response, and returns null if AI say
 
     assert.ok(savedData, 'AI response should be saved in DB');
     assert.equal(savedData.isHit, false);
+    assert.equal(savedData.groupOutcome, 'MISS');
     assert.equal(result, null, 'Must NOT use game group if AI said it was not a hit');
   } finally {
     (prisma.predictionGroup as any).findMany = origFindMany;

@@ -1,4 +1,7 @@
 import { Router, Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { prisma } from '../db/prisma';
 import { getAIService } from '../services/ai/aiFactory';
 import {
@@ -10,6 +13,8 @@ import {
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
 import { getPreviousHitGameGroup } from '../services/predictions/previousHitService';
+import { outcomeResolverService } from '../services/predictions/outcomeResolverService';
+import { overlayGenerator } from '../services/video/overlayGenerator';
 
 const router = Router();
 
@@ -299,11 +304,11 @@ router.post('/status', async (req: Request, res: Response): Promise<void> => {
 
 /**
  * GET /api/predictions/history
- * Returns list of all ACCEPTED prediction groups
+ * Returns list of all ACCEPTED prediction groups with real outcome resolution
  */
 router.get('/history', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const history = await prisma.predictionGroup.findMany({
+    const rawHistory = await prisma.predictionGroup.findMany({
       where: { status: 'ACCEPTED' },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -318,6 +323,9 @@ router.get('/history', async (_req: Request, res: Response): Promise<void> => {
       }
     });
 
+    // Automatically resolve real outcomes for any started games with grouped AI prompt
+    const history = await outcomeResolverService.resolveGroups(rawHistory);
+
     res.json({
       success: true,
       count: history.length,
@@ -330,6 +338,97 @@ router.get('/history', async (_req: Request, res: Response): Promise<void> => {
       count: 0,
       history: []
     });
+  }
+});
+
+/**
+ * GET /api/predictions/recap-image/:groupId
+ * Generates and returns a 1080x1920 recap image for the prediction group
+ */
+router.get('/recap-image/:groupId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const groupId = req.params.groupId as string;
+    const download = req.query.download === '1' || req.query.download === 'true';
+
+    const group = await prisma.predictionGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        games: {
+          include: { selections: true },
+          orderBy: { orderIndex: 'asc' }
+        }
+      }
+    });
+
+    if (!group) {
+      res.status(404).json({ error: 'Prediction group not found' });
+      return;
+    }
+
+    // Resolve any started pending games if needed
+    const [resolvedGroup] = await outcomeResolverService.resolveGroups([group]);
+
+    const recapsDir = path.join(os.tmpdir(), 'goalcast_render', 'recaps');
+    if (!fs.existsSync(recapsDir)) {
+      fs.mkdirSync(recapsDir, { recursive: true });
+    }
+
+    const outputPath = path.join(recapsDir, `recap_${groupId}.png`);
+    await overlayGenerator.generateGroupRecapImage(resolvedGroup, outputPath);
+
+    if (download) {
+      res.download(outputPath, `goalcast_recap_${groupId}.png`);
+    } else {
+      res.setHeader('Content-Type', 'image/png');
+      res.sendFile(outputPath);
+    }
+  } catch (error: any) {
+    console.error('[PredictionsRoute] Error generating recap image:', error);
+    res.status(500).json({ error: 'Failed to generate recap image', details: error?.message });
+  }
+});
+
+/**
+ * POST /api/predictions/recap-image/:groupId
+ * Triggers generation and returns URL metadata
+ */
+router.post('/recap-image/:groupId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const groupId = req.params.groupId as string;
+    const group = await prisma.predictionGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        games: {
+          include: { selections: true },
+          orderBy: { orderIndex: 'asc' }
+        }
+      }
+    });
+
+    if (!group) {
+      res.status(404).json({ error: 'Prediction group not found' });
+      return;
+    }
+
+    const [resolvedGroup] = await outcomeResolverService.resolveGroups([group]);
+
+    const recapsDir = path.join(os.tmpdir(), 'goalcast_render', 'recaps');
+    if (!fs.existsSync(recapsDir)) {
+      fs.mkdirSync(recapsDir, { recursive: true });
+    }
+
+    const outputPath = path.join(recapsDir, `recap_${groupId}.png`);
+    await overlayGenerator.generateGroupRecapImage(resolvedGroup, outputPath);
+
+    res.json({
+      success: true,
+      groupId,
+      groupOutcome: resolvedGroup.groupOutcome,
+      imageUrl: `/api/predictions/recap-image/${groupId}`
+    });
+  } catch (error: any) {
+    console.error('[PredictionsRoute] Error generating recap image:', error);
+    res.status(500).json({ error: 'Failed to generate recap image', details: error?.message });
   }
 });
 

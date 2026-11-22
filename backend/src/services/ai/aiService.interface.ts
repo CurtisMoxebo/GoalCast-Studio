@@ -41,9 +41,30 @@ export interface ValidationResult {
   notes: string;
 }
 
+export interface GameOutcomeEvaluationInput {
+  gameId: string;
+  homeTeam: string;
+  awayTeam: string;
+  competition?: string;
+  kickoffTime: string;
+  selections: {
+    code: string;
+    label: string;
+    category?: string;
+  }[];
+}
+
+export interface GameOutcomeEvaluationResult {
+  gameId: string;
+  realOutcome: 'PENDING' | 'HIT' | 'MISS';
+  realScore?: string;
+  realOutcomeDetails?: string;
+}
+
 export interface IAIService {
   readonly providerName: string;
   fetchUpcomingGames(targetDate: string, timezone: string): Promise<UpcomingGame[]>;
   generatePredictions(games: UpcomingGame[]): Promise<GamePredictionResult[]>;
   validatePreviousPredictions(games: ValidatableGame[]): Promise<ValidationResult>;
+  resolveGameOutcomes?(games: GameOutcomeEvaluationInput[]): Promise<GameOutcomeEvaluationResult[]>;
 }

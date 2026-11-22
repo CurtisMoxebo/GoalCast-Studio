@@ -124,6 +124,22 @@ export class MobileApiService {
     return `${this.baseUrl}/api/video/thumbnail/${jobId}`;
   }
 
+  getRecapImageUrl(groupId: string, download = false): string {
+    return `${this.baseUrl}/api/predictions/recap-image/${groupId}${download ? '?download=1' : ''}`;
+  }
+
+  async generateRecapImage(groupId: string): Promise<{ success: boolean; imageUrl: string }> {
+    const res = await fetch(`${this.baseUrl}/api/predictions/recap-image/${groupId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to generate recap image');
+    }
+    return data;
+  }
+
   async updatePredictionStatus(
     target: string | string[],
     status: 'ACCEPTED' | 'CANCELLED' | 'DELETED'

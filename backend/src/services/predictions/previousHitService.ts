@@ -1,5 +1,5 @@
-import { prisma } from '../../db/prisma';
-import { getAIService } from '../ai/aiFactory';
+import prisma from '../../db/prisma';
+import { outcomeResolverService } from './outcomeResolverService';
 import { OverlayGameData } from '../video/overlayGenerator';
 
 export const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
@@ -42,10 +42,9 @@ export function mapGroupToOverlayGames(games: any[]): OverlayGameData[] {
  * When generating a video, retrieves the previous game group that was a hit:
  * 1. Queries the database to find the latest game group with status ACCEPTED where ALL games
  *    in it are at least 2 hours above their start time.
- * 2. If the group was already saved as a hit (isHit === true), returns it.
- * 3. Else, prompts AI to find if it was a hit.
- * 4. Saves the AI response for future use in the database.
- * 5. Uses the AI response: if AI said it was a hit (isHit === true), returns the game group; else returns null.
+ * 2. If the group was already saved as a hit (groupOutcome === 'HIT' or isHit === true), returns it.
+ * 3. Else, resolves real outcomes using the unified outcome resolver service and saves them to DB.
+ * 4. If all games in that group hit, returns the game group; else returns null.
  */
 export async function getPreviousHitGameGroup(currentTimeMs = Date.now()): Promise<{ games: OverlayGameData[] } | null> {
   try {
@@ -83,56 +82,32 @@ export async function getPreviousHitGameGroup(currentTimeMs = Date.now()): Promi
     }
 
     // If the group was already saved as a hit, return it
-    if (lastAcceptedGroup.isHit === true) {
+    if (lastAcceptedGroup.groupOutcome === 'HIT' || lastAcceptedGroup.isHit === true) {
       console.log(`[PreviousHit] Group ${lastAcceptedGroup.id} was already saved as a hit in DB. Using it.`);
       return {
         games: mapGroupToOverlayGames(lastAcceptedGroup.games)
       };
     }
 
-    // Else prompt AI to find if it was a hit
-    console.log(`[PreviousHit] Group ${lastAcceptedGroup.id} not marked as hit (isHit=${lastAcceptedGroup.isHit}). Prompting AI...`);
-    const ai = getAIService();
-    const validatable = lastAcceptedGroup.games.map((g) => ({
-      homeTeam: g.homeTeam,
-      awayTeam: g.awayTeam,
-      kickoffTime: g.kickoffTime instanceof Date ? g.kickoffTime.toISOString() : String(g.kickoffTime),
-      selections: (g.selections || []).map((s) => ({
-        code: s.code,
-        label: s.label,
-        category: s.category
-      }))
-    }));
-
-    const validation = await ai.validatePreviousPredictions(validatable);
-    console.log(
-      `[PreviousHit] AI verification result for group ${lastAcceptedGroup.id}: isHit=${validation.isHit} (notes: ${validation.notes})`
-    );
-
-    // Save the AI response for future use
-    try {
-      await prisma.predictionGroup.update({
-        where: { id: lastAcceptedGroup.id },
-        data: {
-          isHit: validation.isHit,
-          validationNotes: validation.notes,
-          validationCheckedAt: new Date()
-        }
-      });
-      console.log(`[PreviousHit] Saved AI verification response to group ${lastAcceptedGroup.id}`);
-    } catch (saveErr) {
-      console.warn(`[PreviousHit] Notice: DB update skipped:`, saveErr);
+    // If already marked as MISS, skip
+    if (lastAcceptedGroup.groupOutcome === 'MISS' || lastAcceptedGroup.isHit === false) {
+      console.log(`[PreviousHit] Group ${lastAcceptedGroup.id} was already evaluated as MISS. Skipping celebration.`);
+      return null;
     }
 
-    // Use the AI response: if AI said it was a hit, use the game group
-    if (validation.isHit === true) {
+    // Resolve real outcomes using unified service
+    console.log(`[PreviousHit] Group ${lastAcceptedGroup.id} pending outcome. Resolving with outcomeResolverService...`);
+    const resolvedList = await outcomeResolverService.resolveGroups([lastAcceptedGroup], new Date(currentTimeMs));
+    const resolvedGroup = resolvedList[0];
+
+    if (resolvedGroup?.groupOutcome === 'HIT') {
       console.log(`[PreviousHit] AI confirmed group ${lastAcceptedGroup.id} was a HIT. Using it in video.`);
       return {
-        games: mapGroupToOverlayGames(lastAcceptedGroup.games)
+        games: mapGroupToOverlayGames(resolvedGroup.games)
       };
     }
 
-    console.log(`[PreviousHit] AI determined group ${lastAcceptedGroup.id} was NOT a hit. Skipping celebration.`);
+    console.log(`[PreviousHit] AI determined group ${lastAcceptedGroup.id} was NOT a hit (${resolvedGroup?.groupOutcome}). Skipping celebration.`);
     return null;
   } catch (err: any) {
     console.warn(`[PreviousHit] Could not check previous hit game group:`, err?.message || err);

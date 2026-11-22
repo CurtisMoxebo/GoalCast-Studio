@@ -85,6 +85,14 @@ export const HistoryScreen: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBatchSharing, setIsBatchSharing] = useState(false);
 
+  // Recap Image Modal state
+  const [recapModalVisible, setRecapModalVisible] = useState(false);
+  const [recapTargetItem, setRecapTargetItem] = useState<HistoryItem | null>(null);
+  const [recapImageUri, setRecapImageUri] = useState<string | null>(null);
+  const [isGeneratingRecap, setIsGeneratingRecap] = useState(false);
+  const [isDownloadingRecap, setIsDownloadingRecap] = useState(false);
+  const [isSharingRecap, setIsSharingRecap] = useState(false);
+
   const loadHistory = async (forceRefresh = false) => {
     if (!forceRefresh && sessionStore.hasHistory()) {
       setHistory(sessionStore.getHistory() || []);
@@ -364,6 +372,116 @@ export const HistoryScreen: React.FC = () => {
     }
   };
 
+  /**
+   * Evaluates the overall group outcome adhering strictly to the rule:
+   * - If at least ONE game is a MISS -> the entire group is a MISS (even if others are pending).
+   * - If ALL games are HIT -> the group is HIT.
+   * - Otherwise -> PENDING.
+   */
+  const getGroupOutcome = (item: HistoryItem): 'HIT' | 'MISS' | 'PENDING' => {
+    if (item.groupOutcome === 'HIT' || item.groupOutcome === 'MISS' || item.groupOutcome === 'PENDING') {
+      return item.groupOutcome;
+    }
+    const games = item.games || [];
+    if (games.some((g) => g.realOutcome === 'MISS')) return 'MISS';
+    if (games.length > 0 && games.every((g) => g.realOutcome === 'HIT')) return 'HIT';
+    return 'PENDING';
+  };
+
+  // --- Recap Image Handlers ---
+  const handleOpenRecapImage = async (item: HistoryItem) => {
+    try {
+      setIsGeneratingRecap(true);
+      setRecapTargetItem(item);
+      const url = mobileApi.getRecapImageUrl(item.id);
+      setRecapImageUri(url);
+      setRecapModalVisible(true);
+    } catch (err: any) {
+      console.warn('[HistoryScreen] Error generating recap image:', err);
+      Alert.alert('Error', 'Failed to generate recap image. Please try again.');
+    } finally {
+      setIsGeneratingRecap(false);
+    }
+  };
+
+  const handleDownloadRecapImage = async () => {
+    if (!recapTargetItem) return;
+    try {
+      setIsDownloadingRecap(true);
+      const FileSystem = await import('expo-file-system/legacy');
+      const MediaLibrary = await import('expo-media-library');
+
+      // 1. Download image to app cache
+      const remoteUrl = mobileApi.getRecapImageUrl(recapTargetItem.id, true);
+      const localUri = `${FileSystem.cacheDirectory}goalcast_recap_${recapTargetItem.id}.png`;
+      const dl = await FileSystem.downloadAsync(remoteUrl, localUri);
+
+      // 2. Request permission and save to Gallery
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === 'granted') {
+        const asset = await MediaLibrary.createAssetAsync(dl.uri);
+        try {
+          const album = await MediaLibrary.getAlbumAsync('GoalCast Studio');
+          if (album == null) {
+            await MediaLibrary.createAlbumAsync('GoalCast Studio', asset, false);
+          } else {
+            await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+          }
+        } catch (albumErr) {
+          console.warn('[HistoryScreen] Album save fallback:', albumErr);
+        }
+
+        Alert.alert(
+          '✅ Image Saved',
+          'Recap image has been saved directly to your phone\'s Photos / Gallery in the "GoalCast Studio" album!'
+        );
+      } else {
+        // Fallback to sharing if permission denied
+        const Sharing = await import('expo-sharing');
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(dl.uri, {
+            mimeType: 'image/png',
+            dialogTitle: 'Save Recap Image'
+          });
+        } else {
+          Alert.alert('Permission Denied', 'Please grant photo permissions to save to gallery.');
+        }
+      }
+    } catch (err: any) {
+      console.warn('[HistoryScreen] Error saving recap image:', err);
+      Alert.alert('Save Failed', err?.message || 'Could not save recap image to gallery.');
+    } finally {
+      setIsDownloadingRecap(false);
+    }
+  };
+
+  const handleShareRecapImage = async () => {
+    if (!recapTargetItem) return;
+    try {
+      setIsSharingRecap(true);
+      const FileSystem = await import('expo-file-system/legacy');
+      const Sharing = await import('expo-sharing');
+
+      const remoteUrl = mobileApi.getRecapImageUrl(recapTargetItem.id);
+      const localUri = `${FileSystem.cacheDirectory}goalcast_recap_${recapTargetItem.id}.png`;
+      const dl = await FileSystem.downloadAsync(remoteUrl, localUri);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(dl.uri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share Matchday Recap'
+        });
+      } else {
+        Alert.alert('Sharing Unavailable', 'Native sharing is not available on this device.');
+      }
+    } catch (err: any) {
+      console.warn('[HistoryScreen] Error sharing recap image:', err);
+      Alert.alert('Share Failed', 'Could not share recap image.');
+    } finally {
+      setIsSharingRecap(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
       {/* Header bar */}
@@ -461,6 +579,7 @@ export const HistoryScreen: React.FC = () => {
             const isSelected = selectedIds.has(item.id);
             const createdFormatted = formatCreationDateTime(item.createdAt || item.targetDate);
             const gamesCount = item.games?.length || 0;
+            const outcome = getGroupOutcome(item);
 
             return (
               <TouchableOpacity
@@ -479,7 +598,7 @@ export const HistoryScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* Main Content: Created Date/Time and Games Count ONLY */}
+                {/* Main Content: Created Date/Time, Games Count & Overall Outcome */}
                 <View style={styles.cardContent}>
                   <View style={styles.dateRow}>
                     <Text style={styles.dateLabel}>📅 {createdFormatted}</Text>
@@ -490,6 +609,21 @@ export const HistoryScreen: React.FC = () => {
                         {gamesCount} {gamesCount === 1 ? 'Game' : 'Games'}
                       </Text>
                     </View>
+                    {outcome === 'HIT' && (
+                      <View style={[styles.groupOutcomeBadge, styles.groupOutcomeBadgeHit]}>
+                        <Text style={styles.groupOutcomeBadgeTextHit}>🏆 ALL HIT</Text>
+                      </View>
+                    )}
+                    {outcome === 'MISS' && (
+                      <View style={[styles.groupOutcomeBadge, styles.groupOutcomeBadgeMiss]}>
+                        <Text style={styles.groupOutcomeBadgeTextMiss}>❌ MISSED</Text>
+                      </View>
+                    )}
+                    {outcome === 'PENDING' && (
+                      <View style={[styles.groupOutcomeBadge, styles.groupOutcomeBadgePending]}>
+                        <Text style={styles.groupOutcomeBadgeTextPending}>⏳ PENDING</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
 
@@ -532,6 +666,34 @@ export const HistoryScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
+            {/* Overall Group Outcome Banner */}
+            {detailItem && (() => {
+              const grpOutcome = getGroupOutcome(detailItem);
+              return (
+                <View
+                  style={[
+                    styles.modalGroupOutcomeBanner,
+                    grpOutcome === 'HIT' && styles.modalGroupOutcomeBannerHit,
+                    grpOutcome === 'MISS' && styles.modalGroupOutcomeBannerMiss,
+                    grpOutcome === 'PENDING' && styles.modalGroupOutcomeBannerPending
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.modalGroupOutcomeBannerText,
+                      grpOutcome === 'HIT' && styles.modalGroupOutcomeBannerTextHit,
+                      grpOutcome === 'MISS' && styles.modalGroupOutcomeBannerTextMiss,
+                      grpOutcome === 'PENDING' && styles.modalGroupOutcomeBannerTextPending
+                    ]}
+                  >
+                    {grpOutcome === 'HIT' && '🏆 ALL GAMES HIT • 100% SUCCESS'}
+                    {grpOutcome === 'MISS' && '❌ GROUP MISSED • 1 OR MORE GAMES MISSED'}
+                    {grpOutcome === 'PENDING' && '⏳ PREDICTIONS IN PROGRESS • OUTCOMES PENDING'}
+                  </Text>
+                </View>
+              );
+            })()}
+
             {/* Games and Predictions List */}
             <ScrollView
               style={styles.detailModalScroll}
@@ -544,21 +706,48 @@ export const HistoryScreen: React.FC = () => {
 
                 return (
                   <View key={idx} style={styles.gameCard}>
-                    {/* Game header: match index & competition & time */}
+                    {/* Game header: match index & competition & time & REAL OUTCOME */}
                     <View style={styles.gameCardTop}>
-                      <Text style={styles.gameCardIndex}>Game #{idx + 1}</Text>
-                      {game.competition ? (
-                        <View style={styles.competitionBadge}>
-                          <Text style={styles.competitionBadgeText} numberOfLines={1}>
-                            {game.competition}
+                      <View style={styles.gameCardTopLeft}>
+                        <Text style={styles.gameCardIndex}>Game #{idx + 1}</Text>
+                        {game.competition ? (
+                          <View style={styles.competitionBadge}>
+                            <Text style={styles.competitionBadgeText} numberOfLines={1}>
+                              {game.competition}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {/* Real outcome badge: Green (HIT), Red (MISS), Gray (PENDING) */}
+                      <View style={styles.gameCardTopRight}>
+                        {game.realOutcome === 'HIT' && (
+                          <View style={[styles.gameOutcomeBadge, styles.gameOutcomeBadgeHit]}>
+                            <Text style={styles.gameOutcomeBadgeTextHit}>
+                              ✓ HIT {game.realScore ? `(${game.realScore})` : ''}
+                            </Text>
+                          </View>
+                        )}
+                        {game.realOutcome === 'MISS' && (
+                          <View style={[styles.gameOutcomeBadge, styles.gameOutcomeBadgeMiss]}>
+                            <Text style={styles.gameOutcomeBadgeTextMiss}>
+                              ✗ MISS {game.realScore ? `(${game.realScore})` : ''}
+                            </Text>
+                          </View>
+                        )}
+                        {(!game.realOutcome || game.realOutcome === 'PENDING') && (
+                          <View style={[styles.gameOutcomeBadge, styles.gameOutcomeBadgePending]}>
+                            <Text style={styles.gameOutcomeBadgeTextPending}>
+                              ⏳ PENDING
+                            </Text>
+                          </View>
+                        )}
+                        {game.kickoffTime ? (
+                          <Text style={styles.gameKickoffTime}>
+                            {formatKickoffTime(game.kickoffTime)}
                           </Text>
-                        </View>
-                      ) : null}
-                      {game.kickoffTime ? (
-                        <Text style={styles.gameKickoffTime}>
-                          {formatKickoffTime(game.kickoffTime)}
-                        </Text>
-                      ) : null}
+                        ) : null}
+                      </View>
                     </View>
 
                     {/* Teams row */}
@@ -619,9 +808,24 @@ export const HistoryScreen: React.FC = () => {
               })}
             </ScrollView>
 
-            {/* Bottom Actions: Watch Video (full width top), Delete History (half width left), Share Video (half width right) */}
+            {/* Bottom Actions: Generate Recap Image, Watch Video, Delete, Share */}
             {detailItem && (
               <View style={styles.detailModalFooter}>
+                <TouchableOpacity
+                  style={styles.generateRecapBtn}
+                  onPress={() => handleOpenRecapImage(detailItem)}
+                  disabled={isGeneratingRecap}
+                >
+                  {isGeneratingRecap ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Ionicons name="image-outline" size={18} color="#ffffff" style={{ marginRight: 6 }} />
+                      <Text style={styles.generateRecapBtnText}>📸 Generate Recap Image</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.watchVideoBtn}
                   onPress={() => handleWatchVideo(detailItem)}
@@ -719,6 +923,81 @@ export const HistoryScreen: React.FC = () => {
           </View>
 
           {activeVideoUri && <HistoryVideoPlayer videoUri={activeVideoUri} />}
+        </View>
+      </Modal>
+
+      {/* Recap Image Preview & Download/Share Modal */}
+      <Modal
+        visible={recapModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setRecapModalVisible(false)}
+      >
+        <View style={styles.recapModalContainer}>
+          {/* Header */}
+          <View style={styles.recapModalHeader}>
+            <View style={styles.recapModalTitleContainer}>
+              <Text style={styles.recapModalTitle}>Matchday Predictions Recap</Text>
+              <Text style={styles.recapModalSubtitle}>
+                {recapTargetItem ? formatCreationDateTime(recapTargetItem.createdAt || recapTargetItem.targetDate) : ''}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setRecapModalVisible(false)}
+              style={styles.recapCloseBtn}
+            >
+              <Ionicons name="close" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Image Preview Area */}
+          <View style={styles.recapImageContainer}>
+            {recapImageUri ? (
+              <Image
+                source={{ uri: recapImageUri }}
+                style={styles.recapImagePreview}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={THEME.colors.primary} />
+                <Text style={styles.loadingText}>Generating recap image...</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Bottom Action Footer: Download to Gallery & Native Share */}
+          <View style={styles.recapModalFooter}>
+            <TouchableOpacity
+              style={styles.recapDownloadBtn}
+              onPress={handleDownloadRecapImage}
+              disabled={isDownloadingRecap}
+            >
+              {isDownloadingRecap ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                  <Text style={styles.recapActionBtnText}>Download to Gallery</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.recapShareBtn}
+              onPress={handleShareRecapImage}
+              disabled={isSharingRecap}
+            >
+              {isSharingRecap ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons name="share-social-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                  <Text style={styles.recapActionBtnText}>Share Image</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1210,5 +1489,222 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#000000'
+  },
+
+  // --- Group Outcome Badges (History Cards & Banners) ---
+  groupOutcomeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 8,
+    borderWidth: 1
+  },
+  groupOutcomeBadgeHit: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderColor: '#22c55e'
+  },
+  groupOutcomeBadgeMiss: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#ef4444'
+  },
+  groupOutcomeBadgePending: {
+    backgroundColor: 'rgba(100, 116, 139, 0.15)',
+    borderColor: '#64748b'
+  },
+  groupOutcomeBadgeTextHit: {
+    color: '#22c55e',
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
+  groupOutcomeBadgeTextMiss: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
+  groupOutcomeBadgeTextPending: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
+
+  // Modal Top Outcome Banner
+  modalGroupOutcomeBanner: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  modalGroupOutcomeBannerHit: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderColor: '#22c55e'
+  },
+  modalGroupOutcomeBannerMiss: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#ef4444'
+  },
+  modalGroupOutcomeBannerPending: {
+    backgroundColor: 'rgba(100, 116, 139, 0.15)',
+    borderColor: '#64748b'
+  },
+  modalGroupOutcomeBannerText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5
+  },
+  modalGroupOutcomeBannerTextHit: {
+    color: '#22c55e'
+  },
+  modalGroupOutcomeBannerTextMiss: {
+    color: '#ef4444'
+  },
+  modalGroupOutcomeBannerTextPending: {
+    color: '#94a3b8'
+  },
+
+  // Game Real Outcome Badges (Per Game Card)
+  gameCardTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  gameCardTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  gameOutcomeBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  gameOutcomeBadgeHit: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderColor: '#22c55e'
+  },
+  gameOutcomeBadgeMiss: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#ef4444'
+  },
+  gameOutcomeBadgePending: {
+    backgroundColor: 'rgba(100, 116, 139, 0.15)',
+    borderColor: '#64748b'
+  },
+  gameOutcomeBadgeTextHit: {
+    color: '#22c55e',
+    fontSize: 11,
+    fontWeight: '800'
+  },
+  gameOutcomeBadgeTextMiss: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: '800'
+  },
+  gameOutcomeBadgeTextPending: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '800'
+  },
+
+  // Generate Recap Button
+  generateRecapBtn: {
+    width: '100%',
+    backgroundColor: '#059669',
+    paddingVertical: 13,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#10b981'
+  },
+  generateRecapBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+
+  // --- Recap Modal Styles ---
+  recapModalContainer: {
+    flex: 1,
+    backgroundColor: '#020617',
+    paddingTop: 44
+  },
+  recapModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderColor: THEME.colors.cardBorder
+  },
+  recapModalTitleContainer: {
+    flex: 1
+  },
+  recapModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff'
+  },
+  recapModalSubtitle: {
+    fontSize: 12,
+    color: THEME.colors.textSecondary,
+    marginTop: 2
+  },
+  recapCloseBtn: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: '#1e293b'
+  },
+  recapImageContainer: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  recapImagePreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16
+  },
+  recapModalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 28,
+    gap: 12,
+    backgroundColor: '#0f172a',
+    borderTopWidth: 1,
+    borderColor: THEME.colors.cardBorder
+  },
+  recapDownloadBtn: {
+    flex: 1,
+    backgroundColor: '#0284c7',
+    paddingVertical: 13,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  recapShareBtn: {
+    flex: 1,
+    backgroundColor: '#059669',
+    paddingVertical: 13,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  recapActionBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: 'bold'
   }
 });

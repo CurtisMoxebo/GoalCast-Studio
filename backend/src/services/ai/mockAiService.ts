@@ -3,7 +3,9 @@ import {
   UpcomingGame,
   GamePredictionResult,
   ValidatableGame,
-  ValidationResult
+  ValidationResult,
+  GameOutcomeEvaluationInput,
+  GameOutcomeEvaluationResult
 } from './aiService.interface';
 import { formatSpokenPrediction, findBettingOptionByCode } from '../../constants/bettingRules';
 
@@ -101,5 +103,14 @@ export class MockAIService implements IAIService {
       isHit: true,
       notes: 'All selected matches hit their respective predicted outcomes!'
     };
+  }
+
+  async resolveGameOutcomes(games: GameOutcomeEvaluationInput[]): Promise<GameOutcomeEvaluationResult[]> {
+    return games.map((g) => ({
+      gameId: g.gameId,
+      realOutcome: 'HIT',
+      realScore: '2 - 1',
+      realOutcomeDetails: `${g.homeTeam} 2 - 1 ${g.awayTeam} (Predictions HIT)`
+    }));
   }
 }
