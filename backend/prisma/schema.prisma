@@ -32,6 +32,7 @@ model PredictionGroup {
   backgroundAudio      String                 @default("background_track_1.mp3")
   voiceActor           String                 @default("hearth")
   thumbnailTimestamp   Float                  @default(3.0)
+  scheduledPostTime    DateTime?
   
   // AI validation result of whether this entire group won
   // null = never checked, true = all hit, false = not all hit
@@ -43,8 +44,44 @@ model PredictionGroup {
   updatedAt            DateTime               @updatedAt
 
   games                GamePrediction[]
+  socialPipelines      SocialPostPipeline[]
 
   @@map("prediction_groups")
+}
+
+model SocialPostPipeline {
+  id           String             @id @default(uuid())
+  groupId      String
+  group        PredictionGroup    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  status       String             @default("PENDING") // PENDING, RUNNING, COMPLETED, PARTIALLY_FAILED, FAILED
+  scheduledFor DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  logs         String?            @db.Text
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  items        SocialPostItem[]
+
+  @@map("social_post_pipelines")
+}
+
+model SocialPostItem {
+  id           String             @id @default(uuid())
+  pipelineId   String
+  pipeline     SocialPostPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  platform     String             // 'facebook_reels' | 'instagram_reels' | 'tiktok' | 'youtube_shorts'
+  status       String             @default("PENDING") // PENDING, IN_PROGRESS, SUCCESS, FAILED
+  remotePostId String?            @db.Text
+  remoteUrl    String?            @db.Text
+  error        String?            @db.Text
+  logs         String?            @db.Text
+  attemptedAt  DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@map("social_post_items")
 }
 
 model GamePrediction {

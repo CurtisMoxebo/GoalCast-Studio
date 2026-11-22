@@ -6,6 +6,7 @@ import gamesRoutes from './routes/games.routes';
 import predictionsRoutes from './routes/predictions.routes';
 import mediaRoutes from './routes/media.routes';
 import videoRoutes from './routes/video.routes';
+import socialRoutes from './routes/social.routes';
 
 dotenv.config();
 
@@ -52,6 +53,8 @@ app.use('/api/games', gamesRoutes);
 app.use('/api/predictions', predictionsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/video', videoRoutes);
+app.use('/api/social', socialRoutes);
+app.use('/', socialRoutes);
 
 // Health Check
 app.get('/api/health', (req: Request, res: Response) => {

@@ -112,7 +112,8 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
       backgroundAudio = 'background_track_1.mp3',
       voiceActor = 'hearth',
       thumbnailTimestamp = 3.0,
-      description = ''
+      description = '',
+      scheduledPostTime
     } = req.body;
 
     if (!Array.isArray(games) || games.length === 0) {
@@ -186,6 +187,7 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
           backgroundAudio,
           voiceActor,
           thumbnailTimestamp: parseFloat(thumbnailTimestamp) || 3.0,
+          scheduledPostTime: scheduledPostTime ? new Date(scheduledPostTime) : null,
           games: {
             create: mappedGames.map((g: any) => ({
               homeTeam: g.homeTeam,
@@ -308,6 +310,10 @@ router.get('/history', async (_req: Request, res: Response): Promise<void> => {
         games: {
           include: { selections: true },
           orderBy: { orderIndex: 'asc' }
+        },
+        socialPipelines: {
+          include: { items: true },
+          orderBy: { createdAt: 'desc' }
         }
       }
     });
