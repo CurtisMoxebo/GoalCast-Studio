@@ -177,6 +177,56 @@ router.get('/pipeline/:groupId', async (req: Request, res: Response): Promise<vo
 });
 
 /**
+ * GET /
+ * Public Root Landing Page with TikTok & Meta verification
+ */
+router.get('/', (_req: Request, res: Response): void => {
+  res.type('html').send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="tiktok-developers-site-verification" content="STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU" />
+      <title>GoalCast Studio</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 60px auto; padding: 0 20px; color: #1e293b; text-align: center; }
+        h1 { color: #0284c7; font-size: 2.2rem; }
+        p { color: #475569; font-size: 1.1rem; }
+        .links { margin-top: 30px; }
+        .links a { margin: 0 15px; color: #0284c7; text-decoration: none; font-weight: 600; }
+        .links a:hover { text-decoration: underline; }
+      </style>
+    </head>
+    <body>
+      <h1>⚽ GoalCast Studio API</h1>
+      <p>Automated Football Analysis, AI Predictions, and Multi-Platform Social Media Publishing Hub.</p>
+      <div class="links">
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+/**
+ * TikTok Developer Domain Verification Routes
+ */
+const TIKTOK_VERIFICATION_TOKEN = 'tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU';
+
+router.get('/tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU.txt', (_req: Request, res: Response): void => {
+  res.type('text/plain').send(TIKTOK_VERIFICATION_TOKEN);
+});
+
+router.get('/tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU', (_req: Request, res: Response): void => {
+  res.type('text/plain').send(TIKTOK_VERIFICATION_TOKEN);
+});
+
+router.get('/tiktok-developers-site-verification.txt', (_req: Request, res: Response): void => {
+  res.type('text/plain').send(TIKTOK_VERIFICATION_TOKEN);
+});
+
+/**
  * GET /terms
  * Public Terms of Service page for Meta & TikTok compliance
  */
@@ -186,6 +236,7 @@ router.get('/terms', (_req: Request, res: Response): void => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta name="tiktok-developers-site-verification" content="STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU" />
       <title>GoalCast Studio - Terms of Service</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1e293b; }
@@ -218,6 +269,7 @@ router.get('/privacy', (_req: Request, res: Response): void => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta name="tiktok-developers-site-verification" content="STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU" />
       <title>GoalCast Studio - Privacy Policy</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1e293b; }
