@@ -999,11 +999,6 @@ export class OverlayGenerator {
           <!-- Match Rows & Dividers -->
           ${rowsSvg}
         </g>
-
-        <!-- 3. BRANDING FOOTER -->
-        <text x="540" y="${Math.min(1880, tableStartY + totalTableHeight + 50)}" fill="#64748b" font-size="20" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="1">
-          ⚽ GoalCast Studio • AI Match Predictions
-        </text>
       </svg>
     `;
 
