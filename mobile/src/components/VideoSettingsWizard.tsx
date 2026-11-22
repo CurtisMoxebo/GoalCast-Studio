@@ -149,7 +149,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<any>(null);
   const formattedDate = formatOrdinalDate(targetDate);
-  const defaultDesc = `Football predictions for ${formattedDate} ⚽🔥\n#football #soccer #predictions #footballpredictions #fyp`;
+  const defaultDesc = `Football predictions for ${formattedDate} ⚽🔥\n#football #soccer #predictions #fyp`;
 
   const [selectedVideo, setSelectedVideo] = useState(
     availableVideos[0]?.filename || 'background_video_1.mp4'

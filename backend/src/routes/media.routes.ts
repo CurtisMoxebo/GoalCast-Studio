@@ -30,7 +30,7 @@ router.get('/assets', (_req: Request, res: Response) => {
       voiceActor: 'hearth',
       thumbnailTimestamp: 3.0,
       descriptionTemplate:
-        'Football predictions for {date} ⚽🔥 \n #football #soccer #predictions #footballpredictions #fyp'
+        'Football predictions for {date} ⚽🔥 \n #football #soccer #predictions #fyp'
     }
   });
 });
