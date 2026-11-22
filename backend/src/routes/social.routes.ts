@@ -206,25 +206,34 @@ router.get('/tiktok/callback', async (req: Request, res: Response): Promise<void
     const redirectUri = 'https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback';
 
     console.log('[TikTok OAuth] Exchanging authorization code for access token...');
-    const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_key: clientKey,
-        client_secret: clientSecret,
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri
-      })
+    const bodyParams = new URLSearchParams({
+      client_key: clientKey.trim(),
+      client_secret: clientSecret.trim(),
+      code: code.trim(),
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri
     });
 
-    const tokenData = (await tokenRes.json()) as any;
-    console.log('[TikTok OAuth] Response:', JSON.stringify(tokenData));
+    const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
+      body: bodyParams
+    });
 
-    if (tokenData.data?.access_token) {
-      const accessToken = tokenData.data.access_token;
-      const refreshToken = tokenData.data.refresh_token;
-      const openId = tokenData.data.open_id;
+    const rawText = await tokenRes.text();
+    console.log(`[TikTok OAuth] Status: ${tokenRes.status}, Response: ${rawText}`);
+
+    let tokenData: any = {};
+    try {
+      tokenData = JSON.parse(rawText);
+    } catch {
+      tokenData = { raw: rawText };
+    }
+
+    if (tokenData.data?.access_token || tokenData.access_token) {
+      const accessToken = tokenData.data?.access_token || tokenData.access_token;
+      const refreshToken = tokenData.data?.refresh_token || tokenData.refresh_token;
+      const openId = tokenData.data?.open_id || tokenData.open_id;
 
       // Update runtime process environment
       process.env.TIKTOK_ACCESS_TOKEN = accessToken;
@@ -267,9 +276,11 @@ router.get('/tiktok/callback', async (req: Request, res: Response): Promise<void
         </body>
         </html>
       `);
-    } else {
-      throw new Error(tokenData.error?.message || tokenData.message || 'Token exchange failed');
+      return;
     }
+
+    const errorDetail = tokenData.error_description || tokenData.error?.message || tokenData.message || tokenData.error || rawText;
+    throw new Error(`TikTok HTTP ${tokenRes.status}: ${typeof errorDetail === 'object' ? JSON.stringify(errorDetail) : errorDetail}`);
   } catch (err: any) {
     console.error('[TikTok OAuth] Token exchange error:', err);
     res.type('html').send(`
