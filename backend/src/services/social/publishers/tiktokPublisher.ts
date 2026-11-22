@@ -1,15 +1,31 @@
+import fs from 'fs';
+import path from 'path';
 import { ISocialPublisher, PublishOptions, PublishResult, SocialPlatformId } from '../types';
 
 export class TikTokPublisher implements ISocialPublisher {
   public readonly id: SocialPlatformId = 'tiktok';
   public readonly name = 'TikTok';
 
+  private getAccessToken(): string {
+    if (process.env.TIKTOK_ACCESS_TOKEN) return process.env.TIKTOK_ACCESS_TOKEN;
+    try {
+      const tokensPath = path.join(process.cwd(), 'social_tokens.json');
+      if (fs.existsSync(tokensPath)) {
+        const data = JSON.parse(fs.readFileSync(tokensPath, 'utf8'));
+        if (data.tiktok?.accessToken) return data.tiktok.accessToken;
+      }
+    } catch {
+      // ignore
+    }
+    return '';
+  }
+
   public async publish(options: PublishOptions): Promise<PublishResult> {
     const logs: string[] = [];
     logs.push(`[TikTok] Initializing TikTok scheduled upload for group "${options.groupId}"`);
 
-    const clientKey = process.env.TIKTOK_CLIENT_KEY || '';
-    const accessToken = process.env.TIKTOK_ACCESS_TOKEN || '';
+    const clientKey = process.env.TIKTOK_CLIENT_KEY || 'aw24z5truoqnbpco';
+    const accessToken = this.getAccessToken();
 
     // If access token is not yet generated from review OAuth, execute in graceful simulated mode
     if (!accessToken || !clientKey) {

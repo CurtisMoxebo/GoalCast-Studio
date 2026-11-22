@@ -154,6 +154,131 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * GET /api/social/tiktok/login
+ * Initiates the TikTok OAuth 2.0 authorization code flow
+ */
+router.get('/tiktok/login', (_req: Request, res: Response): void => {
+  const clientKey = process.env.TIKTOK_CLIENT_KEY || 'aw24z5truoqnbpco';
+  const redirectUri = encodeURIComponent('https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback');
+  const scopes = encodeURIComponent('user.info.basic,video.upload,video.publish');
+  const csrfState = Math.random().toString(36).substring(2);
+
+  const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${scopes}&response_type=code&redirect_uri=${redirectUri}&state=${csrfState}`;
+  console.log(`[TikTok OAuth] Redirecting to authorization URL: ${authUrl}`);
+  res.redirect(authUrl);
+});
+
+/**
+ * GET /api/social/tiktok/callback
+ * Handles the redirect callback from TikTok with the authorization code
+ */
+router.get('/tiktok/callback', async (req: Request, res: Response): Promise<void> => {
+  const code = req.query.code as string;
+  const error = req.query.error as string;
+  const errorDesc = req.query.error_description as string;
+
+  if (error || !code) {
+    res.type('html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>TikTok Authorization Failed</title></head>
+      <body style="font-family:sans-serif; text-align:center; padding: 40px; color:#ef4444;">
+        <h2>❌ TikTok Authorization Failed</h2>
+        <p>${errorDesc || error || 'No authorization code returned'}</p>
+        <a href="/api/social/tiktok/login">Try again</a>
+      </body>
+      </html>
+    `);
+    return;
+  }
+
+  try {
+    const clientKey = process.env.TIKTOK_CLIENT_KEY || 'aw24z5truoqnbpco';
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET || 'Tai3ArPN3tszjV9dhDpzTeRpkeVHNwup';
+    const redirectUri = 'https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback';
+
+    console.log('[TikTok OAuth] Exchanging authorization code for access token...');
+    const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri
+      })
+    });
+
+    const tokenData = (await tokenRes.json()) as any;
+    console.log('[TikTok OAuth] Response:', JSON.stringify(tokenData));
+
+    if (tokenData.data?.access_token) {
+      const accessToken = tokenData.data.access_token;
+      const refreshToken = tokenData.data.refresh_token;
+      const openId = tokenData.data.open_id;
+
+      // Update runtime process environment
+      process.env.TIKTOK_ACCESS_TOKEN = accessToken;
+      process.env.TIKTOK_REFRESH_TOKEN = refreshToken;
+
+      // Persist tokens to disk
+      try {
+        const tokensPath = path.join(process.cwd(), 'social_tokens.json');
+        const existing = fs.existsSync(tokensPath) ? JSON.parse(fs.readFileSync(tokensPath, 'utf8')) : {};
+        existing.tiktok = {
+          accessToken,
+          refreshToken,
+          openId,
+          savedAt: new Date().toISOString()
+        };
+        fs.writeFileSync(tokensPath, JSON.stringify(existing, null, 2));
+      } catch (saveErr) {
+        console.warn('[TikTok OAuth] Could not persist tokens to disk:', saveErr);
+      }
+
+      res.type('html').send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>TikTok Connected!</title>
+          <style>
+            body { font-family: -apple-system, sans-serif; text-align: center; padding: 60px 20px; background: #0f172a; color: #f8fafc; }
+            .card { background: #1e293b; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 16px; border: 1px solid #334155; }
+            h1 { color: #10b981; margin-bottom: 12px; }
+            p { color: #94a3b8; font-size: 1.1rem; line-height: 1.6; }
+            .badge { display: inline-block; padding: 6px 14px; background: #064e3b; color: #34d399; border-radius: 9999px; font-weight: 600; margin-top: 15px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>🎉 TikTok Connected Successfully!</h1>
+            <p>GoalCast Studio is now fully authorized to publish scheduled videos directly to your TikTok account.</p>
+            <div class="badge">Status: Live & Authenticated</div>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      throw new Error(tokenData.error?.message || tokenData.message || 'Token exchange failed');
+    }
+  } catch (err: any) {
+    console.error('[TikTok OAuth] Token exchange error:', err);
+    res.type('html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>TikTok Error</title></head>
+      <body style="font-family:sans-serif; text-align:center; padding: 40px; color:#ef4444;">
+        <h2>❌ Failed to exchange TikTok token</h2>
+        <p>${err.message}</p>
+        <a href="/api/social/tiktok/login">Try again</a>
+      </body>
+      </html>
+    `);
+  }
+});
+
+/**
  * GET /api/social/pipeline/:groupId
  * Returns the latest saved social post pipeline for a prediction group
  */
