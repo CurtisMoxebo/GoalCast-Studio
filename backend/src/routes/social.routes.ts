@@ -186,6 +186,7 @@ router.get('/', (_req: Request, res: Response): void => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta name="tiktok-developers-site-verification" content="EvgQwikhKRCTlBqqzfHBXUZ4sKOC4JSO" />
       <meta name="tiktok-developers-site-verification" content="STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU" />
       <title>GoalCast Studio</title>
       <style>
@@ -212,18 +213,21 @@ router.get('/', (_req: Request, res: Response): void => {
 /**
  * TikTok Developer Domain Verification Routes
  */
-const TIKTOK_VERIFICATION_TOKEN = 'tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU';
+const TIKTOK_TOKENS = [
+  'tiktok-developers-site-verification=EvgQwikhKRCTlBqqzfHBXUZ4sKOC4JSO',
+  'tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU'
+];
 
-router.get('/tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU.txt', (_req: Request, res: Response): void => {
-  res.type('text/plain').send(TIKTOK_VERIFICATION_TOKEN);
+router.get('/tiktok-developers-site-verification=EvgQwikhKRCTlBqqzfHBXUZ4sKOC4JSO.txt', (_req: Request, res: Response): void => {
+  res.type('text/plain').send('tiktok-developers-site-verification=EvgQwikhKRCTlBqqzfHBXUZ4sKOC4JSO');
 });
 
-router.get('/tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU', (_req: Request, res: Response): void => {
-  res.type('text/plain').send(TIKTOK_VERIFICATION_TOKEN);
+router.get('/tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU.txt', (_req: Request, res: Response): void => {
+  res.type('text/plain').send('tiktok-developers-site-verification=STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU');
 });
 
 router.get('/tiktok-developers-site-verification.txt', (_req: Request, res: Response): void => {
-  res.type('text/plain').send(TIKTOK_VERIFICATION_TOKEN);
+  res.type('text/plain').send(TIKTOK_TOKENS.join('\n'));
 });
 
 /**
@@ -236,6 +240,7 @@ router.get('/terms', (_req: Request, res: Response): void => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta name="tiktok-developers-site-verification" content="EvgQwikhKRCTlBqqzfHBXUZ4sKOC4JSO" />
       <meta name="tiktok-developers-site-verification" content="STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU" />
       <title>GoalCast Studio - Terms of Service</title>
       <style>
@@ -269,6 +274,7 @@ router.get('/privacy', (_req: Request, res: Response): void => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta name="tiktok-developers-site-verification" content="EvgQwikhKRCTlBqqzfHBXUZ4sKOC4JSO" />
       <meta name="tiktok-developers-site-verification" content="STIS1UdjTjvMgdgyr1PJeM9f50gqxrTU" />
       <title>GoalCast Studio - Privacy Policy</title>
       <style>
