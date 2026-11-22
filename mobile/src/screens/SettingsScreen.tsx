@@ -10,8 +10,13 @@ import {
   Alert
 } from 'react-native';
 import { THEME } from '../constants/theme';
+import { PROD_API_HOST, LOCAL_DEV_FALLBACK } from '../constants/config';
+import { mobileApi } from '../services/api';
 
 export const SettingsScreen: React.FC = () => {
+  const [apiUrl, setApiUrl] = useState(mobileApi.getBaseUrl());
+  const [pingStatus, setPingStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
+  const [pingMessage, setPingMessage] = useState<string>('');
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
   const [cloudProvider, setCloudProvider] = useState('AWS S3');
   const [defaultThumbnailTime, setDefaultThumbnailTime] = useState('00:03');
@@ -20,14 +25,100 @@ export const SettingsScreen: React.FC = () => {
   );
 
   const handleSave = () => {
-    Alert.alert('Settings Saved', 'Your studio preferences have been updated.');
+    mobileApi.setBaseUrl(apiUrl);
+    Alert.alert('Settings Saved', 'Your studio preferences and API server URL have been updated.');
   };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Studio Settings</Text>
-        <Text style={styles.subtitle}>Configure generation defaults & upcoming cloud sync</Text>
+        <Text style={styles.subtitle}>Configure server connection, generation defaults & cloud sync</Text>
+      </View>
+
+      {/* Backend API Server Connectivity */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>🌐 API Server Connection</Text>
+          <View
+            style={[
+              styles.statusPill,
+              pingStatus === 'online'
+                ? styles.statusOnline
+                : pingStatus === 'offline'
+                ? styles.statusOffline
+                : styles.statusIdle
+            ]}
+          >
+            <Text style={styles.statusPillText}>
+              {pingStatus === 'checking'
+                ? '⏳ Checking...'
+                : pingStatus === 'online'
+                ? '🟢 Online'
+                : pingStatus === 'offline'
+                ? '🔴 Offline'
+                : '⚪ Ready'}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.cardDesc}>
+          Configure which backend your device connects to. On real phones, use your local Wi-Fi IP or the cloud server.
+        </Text>
+
+        <TextInput
+          style={styles.input}
+          value={apiUrl}
+          onChangeText={setApiUrl}
+          placeholder="http://192.168.0.15:5000"
+          placeholderTextColor={THEME.colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+
+        <View style={styles.presetRow}>
+          <TouchableOpacity
+            style={[styles.presetBtn, apiUrl === LOCAL_DEV_FALLBACK && styles.presetBtnActive]}
+            onPress={() => {
+              setApiUrl(LOCAL_DEV_FALLBACK);
+              mobileApi.setBaseUrl(LOCAL_DEV_FALLBACK);
+            }}
+          >
+            <Text style={styles.presetBtnText}>💻 Local Wi-Fi (192.168.0.15)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.presetBtn, apiUrl === PROD_API_HOST && styles.presetBtnActive]}
+            onPress={() => {
+              setApiUrl(PROD_API_HOST);
+              mobileApi.setBaseUrl(PROD_API_HOST);
+            }}
+          >
+            <Text style={styles.presetBtnText}>🌐 Production Server</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.testBtn}
+          onPress={async () => {
+            mobileApi.setBaseUrl(apiUrl);
+            setPingStatus('checking');
+            const res = await mobileApi.checkHealth();
+            if (res.ok) {
+              setPingStatus('online');
+              setPingMessage('Successfully connected to server (HTTP 200)');
+            } else {
+              setPingStatus('offline');
+              setPingMessage(res.error || 'Connection failed');
+            }
+          }}
+        >
+          <Text style={styles.testBtnText}>⚡ Test & Apply Connection</Text>
+        </TouchableOpacity>
+        {pingMessage ? (
+          <Text style={[styles.pingResult, pingStatus === 'online' ? styles.pingSuccess : styles.pingError]}>
+            {pingMessage}
+          </Text>
+        ) : null}
       </View>
 
       {/* Cloud Storage Setup Card */}
@@ -235,6 +326,73 @@ const styles = StyleSheet.create({
     color: THEME.colors.primary,
     fontSize: 13,
     fontWeight: 'bold'
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  statusOnline: {
+    backgroundColor: '#064e3b'
+  },
+  statusOffline: {
+    backgroundColor: '#450a0a'
+  },
+  statusIdle: {
+    backgroundColor: '#334155'
+  },
+  statusPillText: {
+    color: '#f8fafc',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 8
+  },
+  presetBtn: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  presetBtnActive: {
+    borderColor: '#38bdf8',
+    backgroundColor: '#0c4a6e'
+  },
+  presetBtnText: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  testBtn: {
+    backgroundColor: '#0284c7',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 6
+  },
+  testBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  pingResult: {
+    marginTop: 8,
+    fontSize: 12,
+    textAlign: 'center'
+  },
+  pingSuccess: {
+    color: '#34d399'
+  },
+  pingError: {
+    color: '#f87171'
   },
   saveBtn: {
     backgroundColor: THEME.colors.primary,

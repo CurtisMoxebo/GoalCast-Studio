@@ -8,6 +8,30 @@ export class MobileApiService {
     this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  setBaseUrl(url: string): void {
+    if (url && typeof url === 'string') {
+      this.baseUrl = url.trim().replace(/\/$/, '');
+    }
+  }
+
+  async checkHealth(): Promise<{ ok: boolean; status?: number; error?: string }> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(`${this.baseUrl}/api/predictions/options`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return { ok: res.ok, status: res.status };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Connection failed' };
+    }
+  }
+
   async fetchGames(date: string, timezone: string): Promise<UpcomingGame[]> {
     const url = `${this.baseUrl}/api/games?date=${encodeURIComponent(date)}&timezone=${encodeURIComponent(timezone)}`;
     const res = await fetch(url);

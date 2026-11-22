@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
+import { PROD_API_HOST, LOCAL_DEV_FALLBACK } from '../constants/config';
 import { UpcomingGame, PredictionSelection, BettingOption, MediaAsset, VoiceOption, VideoSettings } from '../types';
 import { mobileApi } from '../services/api';
 import { sessionStore } from '../services/sessionStore';
@@ -576,6 +577,34 @@ export const GamesScreen: React.FC = () => {
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorTitle}>Error Loading Matches</Text>
           <Text style={styles.errorDetails}>{fetchError}</Text>
+          <Text style={styles.errorServerTarget}>Target: {mobileApi.getBaseUrl()}</Text>
+
+          <View style={styles.serverSwitchRow}>
+            <TouchableOpacity
+              style={styles.serverSwitchBtn}
+              onPress={() => {
+                mobileApi.setBaseUrl(PROD_API_HOST);
+                setFetchError(null);
+                loadGamesForDate(selectedDate, true, true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.serverSwitchBtnText}>🌐 Switch to Production</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.serverSwitchBtn}
+              onPress={() => {
+                mobileApi.setBaseUrl(LOCAL_DEV_FALLBACK);
+                setFetchError(null);
+                loadGamesForDate(selectedDate, true, true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.serverSwitchBtnText}>💻 Switch to Wi-Fi IP</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             style={styles.retryBtn}
             onPress={() => loadGamesForDate(selectedDate, true, true)}
@@ -1063,6 +1092,32 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 20,
     maxWidth: 300
+  },
+  errorServerTarget: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginBottom: 16,
+    textAlign: 'center'
+  },
+  serverSwitchRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center',
+    marginBottom: 16
+  },
+  serverSwitchBtn: {
+    backgroundColor: '#1e293b',
+    borderColor: '#38bdf8',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  serverSwitchBtnText: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '600'
   },
   pullHint: {
     color: THEME.colors.textMuted,

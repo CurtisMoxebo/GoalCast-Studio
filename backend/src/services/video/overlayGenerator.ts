@@ -16,10 +16,11 @@ export interface OverlayGameData {
 
 export class OverlayGenerator {
   /**
-   * Escape XML/SVG special characters
+   * Escape XML/SVG special characters safely converting any input to string
    */
-  private escapeXml(unsafe: string): string {
-    return (unsafe || '').replace(/[<>&'"]/g, (c) => {
+  private escapeXml(unsafe: any): string {
+    const str = unsafe instanceof Date ? unsafe.toISOString() : String(unsafe ?? '');
+    return str.replace(/[<>&'"]/g, (c) => {
       switch (c) {
         case '<': return '&lt;';
         case '>': return '&gt;';
@@ -32,18 +33,21 @@ export class OverlayGenerator {
   }
 
   /**
-   * Format date string to DD/MM/YYYY (e.g. 19/11/2026)
+   * Format date string or Date object to DD/MM/YYYY (e.g. 19/11/2026)
    */
-  private formatSlashDate(dateStr: string): string {
+  private formatSlashDate(dateInput: any): string {
     try {
-      const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`);
-      if (isNaN(d.getTime())) return dateStr;
+      if (!dateInput) return 'Matchday';
+      const d = dateInput instanceof Date
+        ? dateInput
+        : new Date(String(dateInput).includes('T') ? String(dateInput) : `${dateInput}T00:00:00`);
+      if (isNaN(d.getTime())) return String(dateInput);
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
       return `${day}/${month}/${year}`;
     } catch {
-      return dateStr;
+      return String(dateInput ?? 'Matchday');
     }
   }
 
