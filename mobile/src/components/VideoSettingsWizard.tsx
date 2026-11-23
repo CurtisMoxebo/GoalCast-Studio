@@ -38,24 +38,17 @@ const formatSecondsToMMSS = (sec: number): string => {
   return `${String(m).padStart(2, '0')}:${String(remainingS).padStart(2, '0')}`;
 };
 
-const getDefaultScheduledDate = (targetDateStr?: string): Date => {
-  const now = new Date();
-  let baseDate: Date;
+export const getDefaultScheduledDate = (now: Date = new Date()): Date => {
+  const today19 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0, 0);
+  const diffMinutes = (today19.getTime() - now.getTime()) / (1000 * 60);
 
-  if (targetDateStr && /^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) {
-    const [y, m, d] = targetDateStr.split('-').map(Number);
-    baseDate = new Date(y, m - 1, d, 19, 0, 0, 0);
+  // If the current time is more than 30 minutes before 19:00 today, default date is today at 19:00.
+  // Otherwise, default date is tomorrow at 19:00.
+  if (diffMinutes > 30) {
+    return today19;
   } else {
-    baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0, 0);
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 19, 0, 0, 0);
   }
-
-  // If baseDate at 19:00 is less than 30 minutes in the future from now, advance to tomorrow 19:00
-  const diffMinutes = (baseDate.getTime() - now.getTime()) / (1000 * 60);
-  if (diffMinutes < 30) {
-    baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 19, 0, 0, 0);
-  }
-
-  return baseDate;
 };
 
 interface ThumbnailTimeSliderProps {
@@ -186,8 +179,8 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   // Option to schedule the post or create it instantly
   const [isScheduled, setIsScheduled] = useState<boolean>(true);
 
-  // Scheduled Post Time: Defaults to 19:00
-  const [scheduledDate, setScheduledDate] = useState<Date>(() => getDefaultScheduledDate(targetDate));
+  // Scheduled Post Time: Defaults to 19:00 (Today if > 30m before 19:00, or Tomorrow)
+  const [scheduledDate, setScheduledDate] = useState<Date>(() => getDefaultScheduledDate());
 
   // Custom modal picker state
   const [isPickerModalVisible, setIsPickerModalVisible] = useState<boolean>(false);
@@ -248,6 +241,11 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const adjustHours = (delta: number) => {
     triggerHaptic();
     setScheduledDate((prev) => new Date(prev.getTime() + delta * 60 * 60 * 1000));
+  };
+
+  const resetToDefaultSchedule = () => {
+    triggerHaptic();
+    setScheduledDate(getDefaultScheduledDate());
   };
 
   const setTimeTo1900 = () => {
@@ -581,9 +579,9 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               {/* 2. Time Picker Row (Default 19:00) */}
               <View style={styles.timePickerHeaderRow}>
                 <Text style={styles.pickerSectionLabel}>🕒 Select Time (Default 19:00):</Text>
-                <TouchableOpacity onPress={setTimeTo1900} style={styles.defaultTimeChip}>
+                <TouchableOpacity onPress={resetToDefaultSchedule} style={styles.defaultTimeChip}>
                   <Ionicons name="star" size={12} color={THEME.colors.primary} style={{ marginRight: 4 }} />
-                  <Text style={styles.defaultTimeChipText}>Reset to 19:00</Text>
+                  <Text style={styles.defaultTimeChipText}>Default (19:00)</Text>
                 </TouchableOpacity>
               </View>
 
@@ -800,7 +798,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               {/* Hour Selection 00-23 */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
                 <Text style={styles.modalSubHeader}>Hour (00 - 23)</Text>
-                <TouchableOpacity onPress={setTimeTo1900}>
+                <TouchableOpacity onPress={resetToDefaultSchedule}>
                   <Text style={{ color: THEME.colors.primary, fontSize: 12, fontWeight: '700' }}>19:00 Default</Text>
                 </TouchableOpacity>
               </View>
@@ -824,7 +822,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               {/* Minute Selection 00-55 */}
               <Text style={[styles.modalSubHeader, { marginTop: 12 }]}>Minute</Text>
               <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 8, flexWrap: 'wrap' }}>
-                {[0, 15, 30, 45].map((m) => {
+                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => {
                   const isSelected = scheduledDate.getMinutes() === m;
                   return (
                     <TouchableOpacity

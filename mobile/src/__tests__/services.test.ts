@@ -322,31 +322,46 @@ test('Mobile Regression: SessionStore removeHistoryItems removes single and batc
 });
 
 test('Mobile Video Settings: Date Time Picker default 19:00 and instant vs scheduled validation', () => {
-  const getDefaultScheduledDate = (targetDateStr?: string): Date => {
-    const now = new Date();
-    let baseDate: Date;
+  const getDefaultScheduledDate = (now: Date = new Date()): Date => {
+    const today19 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0, 0);
+    const diffMinutes = (today19.getTime() - now.getTime()) / (1000 * 60);
 
-    if (targetDateStr && /^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) {
-      const [y, m, d] = targetDateStr.split('-').map(Number);
-      baseDate = new Date(y, m - 1, d, 19, 0, 0, 0);
+    // If current time is more than 30 minutes before 19:00 today, default date is today at 19:00
+    // Otherwise, default date is tomorrow at 19:00
+    if (diffMinutes > 30) {
+      return today19;
     } else {
-      baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0, 0);
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 19, 0, 0, 0);
     }
-
-    const diffMinutes = (baseDate.getTime() - now.getTime()) / (1000 * 60);
-    if (diffMinutes < 30) {
-      baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 19, 0, 0, 0);
-    }
-
-    return baseDate;
   };
 
-  // Test 1: Default time is strictly 19:00 (hours=19, minutes=0)
-  const defaultDate = getDefaultScheduledDate('2026-11-25');
-  assert.equal(defaultDate.getHours(), 19, 'Default hour must be 19');
-  assert.equal(defaultDate.getMinutes(), 0, 'Default minute must be 0');
+  // Test 1: When current time is > 30m before 19:00 (e.g. 14:00 today) -> Default date is TODAY at 19:00
+  const now14h = new Date(2026, 10, 22, 14, 0, 0, 0); // Nov 22, 14:00
+  const defaultDateToday = getDefaultScheduledDate(now14h);
+  assert.equal(defaultDateToday.getDate(), 22, 'Must default to today when > 30m before 19:00');
+  assert.equal(defaultDateToday.getHours(), 19, 'Default hour must be 19');
+  assert.equal(defaultDateToday.getMinutes(), 0, 'Default minute must be 0');
 
-  // Test 2: Instant post mode (isScheduled = false) allows immediate creation
+  // Test 2: When current time is 18:20 today (40m before 19:00, which is > 30m) -> Default date is TODAY at 19:00
+  const now1820 = new Date(2026, 10, 22, 18, 20, 0, 0);
+  const defaultDate1820 = getDefaultScheduledDate(now1820);
+  assert.equal(defaultDate1820.getDate(), 22, 'Must default to today when 40m before 19:00');
+  assert.equal(defaultDate1820.getHours(), 19);
+
+  // Test 3: When current time is 18:35 today (25m before 19:00, <= 30m) -> Default date is TOMORROW at 19:00
+  const now1835 = new Date(2026, 10, 22, 18, 35, 0, 0);
+  const defaultDateTomorrow1 = getDefaultScheduledDate(now1835);
+  assert.equal(defaultDateTomorrow1.getDate(), 23, 'Must default to tomorrow when <= 30m before 19:00');
+  assert.equal(defaultDateTomorrow1.getHours(), 19);
+  assert.equal(defaultDateTomorrow1.getMinutes(), 0);
+
+  // Test 4: When current time is after 19:00 (e.g. 21:00 today) -> Default date is TOMORROW at 19:00
+  const now21h = new Date(2026, 10, 22, 21, 0, 0, 0);
+  const defaultDateTomorrow2 = getDefaultScheduledDate(now21h);
+  assert.equal(defaultDateTomorrow2.getDate(), 23, 'Must default to tomorrow when after 19:00');
+  assert.equal(defaultDateTomorrow2.getHours(), 19);
+
+  // Test 5: Instant post mode (isScheduled = false) allows immediate creation
   const isPostValid = (isScheduled: boolean, scheduledDate: Date): boolean => {
     if (!isScheduled) return true; // Instant post is always valid
     const diffMinutes = (scheduledDate.getTime() - Date.now()) / (1000 * 60);
@@ -355,7 +370,7 @@ test('Mobile Video Settings: Date Time Picker default 19:00 and instant vs sched
 
   assert.equal(isPostValid(false, new Date()), true, 'Instant post mode must be valid immediately');
 
-  // Test 3: Scheduled post cannot be created within 30 minutes of current time
+  // Test 6: Scheduled post cannot be created within 30 minutes of current time
   const tooSoon = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
   assert.equal(isPostValid(true, tooSoon), false, 'Post within 30 mins must be rejected');
 
