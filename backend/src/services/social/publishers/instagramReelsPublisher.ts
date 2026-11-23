@@ -6,18 +6,33 @@ export class InstagramReelsPublisher implements ISocialPublisher {
 
   public async publish(options: PublishOptions): Promise<PublishResult> {
     const logs: string[] = [];
+    const log = (msg: string) => {
+      logs.push(msg);
+      console.log(msg);
+    };
+    const logWarn = (msg: string) => {
+      logs.push(msg);
+      console.warn(msg);
+    };
+    const logError = (msg: string) => {
+      logs.push(msg);
+      console.error(msg);
+    };
+
     const thumbSeconds = typeof options.thumbnailTimestamp === 'number' && !isNaN(options.thumbnailTimestamp) ? options.thumbnailTimestamp : 3.0;
     const thumbOffsetMs = Math.round(thumbSeconds * 1000);
-    logs.push(`[Instagram] Initializing Instagram Reels scheduled upload for group "${options.groupId}" (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
+    log(`[Instagram] Initializing Instagram Reels scheduled upload for group "${options.groupId}" (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
 
     const igUserId = process.env.INSTAGRAM_ACCOUNT_ID || '';
     const pageToken = process.env.FB_PAGE_ACCESS_TOKEN || '';
 
+    log(`[Instagram] Credential check: INSTAGRAM_ACCOUNT_ID=${igUserId ? `Found (${igUserId})` : 'MISSING'}, FB_PAGE_ACCESS_TOKEN=${pageToken ? `Found (${pageToken.substring(0, 8)}...len=${pageToken.length})` : 'MISSING'}`);
+
     if (!igUserId || !pageToken) {
-      logs.push('[Instagram] ℹ No INSTAGRAM_ACCOUNT_ID or FB_PAGE_ACCESS_TOKEN found in .env; executing in simulated mode');
+      logWarn('[Instagram] ℹ No INSTAGRAM_ACCOUNT_ID or FB_PAGE_ACCESS_TOKEN found in .env; executing in simulated mode');
       const simulatedId = `ig_reel_sim_${Date.now()}`;
       const remoteUrl = `https://www.instagram.com/reel/${simulatedId}`;
-      logs.push(`[Instagram] ⚠️ Simulated schedule run for ${options.scheduledPostTime?.toISOString() || 'immediate'} (Missing INSTAGRAM_ACCOUNT_ID/FB_PAGE_ACCESS_TOKEN): ${remoteUrl}`);
+      logWarn(`[Instagram] ⚠️ Simulated schedule run for ${options.scheduledPostTime?.toISOString() || 'immediate'} (Missing INSTAGRAM_ACCOUNT_ID/FB_PAGE_ACCESS_TOKEN): ${remoteUrl}`);
       return {
         success: true,
         platform: this.id,
@@ -30,7 +45,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
     }
 
     try {
-      logs.push(`[Instagram] Target Instagram Account ID: ${igUserId}`);
+      log(`[Instagram] Target Instagram Account ID: ${igUserId}`);
 
       // Public video and thumbnail cover download URL accessible by Meta's crawler
       const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
@@ -42,7 +57,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
         ? Math.floor(options.scheduledPostTime.getTime() / 1000)
         : undefined;
 
-      logs.push(`[Instagram] Creating media container with video URL: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms (${thumbSeconds}s), cover URL: ${coverUrl}${scheduledEpoch ? `, scheduled_publish_time: ${scheduledEpoch}` : ' (instant publish)'}...`);
+      log(`[Instagram] Creating media container with video URL: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms (${thumbSeconds}s), cover URL: ${coverUrl}${scheduledEpoch ? `, scheduled_publish_time: ${scheduledEpoch}` : ' (instant publish)'}...`);
       
       const containerParams: Record<string, string> = {
         media_type: 'REELS',
@@ -57,6 +72,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
         containerParams.scheduled_publish_time = scheduledEpoch.toString();
       }
 
+      log(`[Instagram] Sending request to https://graph.facebook.com/v21.0/${igUserId}/media`);
       const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -70,12 +86,13 @@ export class InstagramReelsPublisher implements ISocialPublisher {
 
       const containerData = (await containerRes.json()) as any;
       const containerId = containerData.id;
-      logs.push(`[Instagram] Media container created successfully (Container ID: ${containerId})`);
+      log(`[Instagram] Media container created successfully (Container ID: ${containerId})`);
 
       // For scheduled Instagram reels:
       // Instagram Graph API registers container and publishes at scheduled time
-      logs.push(`[Instagram] Scheduled container registered for ${options.scheduledPostTime?.toISOString() || 'publish time'}`);
+      log(`[Instagram] Scheduled container registered for ${options.scheduledPostTime?.toISOString() || 'publish time'}`);
       const remoteUrl = `https://www.instagram.com/reel/${containerId}`;
+      log(`[Instagram] ✅ Instagram Reel container registered: ${remoteUrl}`);
 
       return {
         success: true,
@@ -87,7 +104,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       };
     } catch (err: any) {
       const msg = err?.message || 'Unknown Instagram Reel error';
-      logs.push(`[Instagram] ❌ Failed: ${msg}`);
+      logError(`[Instagram] ❌ Failed: ${msg}`);
       return {
         success: false,
         platform: this.id,

@@ -66,6 +66,32 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
+// Global Error Handler Middleware
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  const time = new Date().toISOString();
+  console.error(`\n[${time}] 💥 UNHANDLED EXPRESS ERROR on ${req.method} ${req.originalUrl || req.url}:`);
+  console.error(`  Name: ${err?.name || 'Error'}`);
+  console.error(`  Message: ${err?.message || err}`);
+  if (err?.stack) console.error(`  Stack Trace:\n${err.stack}`);
+  if (err?.errors) console.error(`  Details:`, JSON.stringify(err.errors, null, 2));
+  console.error(`====================================================\n`);
+
+  res.status(err.status || 500).json({
+    error: err?.message || 'Internal Server Error',
+    details: err?.details || undefined
+  });
+});
+
+// Process-wide unhandled error handlers to guarantee logs are never lost in production
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  console.error('\n🚨 [FATAL] Unhandled Promise Rejection at:', promise);
+  console.error('   Reason:', reason?.stack || reason);
+});
+
+process.on('uncaughtException', (err: any) => {
+  console.error('\n🚨 [FATAL] Uncaught Exception thrown:', err?.stack || err);
+});
+
 const isTest = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
 if (!isTest) {
   const host = '0.0.0.0';

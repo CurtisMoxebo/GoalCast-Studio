@@ -73,10 +73,17 @@ function resolveVideoPath(groupId: string): string | null {
  * Enforces strictly that scheduledPostTime must be at least 30 minutes in the future.
  */
 router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
+  const reqStart = Date.now();
+  console.log(`\n================== [POST /api/social/schedule] ==================`);
+  console.log(`[SocialRoutes] 🕒 Request timestamp: ${new Date().toISOString()}`);
+  console.log(`[SocialRoutes] 🌐 Client IP: ${req.ip || req.socket.remoteAddress || 'unknown'}`);
+  console.log(`[SocialRoutes] 📦 Request Body:`, JSON.stringify(req.body, null, 2));
+
   try {
     const { groupId, scheduledPostTime, isInstant, description, thumbnailTimestamp } = req.body;
 
     if (!groupId) {
+      console.warn('[SocialRoutes] ❌ Rejected: Missing groupId in request body.');
       res.status(400).json({ error: 'Missing groupId in request body.' });
       return;
     }
@@ -87,6 +94,7 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
     if (!isInstantMode) {
       const parsedDate = new Date(scheduledPostTime);
       if (isNaN(parsedDate.getTime())) {
+        console.warn(`[SocialRoutes] ❌ Rejected: Invalid scheduledPostTime date format ("${scheduledPostTime}")`);
         res.status(400).json({ error: 'Invalid scheduledPostTime date format.' });
         return;
       }
@@ -95,12 +103,16 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       const now = Date.now();
       const diffMinutes = (parsedDate.getTime() - now) / (1000 * 60);
       if (diffMinutes < 29.5) {
+        console.warn(`[SocialRoutes] ❌ Rejected: Scheduled post time (${parsedDate.toISOString()}) is only ${diffMinutes.toFixed(1)}m in the future. Must be >= 30m.`);
         res.status(400).json({
           error: 'Scheduled post date & time must be at least 30 minutes in the future.'
         });
         return;
       }
       scheduledDate = parsedDate;
+      console.log(`[SocialRoutes] 📅 Scheduled Mode validated: ${scheduledDate.toISOString()} (~${diffMinutes.toFixed(1)} mins from now)`);
+    } else {
+      console.log(`[SocialRoutes] ⚡ Instant Post Mode enabled: video will be published immediately upon pipeline trigger.`);
     }
 
     // Resolve group details from DB or fallbacks
@@ -114,6 +126,7 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
             : undefined);
 
     try {
+      console.log(`[SocialRoutes] 🔍 Querying database for PredictionGroup "${groupId}"...`);
       const group = await prisma.predictionGroup.findUnique({
         where: { id: groupId }
       });
@@ -123,24 +136,36 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
         if (finalThumbnailTimestamp === undefined && typeof group.thumbnailTimestamp === 'number') {
           finalThumbnailTimestamp = group.thumbnailTimestamp;
         }
+        console.log(`[SocialRoutes] ✅ Group found in DB: targetDate=${targetDate}, description="${finalDesc.substring(0, 50)}...", thumbTime=${finalThumbnailTimestamp}s`);
 
         // Persist scheduledPostTime on group (null if instant)
         await prisma.predictionGroup.update({
           where: { id: groupId },
           data: { scheduledPostTime: scheduledDate ?? null }
         });
+        console.log(`[SocialRoutes] 💾 Updated PredictionGroup.scheduledPostTime to ${scheduledDate ? scheduledDate.toISOString() : 'NULL'}`);
+      } else {
+        console.log(`[SocialRoutes] ℹ Notice: Group "${groupId}" not found in DB (running with payload/defaults)`);
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.warn('[SocialRoutes] ⚠️ DB access warning:', dbErr?.message);
+    }
 
+    console.log(`[SocialRoutes] 🔎 Resolving video file path on disk for groupId="${groupId}"...`);
     const videoPath = resolveVideoPath(groupId);
     if (!videoPath || !fs.existsSync(videoPath)) {
+      console.error(`[SocialRoutes] ❌ Video file NOT found on disk for groupId="${groupId}". Looked at: ${videoPath || 'none'}`);
       res.status(404).json({
         error: 'Video file for this group was not found on server or is still generating.'
       });
       return;
     }
 
+    const videoStat = fs.statSync(videoPath);
+    console.log(`[SocialRoutes] ✅ Video file verified: ${videoPath} (${(videoStat.size / (1024 * 1024)).toFixed(2)} MB)`);
+
     // Execute the social media publishing pipeline (with sequential fail-safe continuation)
+    console.log(`[SocialRoutes] 🚀 Triggering SocialPipelineService for groupId="${groupId}"...`);
     const pipelineResult = await socialPipelineService.executePipeline({
       groupId,
       videoPath,
@@ -150,6 +175,10 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       thumbnailTimestamp: finalThumbnailTimestamp ?? 3.0
     });
 
+    const elapsed = Date.now() - reqStart;
+    console.log(`[SocialRoutes] 🏁 Pipeline completed in ${elapsed}ms. Status: ${pipelineResult.status}`);
+    console.log(`=================================================================\n`);
+
     res.json({
       success: true,
       message: scheduledDate
@@ -158,7 +187,9 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       pipeline: pipelineResult
     });
   } catch (error: any) {
-    console.error('[SocialRoutes] Schedule error:', error);
+    console.error('[SocialRoutes] ❌ Critical failure during /api/social/schedule:', error);
+    if (error?.stack) console.error(error.stack);
+    console.error(`=================================================================\n`);
     res.status(500).json({
       error: 'Failed to schedule social posts',
       details: error?.message || 'Internal server error'

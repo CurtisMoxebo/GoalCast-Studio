@@ -1,3 +1,4 @@
+import fs from 'fs';
 import prisma from '../../db/prisma';
 import { socialPublisherRegistry } from './socialPublisherRegistry';
 import { FacebookReelsPublisher } from './publishers/facebookReelsPublisher';
@@ -37,18 +38,29 @@ export class SocialPipelineService {
   }): Promise<SocialPipelineRunResult> {
     const { groupId, videoPath, description, targetDate, scheduledPostTime, thumbnailTimestamp } = params;
     const finalThumbTime = typeof thumbnailTimestamp === 'number' && !isNaN(thumbnailTimestamp) ? thumbnailTimestamp : 3.0;
+    const pipelineStartTime = Date.now();
+
+    let videoSizeMB = 'unknown';
+    try {
+      if (fs.existsSync(videoPath)) {
+        videoSizeMB = (fs.statSync(videoPath).size / (1024 * 1024)).toFixed(2) + ' MB';
+      }
+    } catch {}
 
     console.log(`\n================== [Social Pipeline Execution] ==================`);
     console.log(`[SocialPipeline] 🕒 Started at: ${new Date().toISOString()}`);
     console.log(`[SocialPipeline] 🎯 Group ID: ${groupId}`);
-    console.log(`[SocialPipeline] 📅 Scheduled Post Time: ${scheduledPostTime ? scheduledPostTime.toISOString() : 'INSTANT (Immediate)'}`);
-    console.log(`[SocialPipeline] 🖼️ Thumbnail Timeframe: ${finalThumbTime}s`);
+    console.log(`[SocialPipeline] 🎬 Video File: ${videoPath} (${videoSizeMB})`);
+    console.log(`[SocialPipeline] 📅 Mode: ${scheduledPostTime ? `SCHEDULED for ${scheduledPostTime.toISOString()}` : 'INSTANT (Immediate Publishing)'}`);
+    console.log(`[SocialPipeline] 🖼️ Thumbnail Timeframe: ${finalThumbTime}s (${Math.round(finalThumbTime * 1000)}ms)`);
     console.log(`[SocialPipeline] 📝 Target Date: ${targetDate}`);
+    console.log(`[SocialPipeline] 📄 Caption preview: "${description ? description.replace(/\n/g, ' ').substring(0, 80) : ''}..."`);
     console.log(`=================================================================\n`);
 
     // 1. Create or initialize Pipeline row in database
     let pipelineId = `pipe_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
+      console.log(`[SocialPipeline] 💾 Initializing database record for pipeline (groupId="${groupId}")...`);
       const created = await prisma.socialPostPipeline.create({
         data: {
           groupId,
@@ -58,18 +70,21 @@ export class SocialPipelineService {
         }
       });
       pipelineId = created.id;
+      console.log(`[SocialPipeline] ✅ Pipeline database entry created with ID: ${pipelineId}`);
     } catch (dbErr: any) {
       console.warn('[SocialPipeline] Notice: DB pipeline creation skipped (offline/test mode):', dbErr?.message);
     }
 
     const publishers = socialPublisherRegistry.getAll();
     const itemResults: SocialPipelineItemResult[] = [];
+    console.log(`[SocialPipeline] 📋 Registered publishers queue (${publishers.length}): ${publishers.map((p) => p.name).join(', ')}`);
 
     // 2. Execute each platform in sequence
     for (let index = 0; index < publishers.length; index++) {
       const publisher = publishers[index];
+      const stepStartTime = Date.now();
       console.log(`\n-----------------------------------------------------------------`);
-      console.log(`[SocialPipeline] 🚀 [Step ${index + 1}/${publishers.length}] Publishing to ${publisher.name}...`);
+      console.log(`[SocialPipeline] 🚀 [Step ${index + 1}/${publishers.length}] Publishing to ${publisher.name} (${publisher.id})...`);
 
       let itemId = `item_${Date.now()}_${index}`;
       try {
@@ -97,14 +112,27 @@ export class SocialPipelineService {
 
       let result;
       try {
+        console.log(`[SocialPipeline] ⏳ Invoking publisher.publish() for ${publisher.name}...`);
         result = await publisher.publish(publishOptions);
       } catch (execErr: any) {
+        console.error(`[SocialPipeline] 💥 Unexpected crash inside ${publisher.name}.publish():`, execErr);
         result = {
           success: false,
           platform: publisher.id,
           error: execErr?.message || 'Unexpected execution crash',
           logs: [`[${publisher.name}] Crash: ${execErr?.message}`]
         };
+      }
+
+      const stepDurationMs = Date.now() - stepStartTime;
+      console.log(`[SocialPipeline] ⏱️ ${publisher.name} step finished in ${stepDurationMs}ms (success: ${result.success}, isSimulated: ${Boolean(result.isSimulated)})`);
+
+      // Print all publisher internal log lines directly to stdout so they appear in server logs
+      if (result.logs && result.logs.length > 0) {
+        console.log(`[SocialPipeline] 📜 Detailed logs from ${publisher.name}:`);
+        for (const logLine of result.logs) {
+          console.log(`   │ ${logLine}`);
+        }
       }
 
       const completedAt = new Date();
@@ -213,9 +241,14 @@ export class SocialPipelineService {
       finalStatus = 'COMPLETED';
     }
 
+    const totalPipelineDurationMs = Date.now() - pipelineStartTime;
     console.log(`\n=================================================================`);
-    console.log(`[SocialPipeline] 🏁 Pipeline finished with status: ${finalStatus}`);
+    console.log(`[SocialPipeline] 🏁 Pipeline finished in ${totalPipelineDurationMs}ms with status: ${finalStatus}`);
     console.log(`[SocialPipeline] 📊 Summary: ${liveCount} live, ${simulatedCount} simulated, ${failedCount} failed`);
+    for (const item of itemResults) {
+      const badge = item.status === 'SUCCESS' ? '🟢 LIVE' : item.status === 'SIMULATED' ? '🟡 SIMULATED' : '🔴 FAILED';
+      console.log(`  ${badge} [${item.platformName}]: ${item.remoteUrl || item.error || item.warning || item.status}`);
+    }
     console.log(`=================================================================\n`);
 
     try {
