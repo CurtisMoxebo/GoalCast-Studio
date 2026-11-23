@@ -1,4 +1,12 @@
 process.env.NODE_ENV = 'test';
+// Isolate social credentials in test environment so tests never make live external API calls
+delete process.env.FB_PAGE_ID;
+delete process.env.FB_PAGE_ACCESS_TOKEN;
+delete process.env.INSTAGRAM_ACCOUNT_ID;
+delete process.env.TIKTOK_ACCESS_TOKEN;
+delete process.env.TIKTOK_CLIENT_KEY;
+delete process.env.YOUTUBE_CLIENT_ID;
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
@@ -144,64 +152,37 @@ test('Social Publishers: All 4 social platforms accept and record the user-speci
     thumbnailTimestamp: customTimeframe
   };
 
-  // Temporarily isolate live credentials so tests verify simulated mode without external network calls
-  const savedEnv = {
-    FB_PAGE_ID: process.env.FB_PAGE_ID,
-    FB_PAGE_ACCESS_TOKEN: process.env.FB_PAGE_ACCESS_TOKEN,
-    INSTAGRAM_ACCOUNT_ID: process.env.INSTAGRAM_ACCOUNT_ID,
-    TIKTOK_ACCESS_TOKEN: process.env.TIKTOK_ACCESS_TOKEN,
-    TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY,
-    YOUTUBE_CLIENT_ID: process.env.YOUTUBE_CLIENT_ID
-  };
+  // 1. Facebook Reels
+  const fb = new FacebookReelsPublisher();
+  const fbRes = await fb.publish(options);
+  assert.equal(fbRes.success, true);
+  assert.equal(fbRes.isSimulated, true);
+  assert.ok(fbRes.warning?.includes('FB_PAGE'));
+  assert.ok(fbRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
 
-  delete process.env.FB_PAGE_ID;
-  delete process.env.FB_PAGE_ACCESS_TOKEN;
-  delete process.env.INSTAGRAM_ACCOUNT_ID;
-  delete process.env.TIKTOK_ACCESS_TOKEN;
-  delete process.env.TIKTOK_CLIENT_KEY;
-  delete process.env.YOUTUBE_CLIENT_ID;
+  // 2. Instagram Reels
+  const ig = new InstagramReelsPublisher();
+  const igRes = await ig.publish(options);
+  assert.equal(igRes.success, true);
+  assert.equal(igRes.isSimulated, true);
+  assert.ok(igRes.warning?.includes('INSTAGRAM'));
+  assert.ok(igRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
 
-  try {
-    // 1. Facebook Reels
-    const fb = new FacebookReelsPublisher();
-    const fbRes = await fb.publish(options);
-    assert.equal(fbRes.success, true);
-    assert.equal(fbRes.isSimulated, true);
-    assert.ok(fbRes.warning?.includes('FB_PAGE'));
-    assert.ok(fbRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
+  // 3. TikTok
+  const tt = new TikTokPublisher();
+  const ttRes = await tt.publish(options);
+  assert.equal(ttRes.success, true);
+  assert.equal(ttRes.isSimulated, true);
+  assert.ok(ttRes.warning?.includes('TIKTOK'));
+  assert.ok(ttRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
 
-    // 2. Instagram Reels
-    const ig = new InstagramReelsPublisher();
-    const igRes = await ig.publish(options);
-    assert.equal(igRes.success, true);
-    assert.equal(igRes.isSimulated, true);
-    assert.ok(igRes.warning?.includes('INSTAGRAM'));
-    assert.ok(igRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
-
-    // 3. TikTok
-    const tt = new TikTokPublisher();
-    const ttRes = await tt.publish(options);
-    assert.equal(ttRes.success, true);
-    assert.equal(ttRes.isSimulated, true);
-    assert.ok(ttRes.warning?.includes('TIKTOK'));
-    assert.ok(ttRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
-
-    // 4. YouTube Shorts
-    const yt = new YouTubePublisher();
-    const ytRes = await yt.publish(options);
-    assert.equal(ytRes.success, true);
-    assert.equal(ytRes.isSimulated, true);
-    assert.ok(ytRes.warning?.includes('YOUTUBE'));
-    assert.ok(ytRes.logs.some((l) => l.includes('8.5s')));
-  } finally {
-    // Restore environment
-    if (savedEnv.FB_PAGE_ID) process.env.FB_PAGE_ID = savedEnv.FB_PAGE_ID;
-    if (savedEnv.FB_PAGE_ACCESS_TOKEN) process.env.FB_PAGE_ACCESS_TOKEN = savedEnv.FB_PAGE_ACCESS_TOKEN;
-    if (savedEnv.INSTAGRAM_ACCOUNT_ID) process.env.INSTAGRAM_ACCOUNT_ID = savedEnv.INSTAGRAM_ACCOUNT_ID;
-    if (savedEnv.TIKTOK_ACCESS_TOKEN) process.env.TIKTOK_ACCESS_TOKEN = savedEnv.TIKTOK_ACCESS_TOKEN;
-    if (savedEnv.TIKTOK_CLIENT_KEY) process.env.TIKTOK_CLIENT_KEY = savedEnv.TIKTOK_CLIENT_KEY;
-    if (savedEnv.YOUTUBE_CLIENT_ID) process.env.YOUTUBE_CLIENT_ID = savedEnv.YOUTUBE_CLIENT_ID;
-  }
+  // 4. YouTube Shorts
+  const yt = new YouTubePublisher();
+  const ytRes = await yt.publish(options);
+  assert.equal(ytRes.success, true);
+  assert.equal(ytRes.isSimulated, true);
+  assert.ok(ytRes.warning?.includes('YOUTUBE'));
+  assert.ok(ytRes.logs.some((l) => l.includes('8.5s')));
 });
 
 test('Social Pipeline: Strictly marks simulated publishers as SIMULATED to eliminate false positives', async () => {
@@ -266,4 +247,87 @@ test('Social Pipeline: executePipeline filters publishers to only user-selected 
   assert.ok(platformsRun.includes('tiktok'));
   assert.equal(platformsRun.includes('facebook_reels'), false);
   assert.equal(platformsRun.includes('youtube_shorts'), false);
+});
+
+test('Instagram Reels Publisher: performs full 4-phase container creation, polling, media_publish and permalink retrieval', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+
+  const savedEnv = {
+    INSTAGRAM_ACCOUNT_ID: process.env.INSTAGRAM_ACCOUNT_ID,
+    FB_PAGE_ACCESS_TOKEN: process.env.FB_PAGE_ACCESS_TOKEN
+  };
+
+  process.env.TEST_LIVE_INSTAGRAM = 'true';
+  process.env.INSTAGRAM_ACCOUNT_ID = 'ig_test_user_123';
+  process.env.FB_PAGE_ACCESS_TOKEN = 'token_test_abc';
+
+  try {
+    let pollCount = 0;
+    (globalThis as any).fetch = async (url: string, init?: any) => {
+      const urlStr = url.toString();
+      calls.push(urlStr);
+      if (urlStr.includes('/media_publish')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'ig_published_media_999' })
+        } as any;
+      }
+      if (urlStr.includes('fields=permalink')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'ig_published_media_999', permalink: 'https://www.instagram.com/reel/C_REAL_POST_123/' })
+        } as any;
+      }
+      if (urlStr.includes('fields=status_code')) {
+        pollCount++;
+        // First poll: IN_PROGRESS, Second poll: FINISHED
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'container_111', status_code: pollCount > 1 ? 'FINISHED' : 'IN_PROGRESS' })
+        } as any;
+      }
+      if (urlStr.includes('/media')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'container_111' })
+        } as any;
+      }
+      return { ok: false, status: 404, text: async () => 'Not Found' } as any;
+    };
+
+    const ig = new InstagramReelsPublisher();
+    const result = await ig.publish({
+      groupId: 'group_test_live',
+      videoPath: 'dummy.mp4',
+      description: 'Test reel',
+      targetDate: '2026-11-25',
+      thumbnailTimestamp: 5
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.isSimulated, false);
+    assert.equal(result.remotePostId, 'ig_published_media_999');
+    assert.equal(result.remoteUrl, 'https://www.instagram.com/reel/C_REAL_POST_123/');
+    assert.ok(calls.some((u) => u.includes('/media_publish')), 'Must call media_publish to push post live');
+    assert.ok(calls.some((u) => u.includes('fields=status_code')), 'Must poll status_code');
+    assert.ok(calls.some((u) => u.includes('fields=permalink')), 'Must fetch permalink');
+  } finally {
+    delete process.env.TEST_LIVE_INSTAGRAM;
+    globalThis.fetch = originalFetch;
+    if (savedEnv.INSTAGRAM_ACCOUNT_ID) {
+      process.env.INSTAGRAM_ACCOUNT_ID = savedEnv.INSTAGRAM_ACCOUNT_ID;
+    } else {
+      delete process.env.INSTAGRAM_ACCOUNT_ID;
+    }
+    if (savedEnv.FB_PAGE_ACCESS_TOKEN) {
+      process.env.FB_PAGE_ACCESS_TOKEN = savedEnv.FB_PAGE_ACCESS_TOKEN;
+    } else {
+      delete process.env.FB_PAGE_ACCESS_TOKEN;
+    }
+  }
 });
