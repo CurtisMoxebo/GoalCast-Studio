@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { THEME } from '../constants/theme';
 import * as FileSystem from 'expo-file-system/legacy';
 import { mobileApi } from '../services/api';
@@ -390,7 +391,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         name: p.name,
         icon: p.icon,
         color: p.color,
-        status: (idx === 0 ? 'IN_PROGRESS' : 'PENDING') as const
+        status: idx === 0 ? ('IN_PROGRESS' as const) : ('PENDING' as const)
       }));
 
     setPipelineItems(initialItems);
@@ -475,14 +476,19 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     if (!item.remoteUrl) return;
     try {
       if (item.platform === 'facebook_reels') {
-        const videoId = item.remotePostId || item.remoteUrl.match(/\/reel\/([0-9]+)/)?.[1];
-        if (videoId) {
-          const fbAppUrl = `fb://reel/${videoId}`;
-          const canOpen = await Linking.canOpenURL(fbAppUrl).catch(() => false);
-          if (canOpen) {
-            await Linking.openURL(fbAppUrl);
-            return;
-          }
+        // Facebook's native app has a known intent routing flaw where external https://facebook.com/*
+        // links are intercepted but drop the user into the general news feed instead of playing the reel.
+        // WebBrowser (Chrome Custom Tabs / SFSafariViewController) bypasses this app interception and
+        // opens the Facebook Reel video player directly with immediate video playback!
+        try {
+          await WebBrowser.openBrowserAsync(item.remoteUrl, {
+            presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+            toolbarColor: '#1877F2',
+            controlsColor: '#ffffff'
+          });
+          return;
+        } catch (browserErr) {
+          console.warn('[PreviewModal] WebBrowser error for Facebook Reel, falling back to Linking:', browserErr);
         }
       } else if (item.platform === 'instagram_reels') {
         const match = item.remoteUrl.match(/\/reel\/([A-Za-z0-9_-]+)/);
