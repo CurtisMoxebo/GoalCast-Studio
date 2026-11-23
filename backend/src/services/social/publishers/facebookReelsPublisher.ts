@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { ISocialPublisher, PublishOptions, PublishResult, SocialPlatformId } from '../types';
+import { getVideoDurationInSeconds, getSafeThumbnailOffset } from '../mediaHelper';
 
 export class FacebookReelsPublisher implements ISocialPublisher {
   public readonly id: SocialPlatformId = 'facebook_reels';
@@ -20,9 +21,9 @@ export class FacebookReelsPublisher implements ISocialPublisher {
       console.error(msg);
     };
 
-    const thumbSeconds = typeof options.thumbnailTimestamp === 'number' && !isNaN(options.thumbnailTimestamp) ? options.thumbnailTimestamp : 3.0;
-    const thumbOffsetMs = Math.round(thumbSeconds * 1000);
-    log(`[Facebook] Initializing Facebook Reels upload for group "${options.groupId}" (thumbnail: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
+    const rawThumb = options.thumbnailTimestamp;
+    const initialThumb = getSafeThumbnailOffset(rawThumb, null);
+    log(`[Facebook] Initializing Facebook Reels upload for group "${options.groupId}" (thumbnail: ${initialThumb.seconds}s / ${initialThumb.ms}ms)`);
 
     const pageId = process.env.FB_PAGE_ID || '';
     const pageToken = process.env.FB_PAGE_ACCESS_TOKEN || '';
@@ -48,7 +49,19 @@ export class FacebookReelsPublisher implements ISocialPublisher {
     try {
       const stat = fs.statSync(options.videoPath);
       const fileSize = stat.size;
-      log(`[Facebook] Video binary file verified: ${options.videoPath} (${(fileSize / (1024 * 1024)).toFixed(2)} MB)`);
+
+      // Probe video duration to ensure thumb_offset falls strictly within bounds
+      const videoDuration = await getVideoDurationInSeconds(options.videoPath);
+      const safeThumb = getSafeThumbnailOffset(rawThumb, videoDuration);
+      const thumbSeconds = safeThumb.seconds;
+      const thumbOffsetMs = safeThumb.ms;
+
+      log(`[Facebook] Video binary file verified: ${options.videoPath} (${(fileSize / (1024 * 1024)).toFixed(2)} MB${videoDuration ? `, duration: ${videoDuration.toFixed(1)}s` : ''})`);
+      if (typeof rawThumb === 'number' && rawThumb !== thumbSeconds) {
+        log(`[Facebook] ⚠️ Requested thumbnail (${rawThumb}s) exceeded video duration. Clamped to active prediction frame: ${thumbSeconds.toFixed(1)}s (${thumbOffsetMs}ms).`);
+      } else {
+        log(`[Facebook] Selected thumbnail frame: ${thumbSeconds}s (${thumbOffsetMs}ms)`);
+      }
 
       // Calculate Unix timestamp for scheduled publishing if provided (Meta requires seconds)
       const scheduledEpoch = options.scheduledPostTime

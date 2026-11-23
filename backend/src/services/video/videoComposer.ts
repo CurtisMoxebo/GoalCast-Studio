@@ -391,7 +391,13 @@ export class VideoComposer {
     // 7. Extract Thumbnail at thumbnailTimestamp if specified
     const thumbnailPath = path.join(workDir, 'thumbnail.jpg');
     try {
-      const thumbTime = typeof input.thumbnailTimestamp === 'number' ? input.thumbnailTimestamp : 3.0;
+      const requestedTime = typeof input.thumbnailTimestamp === 'number' ? input.thumbnailTimestamp : 3.0;
+      // If requested time exceeds video bounds (e.g. 47s on a 30s video), clamp to the active content window
+      // before outro begins (totalDuration - outroDuration - 1.0) so the thumbnail always captures a prediction card
+      const maxThumbTime = Math.max(1.5, totalDuration - outroDuration - 1.0);
+      const thumbTime = requestedTime > totalDuration - 2.0
+        ? maxThumbTime
+        : Math.max(1.0, requestedTime);
       await this.extractThumbnail(outputVideoPath, thumbTime, thumbnailPath);
     } catch (e: any) {
       console.warn('[VideoComposer] Could not extract thumbnail frame:', e.message);

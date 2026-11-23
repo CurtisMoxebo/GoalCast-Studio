@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { ISocialPublisher, PublishOptions, PublishResult, SocialPlatformId } from '../types';
+import { getVideoDurationInSeconds, getSafeThumbnailOffset } from '../mediaHelper';
 
 export class InstagramReelsPublisher implements ISocialPublisher {
   public readonly id: SocialPlatformId = 'instagram_reels';
@@ -20,9 +21,9 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       console.error(msg);
     };
 
-    const thumbSeconds = typeof options.thumbnailTimestamp === 'number' && !isNaN(options.thumbnailTimestamp) ? options.thumbnailTimestamp : 3.0;
-    const thumbOffsetMs = Math.round(thumbSeconds * 1000);
-    log(`[Instagram] Initializing Instagram Reels upload for group "${options.groupId}" (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
+    const rawThumb = options.thumbnailTimestamp;
+    const initialThumb = getSafeThumbnailOffset(rawThumb, null);
+    log(`[Instagram] Initializing Instagram Reels upload for group "${options.groupId}" (thumbnail timeframe: ${initialThumb.seconds}s / ${initialThumb.ms}ms)`);
 
     const igUserId = process.env.INSTAGRAM_ACCOUNT_ID || '';
     const pageToken = process.env.FB_PAGE_ACCESS_TOKEN || '';
@@ -51,7 +52,19 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       const caption = options.description || `Football Predictions ${options.targetDate} ⚽🔥 #reels #football #predictions #fyp`;
       const stat = fs.existsSync(options.videoPath) ? fs.statSync(options.videoPath) : null;
       const fileSize = stat ? stat.size : 0;
-      log(`[Instagram] Video binary verified on disk: ${options.videoPath} (${(fileSize / (1024 * 1024)).toFixed(2)} MB)`);
+
+      // Probe actual video duration to ensure thumb_offset falls strictly within bounds
+      const videoDuration = await getVideoDurationInSeconds(options.videoPath);
+      const safeThumb = getSafeThumbnailOffset(rawThumb, videoDuration);
+      const thumbSeconds = safeThumb.seconds;
+      const thumbOffsetMs = safeThumb.ms;
+
+      log(`[Instagram] Video binary verified on disk: ${options.videoPath} (${(fileSize / (1024 * 1024)).toFixed(2)} MB${videoDuration ? `, duration: ${videoDuration.toFixed(1)}s` : ''})`);
+      if (typeof rawThumb === 'number' && rawThumb !== thumbSeconds) {
+        log(`[Instagram] ⚠️ Requested thumbnail (${rawThumb}s) exceeded video duration. Clamped to active prediction frame: ${thumbSeconds.toFixed(1)}s (${thumbOffsetMs}ms).`);
+      } else {
+        log(`[Instagram] Selected thumbnail frame: ${thumbSeconds}s (${thumbOffsetMs}ms)`);
+      }
 
       let containerId = '';
       let isResumable = false;

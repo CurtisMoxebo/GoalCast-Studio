@@ -18,6 +18,7 @@ import { InstagramReelsPublisher } from '../services/social/publishers/instagram
 import { TikTokPublisher } from '../services/social/publishers/tiktokPublisher';
 import { YouTubePublisher } from '../services/social/publishers/youtubePublisher';
 import { ISocialPublisher, PublishOptions, PublishResult } from '../services/social/types';
+import { getSafeThumbnailOffset } from '../services/social/mediaHelper';
 
 test('Regression Social: SocialPublisherRegistry registers default 4 publishers and supports extensions', () => {
   const all = socialPublisherRegistry.getAll();
@@ -338,4 +339,26 @@ test('Instagram Reels Publisher: performs full 4-phase container creation, polli
       delete process.env.FB_PAGE_ACCESS_TOKEN;
     }
   }
+});
+
+test('Media Helper: getSafeThumbnailOffset clamps out-of-bounds thumbnails to video duration and avoids black intro fade', () => {
+  // Test 1: Requested 47s on a 30.7s video -> must be clamped to active prediction content (30.7 - 5.0 = 25.7s / 25700ms)
+  const clampedOut = getSafeThumbnailOffset(47, 30.7);
+  assert.equal(clampedOut.seconds, 25.7);
+  assert.equal(clampedOut.ms, 25700);
+
+  // Test 2: Requested 0s (start) -> must be clamped to at least 1.0s to avoid black fade
+  const clampedZero = getSafeThumbnailOffset(0, 30.7);
+  assert.equal(clampedZero.seconds, 1.0);
+  assert.equal(clampedZero.ms, 1000);
+
+  // Test 3: Normal within-bounds timestamp (12.5s on 30.7s video)
+  const within = getSafeThumbnailOffset(12.5, 30.7);
+  assert.equal(within.seconds, 12.5);
+  assert.equal(within.ms, 12500);
+
+  // Test 4: Duration unknown (null) -> enforces minimum 1.0s
+  const unknownZero = getSafeThumbnailOffset(0, null);
+  assert.equal(unknownZero.seconds, 1.0);
+  assert.equal(unknownZero.ms, 1000);
 });
