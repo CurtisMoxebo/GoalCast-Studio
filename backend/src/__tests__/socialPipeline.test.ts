@@ -440,6 +440,78 @@ test('Facebook Reels Publisher: performs full 4-phase start, upload, finish, pol
   }
 });
 
+test('YouTube Shorts Publisher: uploads custom thumbnail frame and surfaces phone verification warning on 403', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+
+  try {
+    process.env.YOUTUBE_CLIENT_ID = 'test_yt_client_id';
+    process.env.YOUTUBE_CLIENT_SECRET = 'test_yt_client_secret';
+    process.env.YOUTUBE_REFRESH_TOKEN = 'test_yt_refresh_token';
+
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const urlStr = input.toString();
+      calls.push(urlStr);
+
+      if (urlStr.includes('oauth2.googleapis.com/token')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ access_token: 'mock_yt_access_token' })
+        } as any;
+      }
+      if (urlStr.includes('/videos?uploadType=resumable')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers({ location: 'https://youtube-mock-upload.com/session_123' })
+        } as any;
+      }
+      if (urlStr.includes('youtube-mock-upload.com/session_123')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'yt_vid_999' })
+        } as any;
+      }
+      if (urlStr.includes('/thumbnails/set')) {
+        return {
+          ok: false,
+          status: 403,
+          text: async () => JSON.stringify({
+            error: {
+              code: 403,
+              message: "The authenticated user doesn't have permissions to upload and set custom video thumbnails."
+            }
+          })
+        } as any;
+      }
+      return { ok: false, status: 404, text: async () => 'Not Found' } as any;
+    };
+
+    const yt = new YouTubePublisher();
+    const result = await yt.publish({
+      groupId: 'group_test_yt_thumb',
+      videoPath: 'dummy.mp4',
+      description: 'Test YouTube reel',
+      targetDate: '2026-11-25',
+      thumbnailTimestamp: 3
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.isSimulated, false);
+    assert.equal(result.remotePostId, 'yt_vid_999');
+    assert.equal(result.remoteUrl, 'https://youtube.com/shorts/yt_vid_999');
+    assert.ok(result.warning?.includes('youtube.com/verify'), 'Warning must instruct user to verify channel for custom thumbnails');
+    assert.ok(result.logs.some((l) => l.includes('PERMISSION NOTICE')), 'Must log clear actionable permission notice');
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.YOUTUBE_CLIENT_ID;
+    delete process.env.YOUTUBE_CLIENT_SECRET;
+    delete process.env.YOUTUBE_REFRESH_TOKEN;
+  }
+});
+
 test('Media Helper: getSafeThumbnailOffset clamps out-of-bounds thumbnails to video duration and avoids black intro fade', () => {
   // Test 1: Requested 47s on a 30.7s video -> must be clamped to active prediction content (30.7 - 5.0 = 25.7s / 25700ms)
   const clampedOut = getSafeThumbnailOffset(47, 30.7);
