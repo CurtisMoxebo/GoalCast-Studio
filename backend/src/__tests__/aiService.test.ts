@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { getAIService } from '../services/ai/aiFactory';
 import { MockAIService } from '../services/ai/mockAiService';
 import { findBettingOptionByCode } from '../constants/bettingRules';
+import { buildUpcomingGamesPrompt } from '../services/ai/geminiAiService';
+import { SUPPORTED_LEAGUES } from '../services/fixtures/realFixturesService';
 
 test('Regression: AI Factory fallback to MockAIService when no key configured', () => {
   const originalKey = process.env.GEMINI_API_KEY;
@@ -88,4 +90,21 @@ test('Regression: AI past predictions validation', async () => {
   const result = await mockAI.validatePreviousPredictions(pastGames);
   assert.equal(typeof result.isHit, 'boolean');
   assert.ok(typeof result.notes === 'string' && result.notes.length > 0);
+});
+
+test('AI Prompt: buildUpcomingGamesPrompt explicitly includes Saudi Arabia competitions and AFC Championship', () => {
+  const prompt = buildUpcomingGamesPrompt('2026-11-25', 'America/New_York');
+
+  assert.ok(prompt.includes('AFC Champions League / AFC Championship'), 'Prompt must include AFC Champions League / AFC Championship');
+  assert.ok(prompt.includes('Saudi Pro League'), 'Prompt must include Saudi Pro League');
+  assert.ok(prompt.includes('King Cup of Champions'), 'Prompt must include King Cup of Champions');
+  assert.ok(prompt.includes('Saudi Super Cup'), 'Prompt must include Saudi Super Cup');
+  assert.ok(prompt.includes('Al-Hilal') && prompt.includes('Al-Nassr'), 'Prompt must reference prominent Saudi clubs');
+});
+
+test('RealFixturesService: SUPPORTED_LEAGUES includes AFC Champions League and Saudi competitions', () => {
+  const leagueCodes = SUPPORTED_LEAGUES.map((l) => l.code);
+  assert.ok(leagueCodes.includes('afc.champions'), 'Must support AFC Champions League Elite');
+  assert.ok(leagueCodes.includes('afc.cup'), 'Must support AFC Champions League Two');
+  assert.ok(leagueCodes.includes('ksa.1'), 'Must support Saudi Pro League');
 });

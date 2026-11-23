@@ -50,6 +50,16 @@ export class MockAIService implements IAIService {
       },
       {
         id: `mock_game_4_${dateStr}`,
+        homeTeam: 'Al-Ahli',
+        homeTeamLogo: 'https://images.fotmob.com/image_resources/logo/teamlogo/8583.png',
+        awayTeam: 'Al-Ittihad',
+        awayTeamLogo: 'https://images.fotmob.com/image_resources/logo/teamlogo/8243.png',
+        competition: 'AFC Champions League',
+        competitionLogo: 'https://images.fotmob.com/image_resources/logo/leaguelogo/206.png',
+        kickoffTime: `${dateStr}T17:00:00Z`
+      },
+      {
+        id: `mock_game_5_${dateStr}`,
         homeTeam: 'Inter Miami CF',
         homeTeamLogo: 'https://images.fotmob.com/image_resources/logo/teamlogo/1144933.png',
         awayTeam: 'LA Galaxy',

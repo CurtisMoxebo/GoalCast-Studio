@@ -43,8 +43,10 @@ export const SUPPORTED_LEAGUES: LeagueConfig[] = [
   { code: 'ger.dfb_pokal', name: 'DFB-Pokal', priority: 5 },
   { code: 'fra.coupe_de_france', name: 'Coupe de France', priority: 5 },
 
-  // Saudi Arabia Leagues & Cups
+  // Saudi Arabia & Asian Continental Competitions
   { code: 'ksa.1', name: 'Saudi Pro League', priority: 6 },
+  { code: 'afc.champions', name: 'AFC Champions League Elite', priority: 3 },
+  { code: 'afc.cup', name: 'AFC Champions League Two', priority: 4 },
 
   // American Leagues & Competitions
   { code: 'usa.1', name: 'MLS', priority: 7 },

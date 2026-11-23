@@ -16,6 +16,75 @@ import {
 } from '../../constants/bettingRules';
 import { RealFixturesService } from '../fixtures/realFixturesService';
 
+/**
+ * Builds the AI prompt for fetching upcoming match fixtures for a specific date and timezone.
+ * Focuses on major European leagues/cups, Saudi Arabia competitions (Saudi Pro League,
+ * AFC Champions League / AFC Championship, King Cup, Saudi Super Cup), American leagues,
+ * and international tournaments.
+ */
+export function buildUpcomingGamesPrompt(targetDate: string, timezone: string): string {
+  return `
+You are a global football (soccer) fixtures expert with comprehensive real-time knowledge of worldwide football leagues, tournaments, and cups.
+Return a curated list of exciting, popular football match fixtures for the date: "${targetDate}".
+The user is located in timezone: "${timezone}".
+
+Focus on popular fixtures across all major football regions and competitions:
+1. Popular European Leagues & Domestic Cups:
+   - English Premier League, FA Cup, Carabao Cup
+   - Spanish La Liga, Copa del Rey
+   - Italian Serie A, Coppa Italia
+   - German Bundesliga, DFB-Pokal
+   - French Ligue 1, Coupe de France
+   - Portuguese Primeira Liga, Dutch Eredivisie, Turkish Süper Lig, Scottish Premiership
+2. European Continental Competitions:
+   - UEFA Champions League, UEFA Europa League, UEFA Conference League, UEFA Super Cup
+3. Saudi Arabia Competitions & Asian Continental Tournaments:
+   - AFC Champions League / AFC Championship (AFC Champions League Elite, AFC Champions League Two, featuring top Saudi clubs like Al-Hilal, Al-Nassr, Al-Ittihad, Al-Ahli)
+   - Saudi Pro League (Roshn Saudi League)
+   - King Cup of Champions (Saudi King's Cup)
+   - Saudi Super Cup
+   - Saudi Crown Prince Cup
+4. American Leagues & Competitions:
+   - MLS (Major League Soccer), Leagues Cup
+   - Liga MX (Mexico)
+   - CONCACAF Champions Cup
+   - Copa Libertadores, Copa Sudamericana, Copa do Brasil, Argentine Primera División
+5. International Competitions & Qualifiers:
+   - FIFA World Cup / World Cup Qualifiers
+   - UEFA European Championship (Euros) / Qualifiers / UEFA Nations League
+   - Copa América, CONMEBOL World Cup Qualifiers
+   - AFCON (Africa Cup of Nations)
+   - AFC Asian Cup, CONCACAF Gold Cup, International Friendlies
+
+Instructions:
+1. Return real official scheduled match fixtures for "${targetDate}". If no major matches are scheduled on that specific date, return an empty array [].
+2. Prioritize high-profile clashes across European leagues/cups, Saudi Arabia competitions (Saudi Pro League, AFC Champions League/Championship, King Cup, Super Cup), American leagues, and international fixtures.
+3. For every match and team, provide direct public image URLs or badges:
+   - "id": A clean unique ID string (e.g. "match_${targetDate}_1")
+   - "homeTeam": Full official team name (e.g. "Real Madrid", "Al-Hilal", "Arsenal", "Al-Nassr")
+   - "homeTeamLogo": A direct, publicly accessible HTTPS PNG or JPG image URL to fetch the home team's crest (use direct PNG links like FotMob "https://images.fotmob.com/image_resources/logo/teamlogo/{id}.png" or official club/federation PNG logos)
+   - "awayTeam": Full official team name (e.g. "Barcelona", "Al-Ahli", "Chelsea", "Al-Ittihad")
+   - "awayTeamLogo": A direct, publicly accessible HTTPS PNG or JPG image URL to fetch the away team's crest
+   - "competition": Full competition name (e.g. "AFC Champions League", "Saudi Pro League", "Premier League", "UEFA Champions League", "King Cup")
+   - "competitionLogo": A direct, publicly accessible HTTPS PNG image URL to fetch the competition logo (e.g. "https://images.fotmob.com/image_resources/logo/leaguelogo/{id}.png")
+   - "kickoffTime": Estimated ISO 8601 string for kickoff time in UTC or local timezone (e.g. "${targetDate}T18:00:00Z")
+
+Respond ONLY with a valid JSON array adhering strictly to this schema:
+[
+  {
+    "id": "match_1",
+    "homeTeam": "Al-Hilal",
+    "homeTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/8584.png",
+    "awayTeam": "Al-Nassr",
+    "awayTeamLogo": "https://images.fotmob.com/image_resources/logo/teamlogo/8244.png",
+    "competition": "AFC Champions League",
+    "competitionLogo": "https://images.fotmob.com/image_resources/logo/leaguelogo/206.png",
+    "kickoffTime": "${targetDate}T18:00:00Z"
+  }
+]
+`;
+}
+
 export class GeminiAIService implements IAIService {
   public readonly providerName = 'gemini';
   private aiClient: GoogleGenAI | null = null;
@@ -46,9 +115,10 @@ export class GeminiAIService implements IAIService {
   /**
    * Fetch all real official scheduled football fixtures for targetDate across
    * European leagues & cups, European continental tournaments, American leagues & cups,
-   * Saudi Pro League, and International tournaments.
-   * If no games are scheduled, returns an empty array [].
-   * If fetching fails, throws an error.
+   * Saudi Arabia competitions (Saudi Pro League, AFC Champions League/Championship, King Cup, Saudi Super Cup),
+   * and International tournaments.
+   * If ESPN official fixtures has results, returns them; otherwise queries Gemini AI
+   * with a comprehensive prompt focusing on Saudi Arabia competitions and major leagues.
    */
   async fetchUpcomingGames(targetDate: string, timezone: string): Promise<UpcomingGame[]> {
     console.log(`[GeminiAIService] 🌐 Fetching all real official match fixtures for ${targetDate} (timezone: ${timezone})...`);
@@ -61,15 +131,76 @@ export class GeminiAIService implements IAIService {
         });
         return realMatches;
       }
+    } catch (e: any) {
+      console.warn('[GeminiAIService] RealFixturesService lookup failed, continuing with Gemini AI:', e?.message || e);
+    }
 
-      if (process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'))) {
-        const { MockAIService } = require('./mockAiService');
-        const mock = new MockAIService();
-        return mock.fetchUpcomingGames(targetDate, timezone);
+    if (process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'))) {
+      const { MockAIService } = require('./mockAiService');
+      const mock = new MockAIService();
+      return mock.fetchUpcomingGames(targetDate, timezone);
+    }
+
+    const prompt = buildUpcomingGamesPrompt(targetDate, timezone);
+    console.log(`[GeminiAIService] 🤖 Calling Gemini model "${this.modelName}" for upcoming fixtures on ${targetDate}...`);
+
+    try {
+      const ai = this.getClient();
+      const response = await ai.models.generateContent({
+        model: this.modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1
+        }
+      });
+
+      const text = (response.text || '[]').trim();
+      console.log(`[GeminiAIService] 📥 Full AI Fixtures Response (${text.length} chars):\n${text}\n`);
+      let parsed: any[] = [];
+      try {
+        parsed = JSON.parse(text);
+      } catch (parseErr) {
+        console.error('[GeminiAIService] Failed to parse JSON response:', text);
+        return [];
       }
 
-      console.log(`[GeminiAIService] ℹ No official scheduled matches found for ${targetDate}. Returning empty array.`);
-      return [];
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return [];
+      }
+
+      const formatLogoUrl = (url: any): string => {
+        if (!url || typeof url !== 'string' || !url.startsWith('http')) return '';
+        if (url.includes('upload.wikimedia.org') && url.endsWith('.svg')) {
+          const parts = url.split('/');
+          const filename = parts[parts.length - 1];
+          return (
+            url.replace('upload.wikimedia.org/wikipedia/', 'upload.wikimedia.org/wikipedia/thumb/') +
+            `/240px-${filename}.png`
+          );
+        }
+        return url;
+      };
+
+      return parsed.map((item: any, index: number) => {
+        const homeTeam = String(item.homeTeam || 'Home Team').trim();
+        const awayTeam = String(item.awayTeam || 'Away Team').trim();
+        const competition = String(item.competition || 'Football Match').trim();
+        const homeLogo = formatLogoUrl(item.homeTeamLogo);
+        const awayLogo = formatLogoUrl(item.awayTeamLogo);
+        const compLogo = formatLogoUrl(item.competitionLogo);
+
+        return {
+          id: item.id || `game_${targetDate}_${index}_${Date.now()}`,
+          homeTeam,
+          homeTeamLogo: homeLogo,
+          awayTeam,
+          awayTeamLogo: awayLogo,
+          competition,
+          competitionLogo: compLogo,
+          kickoffTime: item.kickoffTime || `${targetDate}T18:00:00Z`
+        };
+      });
     } catch (err: any) {
       console.error('[GeminiAIService] fetchUpcomingGames failed:', err?.message || err);
       if (
