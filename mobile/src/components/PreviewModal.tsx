@@ -526,25 +526,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             {/* Video Player */}
             <VideoPlayerComponent videoUri={localVideoUri} />
 
-            {/* Post-Accept View: Single Master Action Button & Schedule Summary */}
+            {/* Post-Accept View: Single Master Action Button */}
             {isAccepted ? (
               <View style={styles.socialShareArea}>
-                {scheduledPostTime ? (
-                  <View style={styles.scheduleBadgeContainer}>
-                    <Ionicons name="time" size={16} color={THEME.colors.primary} />
-                    <Text style={styles.scheduleBadgeText}>
-                      Scheduled for: {new Date(scheduledPostTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at {new Date(scheduledPostTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[styles.scheduleBadgeContainer, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
-                    <Ionicons name="flash" size={16} color="#10b981" />
-                    <Text style={[styles.scheduleBadgeText, { color: '#10b981' }]}>
-                      Instant Post: Publishing immediately
-                    </Text>
-                  </View>
-                )}
-
                 <TouchableOpacity
                   style={styles.scheduleAllBtn}
                   onPress={() => setIsPlatformPickerVisible(true)}
@@ -1042,24 +1026,6 @@ const styles = StyleSheet.create({
     color: '#f87171',
     fontSize: 16,
     marginBottom: 16
-  },
-  scheduleBadgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)'
-  },
-  scheduleBadgeText: {
-    color: '#10b981',
-    fontSize: 12,
-    fontWeight: '700',
-    marginLeft: 6
   },
   scheduleAllBtn: {
     flexDirection: 'row',
