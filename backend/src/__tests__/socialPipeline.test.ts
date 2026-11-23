@@ -265,7 +265,7 @@ test('Instagram Reels Publisher: performs full 4-phase container creation, polli
 
   try {
     let pollCount = 0;
-    (globalThis as any).fetch = async (url: string, init?: any) => {
+    (globalThis as any).fetch = async (url: any) => {
       const urlStr = url.toString();
       calls.push(urlStr);
       if (urlStr.includes('/thumbnails')) {
@@ -357,7 +357,7 @@ test('Facebook Reels Publisher: performs full 4-phase start, upload, finish, pol
     process.env.FB_PAGE_ID = 'test_fb_page_123';
     process.env.FB_PAGE_ACCESS_TOKEN = 'test_fb_page_token_abc';
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    (globalThis as any).fetch = async (input: any, init?: any) => {
       const urlStr = input.toString();
       calls.push(urlStr);
 
@@ -449,7 +449,7 @@ test('YouTube Shorts Publisher: uploads custom thumbnail frame and surfaces phon
     process.env.YOUTUBE_CLIENT_SECRET = 'test_yt_client_secret';
     process.env.YOUTUBE_REFRESH_TOKEN = 'test_yt_refresh_token';
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    (globalThis as any).fetch = async (input: any) => {
       const urlStr = input.toString();
       calls.push(urlStr);
 
