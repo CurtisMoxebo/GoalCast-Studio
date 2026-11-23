@@ -40,7 +40,39 @@ export class TikTokPublisher implements ISocialPublisher {
     log(`[TikTok] Initializing TikTok scheduled upload for group "${options.groupId}" (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
 
     const clientKey = process.env.TIKTOK_CLIENT_KEY || '';
-    const accessToken = this.getAccessToken();
+    let accessToken = this.getAccessToken();
+
+    // If access token is missing locally, attempt to auto-sync from production server
+    if (!accessToken && clientKey && process.env.NODE_ENV !== 'test') {
+      try {
+        const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
+        log(`[TikTok] Access token not found locally. Attempting to fetch from remote server (${publicBase}/api/social/tiktok/token)...`);
+        const syncRes = await fetch(`${publicBase}/api/social/tiktok/token`);
+        if (syncRes.ok) {
+          const syncData = (await syncRes.json()) as any;
+          if (syncData.accessToken) {
+            accessToken = syncData.accessToken;
+            process.env.TIKTOK_ACCESS_TOKEN = accessToken;
+            if (syncData.refreshToken) process.env.TIKTOK_REFRESH_TOKEN = syncData.refreshToken;
+            log(`[TikTok] ✅ Successfully auto-synced live TikTok token from remote server!`);
+            try {
+              const tokensPath = path.join(process.cwd(), 'social_tokens.json');
+              const existing = fs.existsSync(tokensPath) ? JSON.parse(fs.readFileSync(tokensPath, 'utf8')) : {};
+              existing.tiktok = {
+                accessToken,
+                refreshToken: syncData.refreshToken,
+                savedAt: new Date().toISOString()
+              };
+              fs.writeFileSync(tokensPath, JSON.stringify(existing, null, 2));
+            } catch (diskErr: any) {
+              logWarn(`[TikTok] Notice: Could not save synced token to disk: ${diskErr.message}`);
+            }
+          }
+        }
+      } catch (syncErr: any) {
+        logWarn(`[TikTok] Token sync attempt from remote server failed: ${syncErr.message}`);
+      }
+    }
 
     log(`[TikTok] Credential check: TIKTOK_CLIENT_KEY=${clientKey ? `Found (${clientKey})` : 'MISSING'}, TIKTOK_ACCESS_TOKEN=${accessToken ? `Found (${accessToken.substring(0, 8)}...len=${accessToken.length})` : 'MISSING'}`);
 

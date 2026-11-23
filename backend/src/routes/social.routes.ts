@@ -306,17 +306,32 @@ router.get('/tiktok/callback', async (req: Request, res: Response): Promise<void
           <title>TikTok Connected!</title>
           <style>
             body { font-family: -apple-system, sans-serif; text-align: center; padding: 60px 20px; background: #0f172a; color: #f8fafc; }
-            .card { background: #1e293b; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 16px; border: 1px solid #334155; }
+            .card { background: #1e293b; max-width: 540px; margin: 0 auto; padding: 40px; border-radius: 16px; border: 1px solid #334155; }
             h1 { color: #10b981; margin-bottom: 12px; }
             p { color: #94a3b8; font-size: 1.1rem; line-height: 1.6; }
             .badge { display: inline-block; padding: 6px 14px; background: #064e3b; color: #34d399; border-radius: 9999px; font-weight: 600; margin-top: 15px; }
+            .token-box { margin-top: 25px; text-align: left; background: #0f172a; padding: 18px; border-radius: 10px; border: 1px solid #334155; }
+            .token-label { font-size: 0.9rem; color: #38bdf8; font-weight: 600; margin-bottom: 8px; }
+            .token-row { display: flex; gap: 8px; }
+            .token-input { flex: 1; background: #1e293b; color: #f1f5f9; border: 1px solid #475569; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; }
+            .copy-btn { background: #10b981; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+            .copy-btn:hover { background: #059669; }
           </style>
         </head>
         <body>
           <div class="card">
             <h1>🎉 TikTok Connected Successfully!</h1>
-            <p>GoalCast Studio is now fully authorized to publish scheduled videos directly to your TikTok account.</p>
+            <p>GoalCast Studio is now authorized to publish videos directly to your TikTok account.</p>
             <div class="badge">Status: Live & Authenticated</div>
+
+            <div class="token-box">
+              <div class="token-label">🔑 Local Development Access Token:</div>
+              <p style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 10px 0;">If you run GoalCast Studio locally on localhost, paste this in your local <code>backend/.env</code>:</p>
+              <div class="token-row">
+                <input id="tokenField" class="token-input" value="TIKTOK_ACCESS_TOKEN=${accessToken}" readonly />
+                <button class="copy-btn" onclick="navigator.clipboard.writeText('TIKTOK_ACCESS_TOKEN=${accessToken}'); this.innerText='Copied!';">Copy</button>
+              </div>
+            </div>
           </div>
         </body>
         </html>
@@ -340,6 +355,37 @@ router.get('/tiktok/callback', async (req: Request, res: Response): Promise<void
       </html>
     `);
   }
+});
+
+/**
+ * GET /api/social/tiktok/token
+ * Returns the active TikTok access token stored on the server (for local dev sync)
+ */
+router.get('/tiktok/token', (_req: Request, res: Response): void => {
+  let accessToken = process.env.TIKTOK_ACCESS_TOKEN || '';
+  let refreshToken = process.env.TIKTOK_REFRESH_TOKEN || '';
+
+  if (!accessToken) {
+    try {
+      const tokensPath = path.join(process.cwd(), 'social_tokens.json');
+      if (fs.existsSync(tokensPath)) {
+        const data = JSON.parse(fs.readFileSync(tokensPath, 'utf8'));
+        accessToken = data.tiktok?.accessToken || '';
+        refreshToken = data.tiktok?.refreshToken || '';
+      }
+    } catch {}
+  }
+
+  if (!accessToken) {
+    res.status(404).json({ success: false, error: 'No TikTok token found on server' });
+    return;
+  }
+
+  res.json({
+    success: true,
+    accessToken,
+    refreshToken
+  });
 });
 
 /**
