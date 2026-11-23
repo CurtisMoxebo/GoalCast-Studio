@@ -545,57 +545,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   </View>
                 )}
 
-                {/* Platform Quick Selection Pills */}
-                <View style={styles.platformPillsContainer}>
-                  <View style={styles.platformPillsHeader}>
-                    <Text style={styles.platformPillsTitle}>
-                      Target Platforms ({selectedPlatforms.length}/{AVAILABLE_SOCIAL_PLATFORMS.length})
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => setIsPlatformPickerVisible(true)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={styles.platformPillsEditLink}>Choose Platforms</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.platformPillsRow}>
-                    {AVAILABLE_SOCIAL_PLATFORMS.map((platform) => {
-                      const isSelected = selectedPlatforms.includes(platform.id);
-                      return (
-                        <TouchableOpacity
-                          key={platform.id}
-                          style={[
-                            styles.platformPill,
-                            isSelected && styles.platformPillSelected
-                          ]}
-                          onPress={() => togglePlatform(platform.id)}
-                          activeOpacity={0.7}
-                        >
-                          <Image source={platform.icon} style={styles.platformPillIcon} resizeMode="contain" />
-                          <Text
-                            style={[
-                              styles.platformPillText,
-                              isSelected && styles.platformPillTextSelected
-                            ]}
-                          >
-                            {platform.name.split(' ')[0]}
-                          </Text>
-                          <Ionicons
-                            name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
-                            size={14}
-                            color={isSelected ? '#10b981' : '#64748b'}
-                          />
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
                 <TouchableOpacity
-                  style={[
-                    styles.scheduleAllBtn,
-                    selectedPlatforms.length === 0 && styles.scheduleAllBtnDisabled
-                  ]}
+                  style={styles.scheduleAllBtn}
                   onPress={() => setIsPlatformPickerVisible(true)}
                   activeOpacity={0.85}
                   disabled={isPipelineRunning}
@@ -603,8 +554,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   <Ionicons name={scheduledPostTime ? "rocket" : "flash"} size={20} color="#020617" style={{ marginRight: 8 }} />
                   <Text style={styles.scheduleAllBtnText}>
                     {scheduledPostTime
-                      ? `🚀 Schedule Post to Social Media (${selectedPlatforms.length})`
-                      : `⚡ Post to Social Media (${selectedPlatforms.length})`}
+                      ? '🚀 Schedule Post to Social Media'
+                      : '⚡ Post to Social Media'}
                   </Text>
                 </TouchableOpacity>
 
@@ -1309,65 +1260,6 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
     fontWeight: '500'
-  },
-  // Platform Quick Selection Pills
-  platformPillsContainer: {
-    marginBottom: 14
-  },
-  platformPillsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  platformPillsTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#94a3b8'
-  },
-  platformPillsEditLink: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.primary
-  },
-  platformPillsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'space-between'
-  },
-  platformPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1e293b',
-    paddingVertical: 7,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#334155'
-  },
-  platformPillSelected: {
-    borderColor: 'rgba(245, 158, 11, 0.6)',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)'
-  },
-  platformPillIcon: {
-    width: 14,
-    height: 14,
-    marginRight: 4
-  },
-  platformPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
-    marginRight: 4
-  },
-  platformPillTextSelected: {
-    color: '#f8fafc'
-  },
-  scheduleAllBtnDisabled: {
-    opacity: 0.45,
-    backgroundColor: '#475569'
   },
   // Platform Selection Picker Modal Styles
   pickerOverlay: {
