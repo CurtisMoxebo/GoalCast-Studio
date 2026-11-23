@@ -433,7 +433,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.modeToggleTitle, isScheduled && styles.modeToggleTitleActive]}>
-                  Schedule Post
+                  Schedule
                 </Text>
                 <Text style={styles.modeToggleSub}>Pick future date &amp; time</Text>
               </View>
@@ -458,7 +458,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.modeToggleTitle, !isScheduled && { color: '#10b981' }]}>
-                  Instant Post
+                  Instant
                 </Text>
                 <Text style={styles.modeToggleSub}>Create &amp; publish now</Text>
               </View>
