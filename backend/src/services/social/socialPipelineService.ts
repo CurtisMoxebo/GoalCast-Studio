@@ -8,7 +8,8 @@ import { YouTubePublisher } from './publishers/youtubePublisher';
 import {
   PublishOptions,
   SocialPipelineItemResult,
-  SocialPipelineRunResult
+  SocialPipelineRunResult,
+  ExecutePipelineParams
 } from './types';
 
 export class SocialPipelineService {
@@ -25,18 +26,12 @@ export class SocialPipelineService {
   }
 
   /**
-   * Execute scheduled posting across all registered social media platforms.
+   * Execute scheduled posting across registered social media platforms.
+   * Supports filtering to only the user-selected platforms.
    * If any platform fails, it records the failure, logs the error, and moves to the next platform.
    */
-  public async executePipeline(params: {
-    groupId: string;
-    videoPath: string;
-    description: string;
-    targetDate: string;
-    scheduledPostTime?: Date;
-    thumbnailTimestamp?: number;
-  }): Promise<SocialPipelineRunResult> {
-    const { groupId, videoPath, description, targetDate, scheduledPostTime, thumbnailTimestamp } = params;
+  public async executePipeline(params: ExecutePipelineParams): Promise<SocialPipelineRunResult> {
+    const { groupId, videoPath, description, targetDate, scheduledPostTime, thumbnailTimestamp, platforms: requestedPlatforms } = params;
     const finalThumbTime = typeof thumbnailTimestamp === 'number' && !isNaN(thumbnailTimestamp) ? thumbnailTimestamp : 3.0;
     const pipelineStartTime = Date.now();
 
@@ -52,6 +47,7 @@ export class SocialPipelineService {
     console.log(`[SocialPipeline] 🎯 Group ID: ${groupId}`);
     console.log(`[SocialPipeline] 🎬 Video File: ${videoPath} (${videoSizeMB})`);
     console.log(`[SocialPipeline] 📅 Mode: ${scheduledPostTime ? `SCHEDULED for ${scheduledPostTime.toISOString()}` : 'INSTANT (Immediate Publishing)'}`);
+    console.log(`[SocialPipeline] 📱 Target Platforms: ${requestedPlatforms && requestedPlatforms.length > 0 ? requestedPlatforms.join(', ') : 'All registered platforms'}`);
     console.log(`[SocialPipeline] 🖼️ Thumbnail Timeframe: ${finalThumbTime}s (${Math.round(finalThumbTime * 1000)}ms)`);
     console.log(`[SocialPipeline] 📝 Target Date: ${targetDate}`);
     console.log(`[SocialPipeline] 📄 Caption preview: "${description ? description.replace(/\n/g, ' ').substring(0, 80) : ''}..."`);
@@ -75,9 +71,13 @@ export class SocialPipelineService {
       console.warn('[SocialPipeline] Notice: DB pipeline creation skipped (offline/test mode):', dbErr?.message);
     }
 
-    const publishers = socialPublisherRegistry.getAll();
+    let publishers = socialPublisherRegistry.getAll();
+    if (requestedPlatforms && Array.isArray(requestedPlatforms) && requestedPlatforms.length > 0) {
+      const allowed = new Set(requestedPlatforms);
+      publishers = publishers.filter((p) => allowed.has(p.id));
+    }
     const itemResults: SocialPipelineItemResult[] = [];
-    console.log(`[SocialPipeline] 📋 Registered publishers queue (${publishers.length}): ${publishers.map((p) => p.name).join(', ')}`);
+    console.log(`[SocialPipeline] 📋 Active publishers queue (${publishers.length}): ${publishers.map((p) => p.name).join(', ')}`);
 
     // 2. Execute each platform in sequence
     for (let index = 0; index < publishers.length; index++) {

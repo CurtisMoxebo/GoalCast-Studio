@@ -49,3 +49,13 @@ export interface SocialPipelineRunResult {
   scheduledFor?: Date;
   items: SocialPipelineItemResult[];
 }
+
+export interface ExecutePipelineParams {
+  groupId: string;
+  videoPath: string;
+  description: string;
+  targetDate: string;
+  scheduledPostTime?: Date;
+  thumbnailTimestamp?: number;
+  platforms?: SocialPlatformId[];
+}

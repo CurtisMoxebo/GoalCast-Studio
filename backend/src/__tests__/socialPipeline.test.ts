@@ -250,3 +250,20 @@ test('Social Pipeline: POST /api/social/schedule supports instant posting withou
   // Not 400 (400 would be validation error), 404 means validation passed and searched for video file
   assert.notEqual(res.status, 400, 'Instant post must bypass the 30-minute advance scheduling rule');
 });
+
+test('Social Pipeline: executePipeline filters publishers to only user-selected platforms', async () => {
+  const result = await socialPipelineService.executePipeline({
+    groupId: 'test_selective_platforms',
+    videoPath: 'dummy.mp4',
+    description: 'Selective platform test',
+    targetDate: '2026-11-25',
+    platforms: ['instagram_reels', 'tiktok']
+  });
+
+  assert.equal(result.items.length, 2, 'Should only execute the 2 requested platforms');
+  const platformsRun = result.items.map((i) => i.platform);
+  assert.ok(platformsRun.includes('instagram_reels'));
+  assert.ok(platformsRun.includes('tiktok'));
+  assert.equal(platformsRun.includes('facebook_reels'), false);
+  assert.equal(platformsRun.includes('youtube_shorts'), false);
+});

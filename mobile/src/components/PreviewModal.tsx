@@ -34,6 +34,45 @@ const SOCIAL_ICONS: Record<SocialPlatform, any> = {
   youtube: require('../../assets/icons/youtube.png')
 };
 
+export interface SocialPlatformConfig {
+  id: string;
+  name: string;
+  subtitle: string;
+  icon: any;
+  color: string;
+}
+
+export const AVAILABLE_SOCIAL_PLATFORMS: SocialPlatformConfig[] = [
+  {
+    id: 'facebook_reels',
+    name: 'Facebook Reels',
+    subtitle: 'Page Reel · Auto-publish & share to feed',
+    icon: SOCIAL_ICONS.facebook,
+    color: '#1877F2'
+  },
+  {
+    id: 'instagram_reels',
+    name: 'Instagram Reels',
+    subtitle: 'Professional account · Reel container',
+    icon: SOCIAL_ICONS.instagram,
+    color: '#E1306C'
+  },
+  {
+    id: 'tiktok',
+    name: 'TikTok',
+    subtitle: 'Direct post video feed · Public',
+    icon: SOCIAL_ICONS.tiktok,
+    color: '#000000'
+  },
+  {
+    id: 'youtube_shorts',
+    name: 'YouTube Shorts',
+    subtitle: '#Shorts upload · Custom thumbnail timeframe',
+    icon: SOCIAL_ICONS.youtube,
+    color: '#FF0000'
+  }
+];
+
 const VideoPlayerComponent: React.FC<{ videoUri: string }> = ({ videoUri }) => {
   const player = useVideoPlayer(videoUri, (p) => {
     p.loop = true;
@@ -82,7 +121,15 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const [isAccepted, setIsAccepted] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
-  // Social Pipeline State
+  // Social Platform Selection & Pipeline State
+  // By default, they should all be selected
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
+    'facebook_reels',
+    'instagram_reels',
+    'tiktok',
+    'youtube_shorts'
+  ]);
+  const [isPlatformPickerVisible, setIsPlatformPickerVisible] = useState(false);
   const [isPipelineModalVisible, setIsPipelineModalVisible] = useState(false);
   const [isPipelineRunning, setIsPipelineRunning] = useState(false);
   const [pipelineSummary, setPipelineSummary] = useState<string | null>(null);
@@ -103,6 +150,14 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     { platform: 'tiktok', name: 'TikTok', icon: SOCIAL_ICONS.tiktok, color: '#000000', status: 'PENDING' },
     { platform: 'youtube_shorts', name: 'YouTube Shorts', icon: SOCIAL_ICONS.youtube, color: '#FF0000', status: 'PENDING' }
   ]);
+
+  const togglePlatform = (platformId: string) => {
+    setSelectedPlatforms((prev) =>
+      prev.includes(platformId)
+        ? prev.filter((id) => id !== platformId)
+        : [...prev, platformId]
+    );
+  };
 
   // Poll video rendering progress
   useEffect(() => {
@@ -312,23 +367,33 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     });
   };
 
-  // Schedule or Publish All Social Media Handler
-  const handleScheduleAll = async () => {
+  // Schedule or Publish Selected Social Media Handler
+  const handleScheduleAll = async (platformsToRun: string[] = selectedPlatforms) => {
     const targetGroupId = groupId || jobId;
     if (!targetGroupId) {
       Alert.alert('Error', 'No prediction group ID found to schedule.');
       return;
     }
 
+    if (!platformsToRun || platformsToRun.length === 0) {
+      Alert.alert('No Platform Selected', 'Please select at least one social media platform to publish to.');
+      return;
+    }
+
     const isInstant = !scheduledPostTime;
 
-    // Reset pipeline state
-    setPipelineItems([
-      { platform: 'facebook_reels', name: 'Facebook Reels', icon: SOCIAL_ICONS.facebook, color: '#1877F2', status: 'IN_PROGRESS' },
-      { platform: 'instagram_reels', name: 'Instagram Reels', icon: SOCIAL_ICONS.instagram, color: '#E1306C', status: 'PENDING' },
-      { platform: 'tiktok', name: 'TikTok', icon: SOCIAL_ICONS.tiktok, color: '#000000', status: 'PENDING' },
-      { platform: 'youtube_shorts', name: 'YouTube Shorts', icon: SOCIAL_ICONS.youtube, color: '#FF0000', status: 'PENDING' }
-    ]);
+    // Reset pipeline state strictly for selected platforms
+    const initialItems = AVAILABLE_SOCIAL_PLATFORMS
+      .filter((p) => platformsToRun.includes(p.id))
+      .map((p, idx) => ({
+        platform: p.id,
+        name: p.name,
+        icon: p.icon,
+        color: p.color,
+        status: (idx === 0 ? 'IN_PROGRESS' : 'PENDING') as const
+      }));
+
+    setPipelineItems(initialItems);
     setPipelineSummary(null);
     setIsPipelineModalVisible(true);
     setIsPipelineRunning(true);
@@ -339,7 +404,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         scheduledPostTime: scheduledPostTime || undefined,
         isInstant,
         description,
-        thumbnailTimestamp
+        thumbnailTimestamp,
+        platforms: platformsToRun
       });
 
       if (res.pipeline?.items && Array.isArray(res.pipeline.items)) {
@@ -370,11 +436,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         const failedCount = res.pipeline.items.filter((i: any) => i.status === 'FAILED').length;
 
         if (liveCount > 0 && failedCount === 0 && simulatedCount === 0) {
-          setPipelineSummary(`✅ All ${liveCount} Platforms Scheduled Live!`);
+          setPipelineSummary(`✅ All ${liveCount} Selected Platforms Scheduled Live!`);
         } else if (liveCount > 0 && simulatedCount > 0) {
           setPipelineSummary(`${liveCount} Live Scheduled, ${simulatedCount} Simulated (Missing API Keys)`);
         } else if (simulatedCount > 0 && liveCount === 0) {
-          setPipelineSummary(`⚠️ All Platforms in Simulated Test Mode (Missing API Keys in .env)`);
+          setPipelineSummary(`⚠️ All Selected Platforms in Simulated Test Mode (Missing API Keys in .env)`);
         } else if (failedCount > 0) {
           setPipelineSummary(`⚠️ ${failedCount} Platform(s) Failed to Publish`);
         } else {
@@ -479,15 +545,66 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   </View>
                 )}
 
+                {/* Platform Quick Selection Pills */}
+                <View style={styles.platformPillsContainer}>
+                  <View style={styles.platformPillsHeader}>
+                    <Text style={styles.platformPillsTitle}>
+                      Target Platforms ({selectedPlatforms.length}/{AVAILABLE_SOCIAL_PLATFORMS.length})
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setIsPlatformPickerVisible(true)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={styles.platformPillsEditLink}>Choose Platforms</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.platformPillsRow}>
+                    {AVAILABLE_SOCIAL_PLATFORMS.map((platform) => {
+                      const isSelected = selectedPlatforms.includes(platform.id);
+                      return (
+                        <TouchableOpacity
+                          key={platform.id}
+                          style={[
+                            styles.platformPill,
+                            isSelected && styles.platformPillSelected
+                          ]}
+                          onPress={() => togglePlatform(platform.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Image source={platform.icon} style={styles.platformPillIcon} resizeMode="contain" />
+                          <Text
+                            style={[
+                              styles.platformPillText,
+                              isSelected && styles.platformPillTextSelected
+                            ]}
+                          >
+                            {platform.name.split(' ')[0]}
+                          </Text>
+                          <Ionicons
+                            name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                            size={14}
+                            color={isSelected ? '#10b981' : '#64748b'}
+                          />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
                 <TouchableOpacity
-                  style={styles.scheduleAllBtn}
-                  onPress={handleScheduleAll}
+                  style={[
+                    styles.scheduleAllBtn,
+                    selectedPlatforms.length === 0 && styles.scheduleAllBtnDisabled
+                  ]}
+                  onPress={() => setIsPlatformPickerVisible(true)}
                   activeOpacity={0.85}
                   disabled={isPipelineRunning}
                 >
                   <Ionicons name={scheduledPostTime ? "rocket" : "flash"} size={20} color="#020617" style={{ marginRight: 8 }} />
                   <Text style={styles.scheduleAllBtnText}>
-                    {scheduledPostTime ? '🚀 Schedule Post to All Social Media' : '⚡ Publish Instantly to All Social Media'}
+                    {scheduledPostTime
+                      ? `🚀 Schedule Post to Social Media (${selectedPlatforms.length})`
+                      : `⚡ Post to Social Media (${selectedPlatforms.length})`}
                   </Text>
                 </TouchableOpacity>
 
@@ -543,6 +660,123 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         )}
       </View>
 
+      {/* Platform Selection Modal: user chooses which social media to post on (all selected by default) */}
+      <Modal
+        visible={isPlatformPickerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsPlatformPickerVisible(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerCard}>
+            {/* Header */}
+            <View style={styles.pickerHeader}>
+              <View style={styles.pickerTitleRow}>
+                <Ionicons name="share-social" size={22} color={THEME.colors.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.pickerTitle}>Post to Social Media</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsPlatformPickerVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.pickerSubtitle}>
+              Choose which social media platforms you want to publish your prediction video to:
+            </Text>
+
+            {/* Quick Actions (Select All / Clear) */}
+            <View style={styles.pickerQuickActions}>
+              <Text style={styles.pickerCountBadge}>
+                {selectedPlatforms.length} of {AVAILABLE_SOCIAL_PLATFORMS.length} selected
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (selectedPlatforms.length === AVAILABLE_SOCIAL_PLATFORMS.length) {
+                    setSelectedPlatforms([]);
+                  } else {
+                    setSelectedPlatforms(AVAILABLE_SOCIAL_PLATFORMS.map((p) => p.id));
+                  }
+                }}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Text style={styles.pickerSelectAllBtn}>
+                  {selectedPlatforms.length === AVAILABLE_SOCIAL_PLATFORMS.length ? 'Clear All' : 'Select All'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Platform Options List */}
+            <View style={styles.pickerList}>
+              {AVAILABLE_SOCIAL_PLATFORMS.map((platform) => {
+                const isSelected = selectedPlatforms.includes(platform.id);
+                return (
+                  <TouchableOpacity
+                    key={platform.id}
+                    style={[
+                      styles.pickerItemRow,
+                      isSelected && styles.pickerItemRowSelected
+                    ]}
+                    onPress={() => togglePlatform(platform.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.pickerItemIconWrap, { backgroundColor: platform.color }]}>
+                      <Image source={platform.icon} style={styles.pickerItemIcon} resizeMode="contain" />
+                    </View>
+
+                    <View style={styles.pickerItemContent}>
+                      <Text style={styles.pickerItemTitle}>{platform.name}</Text>
+                      <Text style={styles.pickerItemSubtitle}>{platform.subtitle}</Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.pickerCheckbox,
+                        isSelected && styles.pickerCheckboxSelected
+                      ]}
+                    >
+                      {isSelected && <Ionicons name="checkmark" size={16} color="#020617" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Bottom Action Buttons */}
+            <View style={styles.pickerActionsRow}>
+              <TouchableOpacity
+                style={styles.pickerCancelBtn}
+                onPress={() => setIsPlatformPickerVisible(false)}
+              >
+                <Text style={styles.pickerCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.pickerConfirmBtn,
+                  selectedPlatforms.length === 0 && styles.pickerConfirmBtnDisabled
+                ]}
+                disabled={selectedPlatforms.length === 0}
+                onPress={() => {
+                  setIsPlatformPickerVisible(false);
+                  handleScheduleAll(selectedPlatforms);
+                }}
+              >
+                <Text style={styles.pickerConfirmBtnText}>
+                  {selectedPlatforms.length === 0
+                    ? 'Select at least 1'
+                    : scheduledPostTime
+                      ? `🚀 Schedule (${selectedPlatforms.length})`
+                      : `⚡ Publish Now (${selectedPlatforms.length})`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Live Visual Social Pipeline Progress Modal */}
       <Modal
         visible={isPipelineModalVisible}
@@ -571,7 +805,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             </View>
 
             <Text style={styles.pipelineSubtitle}>
-              Executing sequential fail-safe scheduled publishing across all 4 platforms
+              Executing sequential fail-safe publishing across selected platforms ({pipelineItems.length})
             </Text>
 
             {/* Platform Items List */}
@@ -1075,5 +1309,221 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
     fontWeight: '500'
+  },
+  // Platform Quick Selection Pills
+  platformPillsContainer: {
+    marginBottom: 14
+  },
+  platformPillsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  platformPillsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8'
+  },
+  platformPillsEditLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.primary
+  },
+  platformPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'space-between'
+  },
+  platformPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1e293b',
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  platformPillSelected: {
+    borderColor: 'rgba(245, 158, 11, 0.6)',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)'
+  },
+  platformPillIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 4
+  },
+  platformPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    marginRight: 4
+  },
+  platformPillTextSelected: {
+    color: '#f8fafc'
+  },
+  scheduleAllBtnDisabled: {
+    opacity: 0.45,
+    backgroundColor: '#475569'
+  },
+  // Platform Selection Picker Modal Styles
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  pickerCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#0f172a',
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6
+  },
+  pickerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#f8fafc'
+  },
+  pickerSubtitle: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginBottom: 12,
+    lineHeight: 16
+  },
+  pickerQuickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+    marginBottom: 12
+  },
+  pickerCountBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#38bdf8'
+  },
+  pickerSelectAllBtn: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.primary
+  },
+  pickerList: {
+    gap: 10,
+    marginBottom: 18
+  },
+  pickerItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#334155'
+  },
+  pickerItemRowSelected: {
+    borderColor: 'rgba(245, 158, 11, 0.6)',
+    backgroundColor: 'rgba(30, 41, 59, 0.95)'
+  },
+  pickerItemIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12
+  },
+  pickerItemIcon: {
+    width: 24,
+    height: 24
+  },
+  pickerItemContent: {
+    flex: 1
+  },
+  pickerItemTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#f8fafc',
+    marginBottom: 2
+  },
+  pickerItemSubtitle: {
+    fontSize: 11,
+    color: '#94a3b8'
+  },
+  pickerCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#64748b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10
+  },
+  pickerCheckboxSelected: {
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary
+  },
+  pickerActionsRow: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  pickerCancelBtn: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  pickerCancelBtnText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  pickerConfirmBtn: {
+    flex: 2,
+    backgroundColor: THEME.colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: THEME.colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4
+  },
+  pickerConfirmBtnDisabled: {
+    opacity: 0.45,
+    backgroundColor: '#334155'
+  },
+  pickerConfirmBtnText: {
+    color: '#020617',
+    fontSize: 14,
+    fontWeight: '900'
   }
 });

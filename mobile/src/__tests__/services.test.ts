@@ -342,3 +342,30 @@ test('Mobile Video Settings: Date Time Picker default 19:00 and instant vs sched
   assert.equal(isPostValid(true, validFuture), true, 'Post >= 30 mins must be accepted');
 });
 
+test('Mobile Social Selection: Default platforms include all 4 platforms and support user toggling', () => {
+  const defaultPlatforms = ['facebook_reels', 'instagram_reels', 'tiktok', 'youtube_shorts'];
+  assert.equal(defaultPlatforms.length, 4, 'By default, all 4 platforms must be selected');
+
+  // Verify toggling off and on
+  const toggle = (current: string[], target: string) =>
+    current.includes(target) ? current.filter((p) => p !== target) : [...current, target];
+
+  // Deselect TikTok
+  const withoutTikTok = toggle(defaultPlatforms, 'tiktok');
+  assert.equal(withoutTikTok.includes('tiktok'), false);
+  assert.equal(withoutTikTok.length, 3);
+
+  // Re-select TikTok
+  const restored = toggle(withoutTikTok, 'tiktok');
+  assert.equal(restored.includes('tiktok'), true);
+  assert.equal(restored.length, 4);
+
+  // Deselect all
+  const allDeselected: string[] = [];
+  assert.equal(allDeselected.length, 0);
+
+  // Select all
+  const allSelected = [...defaultPlatforms];
+  assert.equal(allSelected.length, 4);
+});
+

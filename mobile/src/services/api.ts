@@ -109,6 +109,7 @@ export class MobileApiService {
     isInstant?: boolean;
     description?: string;
     thumbnailTimestamp?: number;
+    platforms?: string[];
   }): Promise<{ success: boolean; message: string; pipeline: any }> {
     const res = await fetch(`${this.baseUrl}/api/social/schedule`, {
       method: 'POST',

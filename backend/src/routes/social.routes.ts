@@ -80,7 +80,7 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
   console.log(`[SocialRoutes] 📦 Request Body:`, JSON.stringify(req.body, null, 2));
 
   try {
-    const { groupId, scheduledPostTime, isInstant, description, thumbnailTimestamp } = req.body;
+    const { groupId, scheduledPostTime, isInstant, description, thumbnailTimestamp, platforms } = req.body;
 
     if (!groupId) {
       console.warn('[SocialRoutes] ❌ Rejected: Missing groupId in request body.');
@@ -172,7 +172,8 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       description: finalDesc,
       targetDate,
       scheduledPostTime: scheduledDate,
-      thumbnailTimestamp: finalThumbnailTimestamp ?? 3.0
+      thumbnailTimestamp: finalThumbnailTimestamp ?? 3.0,
+      platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : undefined
     });
 
     const elapsed = Date.now() - reqStart;
