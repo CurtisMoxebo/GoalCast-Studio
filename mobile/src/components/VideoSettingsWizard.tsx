@@ -10,6 +10,7 @@ import {
   PanResponder,
   KeyboardAvoidingView,
   Platform,
+  Modal,
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +36,26 @@ const formatSecondsToMMSS = (sec: number): string => {
   const m = Math.floor(s / 60);
   const remainingS = s % 60;
   return `${String(m).padStart(2, '0')}:${String(remainingS).padStart(2, '0')}`;
+};
+
+const getDefaultScheduledDate = (targetDateStr?: string): Date => {
+  const now = new Date();
+  let baseDate: Date;
+
+  if (targetDateStr && /^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) {
+    const [y, m, d] = targetDateStr.split('-').map(Number);
+    baseDate = new Date(y, m - 1, d, 19, 0, 0, 0);
+  } else {
+    baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0, 0);
+  }
+
+  // If baseDate at 19:00 is less than 30 minutes in the future from now, advance to tomorrow 19:00
+  const diffMinutes = (baseDate.getTime() - now.getTime()) / (1000 * 60);
+  if (diffMinutes < 30) {
+    baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 19, 0, 0, 0);
+  }
+
+  return baseDate;
 };
 
 interface ThumbnailTimeSliderProps {
@@ -162,33 +183,61 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const [thumbnailSeconds, setThumbnailSeconds] = useState(3.0); // 00:03 default
   const [description, setDescription] = useState(defaultDesc);
 
-  // Scheduled Post Time: Defaults to 60 minutes in the future
-  const [scheduledDate, setScheduledDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + 60);
-    return d;
-  });
+  // Option to schedule the post or create it instantly
+  const [isScheduled, setIsScheduled] = useState<boolean>(true);
 
-  // Strict Validation: Must be strictly at least 30 minutes in the future
+  // Scheduled Post Time: Defaults to 19:00
+  const [scheduledDate, setScheduledDate] = useState<Date>(() => getDefaultScheduledDate(targetDate));
+
+  // Custom modal picker state
+  const [isPickerModalVisible, setIsPickerModalVisible] = useState<boolean>(false);
+
+  // Strict Validation: Must be strictly at least 30 minutes in the future if scheduled
   const diffMinutes = useMemo(() => {
     return (scheduledDate.getTime() - Date.now()) / (1000 * 60);
   }, [scheduledDate]);
 
-  const isScheduleValid = diffMinutes >= 29.5;
+  const isScheduleValid = !isScheduled || diffMinutes >= 29.5;
 
-  const applyPreset = (minutesFromNow: number) => {
+  // Next 10 days for rapid day picking
+  const selectableDays = useMemo(() => {
+    const list: { key: string; label: string; subLabel: string; date: Date }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 10; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const isToday = i === 0;
+      const isTomorrow = i === 1;
+      const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : d.toLocaleDateString(undefined, { weekday: 'short' });
+      const subLabel = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      list.push({ key: d.toISOString().split('T')[0], label, subLabel, date: d });
+    }
+    return list;
+  }, []);
+
+  const selectDay = (dayDate: Date) => {
     triggerHaptic();
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + minutesFromNow);
-    setScheduledDate(d);
+    setScheduledDate((prev) => {
+      const d = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), prev.getHours(), prev.getMinutes(), 0, 0);
+      return d;
+    });
   };
 
-  const applyTomorrow = (hour: number) => {
+  const setHour = (h: number) => {
     triggerHaptic();
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(hour, 0, 0, 0);
-    setScheduledDate(d);
+    setScheduledDate((prev) => {
+      const d = new Date(prev);
+      d.setHours(h);
+      return d;
+    });
+  };
+
+  const setMinute = (m: number) => {
+    triggerHaptic();
+    setScheduledDate((prev) => {
+      const d = new Date(prev);
+      d.setMinutes(m);
+      return d;
+    });
   };
 
   const adjustMinutes = (delta: number) => {
@@ -196,11 +245,25 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     setScheduledDate((prev) => new Date(prev.getTime() + delta * 60 * 1000));
   };
 
+  const adjustHours = (delta: number) => {
+    triggerHaptic();
+    setScheduledDate((prev) => new Date(prev.getTime() + delta * 60 * 60 * 1000));
+  };
+
+  const setTimeTo1900 = () => {
+    triggerHaptic();
+    setScheduledDate((prev) => {
+      const d = new Date(prev);
+      d.setHours(19, 0, 0, 0);
+      return d;
+    });
+  };
+
   const handleStartGeneration = () => {
-    if (!isScheduleValid) {
+    if (isScheduled && !isScheduleValid) {
       Alert.alert(
         'Invalid Scheduled Time',
-        'Scheduled post time must be strictly at least 30 minutes in the future for all social networks.'
+        'A post cannot be created within 30 minutes of the current time. Please select a time at least 30 minutes in the future.'
       );
       return;
     }
@@ -210,7 +273,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
       voiceActor: selectedVoice,
       thumbnailTimestamp: thumbnailSeconds,
       description,
-      scheduledPostTime: scheduledDate.toISOString()
+      scheduledPostTime: isScheduled ? scheduledDate.toISOString() : undefined
     });
   };
 
@@ -354,86 +417,303 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           />
         </View>
 
-        {/* 6. Scheduled Post Date & Time Section */}
+        {/* 6. Post Timing: Instant vs DateTime Picker */}
         <View style={styles.section}>
           <View style={styles.scheduleHeaderRow}>
-            <Text style={styles.sectionTitle}>📅 Scheduled Post Time</Text>
-            {isScheduleValid ? (
-              <View style={styles.validBadge}>
-                <Ionicons name="checkmark-circle" size={13} color="#10b981" style={{ marginRight: 4 }} />
-                <Text style={styles.validBadgeText}>Valid ({Math.round(diffMinutes)}m)</Text>
-              </View>
+            <Text style={styles.sectionTitle}>📅 Publishing Time &amp; Schedule</Text>
+            {isScheduled ? (
+              isScheduleValid ? (
+                <View style={styles.validBadge}>
+                  <Ionicons name="checkmark-circle" size={13} color="#10b981" style={{ marginRight: 4 }} />
+                  <Text style={styles.validBadgeText}>Valid ({Math.round(diffMinutes)}m)</Text>
+                </View>
+              ) : (
+                <View style={styles.invalidBadge}>
+                  <Ionicons name="alert-circle" size={13} color="#ef4444" style={{ marginRight: 4 }} />
+                  <Text style={styles.invalidBadgeText}>Must be ≥ 30m</Text>
+                </View>
+              )
             ) : (
-              <View style={styles.invalidBadge}>
-                <Ionicons name="alert-circle" size={13} color="#ef4444" style={{ marginRight: 4 }} />
-                <Text style={styles.invalidBadgeText}>Must be ≥ 30m</Text>
+              <View style={[styles.validBadge, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                <Ionicons name="flash" size={13} color="#10b981" style={{ marginRight: 4 }} />
+                <Text style={styles.validBadgeText}>Instant</Text>
               </View>
             )}
           </View>
           <Text style={styles.sectionSubtitle}>
-            When approved, video will schedule automatically to YouTube, Facebook, Instagram &amp; TikTok.
+            Choose whether to publish immediately upon approval or schedule for a specific date and time.
           </Text>
 
-          {/* Current Scheduled Display Card */}
-          <View style={[styles.scheduleCard, !isScheduleValid && styles.scheduleCardError]}>
-            <Ionicons name="time" size={26} color={isScheduleValid ? THEME.colors.primary : '#ef4444'} />
-            <View style={styles.scheduleTimeInfo}>
-              <Text style={styles.scheduleTimeDisplay}>
-                {scheduledDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at{' '}
-                {scheduledDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-              </Text>
-              <Text style={[styles.scheduleSubText, !isScheduleValid && styles.scheduleSubTextError]}>
-                {isScheduleValid
-                  ? `Scheduled for ~${Math.round(diffMinutes)} minutes from now`
-                  : '⚠️ Strict Rule: Must be strictly at least 30 minutes in the future'}
-              </Text>
-            </View>
+          {/* Schedule vs Instant Toggle Selector */}
+          <View style={styles.modeToggleRow}>
+            <TouchableOpacity
+              style={[styles.modeToggleCard, isScheduled && styles.modeToggleCardActive]}
+              onPress={() => {
+                triggerHaptic();
+                setIsScheduled(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.modeToggleRadio}>
+                {isScheduled && <View style={styles.modeToggleRadioInner} />}
+              </View>
+              <Ionicons
+                name="calendar"
+                size={20}
+                color={isScheduled ? THEME.colors.primary : '#94a3b8'}
+                style={{ marginRight: 8 }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modeToggleTitle, isScheduled && styles.modeToggleTitleActive]}>
+                  Schedule Post
+                </Text>
+                <Text style={styles.modeToggleSub}>Pick future date &amp; time</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modeToggleCard, !isScheduled && styles.modeToggleCardActiveInstant]}
+              onPress={() => {
+                triggerHaptic();
+                setIsScheduled(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.modeToggleRadio, !isScheduled && { borderColor: '#10b981' }]}>
+                {!isScheduled && <View style={[styles.modeToggleRadioInner, { backgroundColor: '#10b981' }]} />}
+              </View>
+              <Ionicons
+                name="flash"
+                size={20}
+                color={!isScheduled ? '#10b981' : '#94a3b8'}
+                style={{ marginRight: 8 }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modeToggleTitle, !isScheduled && { color: '#10b981' }]}>
+                  Instant Post
+                </Text>
+                <Text style={styles.modeToggleSub}>Create &amp; publish now</Text>
+              </View>
+            </TouchableOpacity>
           </View>
 
-          {!isScheduleValid && (
-            <View style={styles.warningBanner}>
-              <Ionicons name="warning" size={16} color="#ef4444" style={{ marginRight: 6 }} />
-              <Text style={styles.warningBannerText}>
-                Scheduled time is too soon. Social networks require at least 30 minutes advance scheduling.
-              </Text>
+          {/* If Instant Selected */}
+          {!isScheduled && (
+            <View style={styles.instantNoticeCard}>
+              <Ionicons name="flash-outline" size={24} color="#10b981" style={{ marginRight: 10 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.instantNoticeTitle}>Instant Post Selected ⚡</Text>
+                <Text style={styles.instantNoticeText}>
+                  Your video will be queued and published immediately to YouTube Shorts, Facebook Reels, Instagram Reels &amp; TikTok once you click Accept.
+                </Text>
+              </View>
             </View>
           )}
 
-          {/* Presets */}
-          <Text style={styles.presetLabel}>Quick Presets:</Text>
-          <View style={styles.presetsRow}>
-            <TouchableOpacity style={styles.presetChip} onPress={() => applyPreset(31)}>
-              <Text style={styles.presetChipText}>+30m</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.presetChip} onPress={() => applyPreset(60)}>
-              <Text style={styles.presetChipText}>+1 Hour</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.presetChip} onPress={() => applyPreset(120)}>
-              <Text style={styles.presetChipText}>+2 Hours</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.presetChip} onPress={() => applyTomorrow(10)}>
-              <Text style={styles.presetChipText}>Tmrw 10 AM</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.presetChip} onPress={() => applyTomorrow(18)}>
-              <Text style={styles.presetChipText}>Tmrw 6 PM</Text>
-            </TouchableOpacity>
-          </View>
+          {/* If Schedule Selected: DateTimePicker Component */}
+          {isScheduled && (
+            <View style={styles.dateTimePickerContainer}>
+              {/* Active Scheduled Date & Time Summary Card */}
+              <TouchableOpacity
+                style={[styles.scheduleCard, !isScheduleValid && styles.scheduleCardError]}
+                onPress={() => setIsPickerModalVisible(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="time" size={28} color={isScheduleValid ? THEME.colors.primary : '#ef4444'} />
+                <View style={styles.scheduleTimeInfo}>
+                  <Text style={styles.scheduleTimeDisplay}>
+                    {scheduledDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at{' '}
+                    {scheduledDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                  <Text style={[styles.scheduleSubText, !isScheduleValid && styles.scheduleSubTextError]}>
+                    {isScheduleValid
+                      ? `~${Math.round(diffMinutes)} minutes from now (Default: 19:00)`
+                      : '⚠️ Strict Rule: A post cannot be created within 30 mins of current time'}
+                  </Text>
+                </View>
+                <View style={styles.editBadge}>
+                  <Ionicons name="create-outline" size={14} color="#94a3b8" />
+                  <Text style={styles.editBadgeText}>Custom</Text>
+                </View>
+              </TouchableOpacity>
 
-          {/* Fine Tuning Controls */}
-          <View style={styles.adjustRow}>
-            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(-15)}>
-              <Text style={styles.adjustBtnText}>-15m</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(15)}>
-              <Text style={styles.adjustBtnText}>+15m</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(-60)}>
-              <Text style={styles.adjustBtnText}>-1h</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(60)}>
-              <Text style={styles.adjustBtnText}>+1h</Text>
-            </TouchableOpacity>
-          </View>
+              {/* 30-min validation error banner */}
+              {!isScheduleValid && (
+                <View style={styles.warningBanner}>
+                  <Ionicons name="warning" size={18} color="#ef4444" style={{ marginRight: 8 }} />
+                  <Text style={styles.warningBannerText}>
+                    A post cannot be created within 30 mins of the current time. Please select a time at least 30 minutes in the future.
+                  </Text>
+                </View>
+              )}
+
+              {/* 1. Date Picker Row */}
+              <Text style={styles.pickerSectionLabel}>📅 Select Date:</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.daysScrollList}
+              >
+                {selectableDays.map((d) => {
+                  const isSelected =
+                    scheduledDate.getFullYear() === d.date.getFullYear() &&
+                    scheduledDate.getMonth() === d.date.getMonth() &&
+                    scheduledDate.getDate() === d.date.getDate();
+
+                  return (
+                    <TouchableOpacity
+                      key={d.key}
+                      style={[styles.dayCard, isSelected && styles.dayCardActive]}
+                      onPress={() => selectDay(d.date)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.dayCardLabel, isSelected && styles.dayCardLabelActive]}>
+                        {d.label}
+                      </Text>
+                      <Text style={[styles.dayCardSub, isSelected && styles.dayCardSubActive]}>
+                        {d.subLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* 2. Time Picker Row (Default 19:00) */}
+              <View style={styles.timePickerHeaderRow}>
+                <Text style={styles.pickerSectionLabel}>🕒 Select Time (Default 19:00):</Text>
+                <TouchableOpacity onPress={setTimeTo1900} style={styles.defaultTimeChip}>
+                  <Ionicons name="star" size={12} color={THEME.colors.primary} style={{ marginRight: 4 }} />
+                  <Text style={styles.defaultTimeChipText}>Reset to 19:00</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Digital Time Dial Display with Steppers */}
+              <View style={styles.digitalClockWrap}>
+                {/* Hour Box */}
+                <View style={styles.clockUnitCol}>
+                  <Text style={styles.clockUnitLabel}>HOUR</Text>
+                  <View style={styles.clockStepperRow}>
+                    <TouchableOpacity
+                      style={styles.stepperArrow}
+                      onPress={() => adjustHours(-1)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="chevron-down" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                    <View style={styles.clockBox}>
+                      <Text style={styles.clockBoxText}>
+                        {String(scheduledDate.getHours()).padStart(2, '0')}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.stepperArrow}
+                      onPress={() => adjustHours(1)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="chevron-up" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Separator */}
+                <Text style={styles.clockColon}>:</Text>
+
+                {/* Minute Box */}
+                <View style={styles.clockUnitCol}>
+                  <Text style={styles.clockUnitLabel}>MINUTE</Text>
+                  <View style={styles.clockStepperRow}>
+                    <TouchableOpacity
+                      style={styles.stepperArrow}
+                      onPress={() => adjustMinutes(-15)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="chevron-down" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                    <View style={styles.clockBox}>
+                      <Text style={styles.clockBoxText}>
+                        {String(scheduledDate.getMinutes()).padStart(2, '0')}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.stepperArrow}
+                      onPress={() => adjustMinutes(15)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="chevron-up" size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* 12-hour AM/PM indicator */}
+                <View style={styles.ampmBadge}>
+                  <Text style={styles.ampmBadgeText}>
+                    {scheduledDate.getHours() >= 12 ? 'PM' : 'AM'}
+                  </Text>
+                  <Text style={styles.ampmSubText}>
+                    {scheduledDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Quick Hour Presets */}
+              <View style={styles.hourPresetsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.hourChip,
+                    scheduledDate.getHours() === 19 && scheduledDate.getMinutes() === 0 && styles.hourChipActive
+                  ]}
+                  onPress={setTimeTo1900}
+                >
+                  <Text
+                    style={[
+                      styles.hourChipText,
+                      scheduledDate.getHours() === 19 && scheduledDate.getMinutes() === 0 && styles.hourChipTextActive
+                    ]}
+                  >
+                    ⭐ 19:00 (Default)
+                  </Text>
+                </TouchableOpacity>
+
+                {[12, 15, 18, 20, 21].map((h) => {
+                  const isActive = scheduledDate.getHours() === h && scheduledDate.getMinutes() === 0;
+                  return (
+                    <TouchableOpacity
+                      key={h}
+                      style={[styles.hourChip, isActive && styles.hourChipActive]}
+                      onPress={() => {
+                        triggerHaptic();
+                        setScheduledDate((prev) => {
+                          const d = new Date(prev);
+                          d.setHours(h, 0, 0, 0);
+                          return d;
+                        });
+                      }}
+                    >
+                      <Text style={[styles.hourChipText, isActive && styles.hourChipTextActive]}>
+                        {h}:00
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Step adjustments */}
+              <View style={styles.adjustRow}>
+                <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(-15)}>
+                  <Text style={styles.adjustBtnText}>-15m</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(15)}>
+                  <Text style={styles.adjustBtnText}>+15m</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(-60)}>
+                  <Text style={styles.adjustBtnText}>-1h</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustMinutes(60)}>
+                  <Text style={styles.adjustBtnText}>+1h</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -465,12 +745,132 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           {isLoading ? (
             <ActivityIndicator color="#020617" size="small" />
           ) : !isScheduleValid ? (
-            <Text style={styles.previewBtnText}>Schedule Time &lt; 30m ⚠️</Text>
+            <Text style={styles.previewBtnText}>Must be ≥ 30m in future ⚠️</Text>
+          ) : isScheduled ? (
+            <Text style={styles.previewBtnText}>Generate &amp; Schedule 📅</Text>
           ) : (
-            <Text style={styles.previewBtnText}>Generate Video ✨</Text>
+            <Text style={styles.previewBtnText}>Generate &amp; Post Instantly ⚡</Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Date & Time Picker Modal */}
+      <Modal
+        visible={isPickerModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsPickerModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Date &amp; Time</Text>
+              <TouchableOpacity onPress={() => setIsPickerModalVisible(false)}>
+                <Ionicons name="close-circle" size={26} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Date selection list */}
+              <Text style={styles.modalSubHeader}>Select Post Date</Text>
+              <View style={styles.modalDaysGrid}>
+                {selectableDays.map((d) => {
+                  const isSelected =
+                    scheduledDate.getFullYear() === d.date.getFullYear() &&
+                    scheduledDate.getMonth() === d.date.getMonth() &&
+                    scheduledDate.getDate() === d.date.getDate();
+
+                  return (
+                    <TouchableOpacity
+                      key={d.key}
+                      style={[styles.modalDayBtn, isSelected && styles.modalDayBtnActive]}
+                      onPress={() => selectDay(d.date)}
+                    >
+                      <Text style={[styles.modalDayBtnLabel, isSelected && styles.modalDayBtnLabelActive]}>
+                        {d.label}
+                      </Text>
+                      <Text style={[styles.modalDayBtnSub, isSelected && styles.modalDayBtnSubActive]}>
+                        {d.subLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Hour Selection 00-23 */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+                <Text style={styles.modalSubHeader}>Hour (00 - 23)</Text>
+                <TouchableOpacity onPress={setTimeTo1900}>
+                  <Text style={{ color: THEME.colors.primary, fontSize: 12, fontWeight: '700' }}>19:00 Default</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
+                {Array.from({ length: 24 }, (_, i) => i).map((h) => {
+                  const isSelected = scheduledDate.getHours() === h;
+                  return (
+                    <TouchableOpacity
+                      key={h}
+                      style={[styles.modalHourBtn, isSelected && styles.modalHourBtnActive]}
+                      onPress={() => setHour(h)}
+                    >
+                      <Text style={[styles.modalHourBtnText, isSelected && styles.modalHourBtnTextActive]}>
+                        {String(h).padStart(2, '0')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Minute Selection 00-55 */}
+              <Text style={[styles.modalSubHeader, { marginTop: 12 }]}>Minute</Text>
+              <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 8, flexWrap: 'wrap' }}>
+                {[0, 15, 30, 45].map((m) => {
+                  const isSelected = scheduledDate.getMinutes() === m;
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.modalMinBtn, isSelected && styles.modalMinBtnActive]}
+                      onPress={() => setMinute(m)}
+                    >
+                      <Text style={[styles.modalMinBtnText, isSelected && styles.modalMinBtnTextActive]}>
+                        :{String(m).padStart(2, '0')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Real-time status in modal */}
+              <View style={[styles.modalStatusBox, !isScheduleValid && styles.modalStatusBoxError]}>
+                <Ionicons
+                  name={isScheduleValid ? 'checkmark-circle' : 'alert-circle'}
+                  size={20}
+                  color={isScheduleValid ? '#10b981' : '#ef4444'}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={[styles.modalStatusText, !isScheduleValid && { color: '#fca5a5' }]}>
+                  {isScheduleValid
+                    ? `Valid: ${scheduledDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at ${scheduledDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+                    : 'A post cannot be created within 30 mins of current time.'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, !isScheduleValid && styles.modalConfirmBtnDisabled]}
+                onPress={() => {
+                  if (!isScheduleValid) {
+                    Alert.alert('Cannot Schedule', 'A post cannot be created within 30 mins of the current time.');
+                    return;
+                  }
+                  setIsPickerModalVisible(false);
+                }}
+              >
+                <Text style={styles.modalConfirmBtnText}>Apply Date &amp; Time</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -891,5 +1291,399 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 13,
     fontWeight: '700'
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14
+  },
+  modeToggleCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#334155'
+  },
+  modeToggleCardActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: 'rgba(234, 179, 8, 0.08)'
+  },
+  modeToggleCardActiveInstant: {
+    borderColor: '#10b981',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)'
+  },
+  modeToggleRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#64748b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8
+  },
+  modeToggleRadioInner: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: THEME.colors.primary
+  },
+  modeToggleTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#94a3b8'
+  },
+  modeToggleTitleActive: {
+    color: THEME.colors.primary
+  },
+  modeToggleSub: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 1
+  },
+  instantNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    marginBottom: 10
+  },
+  instantNoticeTitle: {
+    color: '#10b981',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2
+  },
+  instantNoticeText: {
+    color: '#a7f3d0',
+    fontSize: 12,
+    lineHeight: 16
+  },
+  dateTimePickerContainer: {
+    marginTop: 4
+  },
+  editBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6
+  },
+  editBadgeText: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  pickerSectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#cbd5e1',
+    marginBottom: 8,
+    marginTop: 6
+  },
+  daysScrollList: {
+    gap: 8,
+    paddingBottom: 6
+  },
+  dayCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    minWidth: 70,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  dayCardActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: 'rgba(234, 179, 8, 0.12)'
+  },
+  dayCardLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8'
+  },
+  dayCardLabelActive: {
+    color: THEME.colors.primary
+  },
+  dayCardSub: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2
+  },
+  dayCardSubActive: {
+    color: '#f8fafc',
+    fontWeight: '600'
+  },
+  timePickerHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10
+  },
+  defaultTimeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(234, 179, 8, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  defaultTimeChipText: {
+    color: THEME.colors.primary,
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  digitalClockWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginVertical: 10
+  },
+  clockUnitCol: {
+    alignItems: 'center'
+  },
+  clockUnitLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 1,
+    marginBottom: 4
+  },
+  clockStepperRow: {
+    alignItems: 'center',
+    gap: 4
+  },
+  stepperArrow: {
+    padding: 2
+  },
+  clockBox: {
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    minWidth: 54,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#475569'
+  },
+  clockBoxText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#f8fafc',
+    fontVariant: ['tabular-nums']
+  },
+  clockColon: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: THEME.colors.primary,
+    marginHorizontal: 10,
+    marginTop: 14
+  },
+  ampmBadge: {
+    marginLeft: 16,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    paddingLeft: 14,
+    borderLeftWidth: 1,
+    borderColor: '#334155'
+  },
+  ampmBadgeText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: THEME.colors.primary
+  },
+  ampmSubText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
+    marginTop: 2
+  },
+  hourPresetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10
+  },
+  hourChip: {
+    backgroundColor: '#0f172a',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  hourChipActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: 'rgba(234, 179, 8, 0.12)'
+  },
+  hourChipText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600'
+  },
+  hourChipTextActive: {
+    color: THEME.colors.primary,
+    fontWeight: '800'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end'
+  },
+  modalSheet: {
+    backgroundColor: '#0f172a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderColor: '#1e293b'
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#f8fafc'
+  },
+  modalSubHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94a3b8',
+    marginBottom: 8
+  },
+  modalDaysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  modalDayBtn: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    minWidth: 70,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  modalDayBtnActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: 'rgba(234, 179, 8, 0.15)'
+  },
+  modalDayBtnLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#cbd5e1'
+  },
+  modalDayBtnLabelActive: {
+    color: THEME.colors.primary
+  },
+  modalDayBtnSub: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2
+  },
+  modalDayBtnSubActive: {
+    color: '#f8fafc',
+    fontWeight: '600'
+  },
+  modalHourBtn: {
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  modalHourBtnActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: 'rgba(234, 179, 8, 0.15)'
+  },
+  modalHourBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94a3b8'
+  },
+  modalHourBtnTextActive: {
+    color: THEME.colors.primary
+  },
+  modalMinBtn: {
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  modalMinBtnActive: {
+    borderColor: THEME.colors.primary,
+    backgroundColor: 'rgba(234, 179, 8, 0.15)'
+  },
+  modalMinBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94a3b8'
+  },
+  modalMinBtnTextActive: {
+    color: THEME.colors.primary
+  },
+  modalStatusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 10,
+    padding: 12,
+    marginVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  modalStatusBoxError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.3)'
+  },
+  modalStatusText: {
+    color: '#34d399',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1
+  },
+  modalConfirmBtn: {
+    backgroundColor: THEME.colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 6
+  },
+  modalConfirmBtnDisabled: {
+    opacity: 0.5
+  },
+  modalConfirmBtnText: {
+    color: '#020617',
+    fontSize: 14,
+    fontWeight: '800'
   }
 });

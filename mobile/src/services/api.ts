@@ -105,7 +105,8 @@ export class MobileApiService {
 
   async scheduleSocialPost(payload: {
     groupId: string;
-    scheduledPostTime: string;
+    scheduledPostTime?: string;
+    isInstant?: boolean;
     description?: string;
     thumbnailTimestamp?: number;
   }): Promise<{ success: boolean; message: string; pipeline: any }> {

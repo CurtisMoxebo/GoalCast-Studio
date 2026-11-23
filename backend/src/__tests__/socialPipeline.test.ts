@@ -236,3 +236,17 @@ test('Social Pipeline: Strictly marks simulated publishers as SIMULATED to elimi
   assert.equal(simItem.isSimulated, true);
   assert.ok(simItem.warning?.includes('Missing'));
 });
+
+test('Social Pipeline: POST /api/social/schedule supports instant posting without 30-min restriction', async () => {
+  // When isInstant is true, it proceeds without 30-min validation (returns 404 because video file not found in test, not 400 validation error)
+  const res = await request(app)
+    .post('/api/social/schedule')
+    .send({
+      groupId: 'instant_group_test',
+      isInstant: true,
+      description: 'Instant prediction post'
+    });
+
+  // Not 400 (400 would be validation error), 404 means validation passed and searched for video file
+  assert.notEqual(res.status, 400, 'Instant post must bypass the 30-minute advance scheduling rule');
+});

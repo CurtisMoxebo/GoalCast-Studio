@@ -40,9 +40,9 @@ export class InstagramReelsPublisher implements ISocialPublisher {
 
       const scheduledEpoch = options.scheduledPostTime
         ? Math.floor(options.scheduledPostTime.getTime() / 1000)
-        : Math.floor(Date.now() / 1000) + 45 * 60;
+        : undefined;
 
-      logs.push(`[Instagram] Creating media container with video URL: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms (${thumbSeconds}s), cover URL: ${coverUrl}, scheduled_publish_time: ${scheduledEpoch}...`);
+      logs.push(`[Instagram] Creating media container with video URL: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms (${thumbSeconds}s), cover URL: ${coverUrl}${scheduledEpoch ? `, scheduled_publish_time: ${scheduledEpoch}` : ' (instant publish)'}...`);
       
       const containerParams: Record<string, string> = {
         media_type: 'REELS',
@@ -51,9 +51,11 @@ export class InstagramReelsPublisher implements ISocialPublisher {
         share_to_feed: 'true',
         thumb_offset: thumbOffsetMs.toString(),
         cover_url: coverUrl,
-        scheduled_publish_time: scheduledEpoch.toString(),
         access_token: pageToken
       };
+      if (scheduledEpoch) {
+        containerParams.scheduled_publish_time = scheduledEpoch.toString();
+      }
 
       const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
         method: 'POST',

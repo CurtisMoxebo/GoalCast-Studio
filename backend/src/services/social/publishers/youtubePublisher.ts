@@ -59,12 +59,12 @@ export class YouTubePublisher implements ISocialPublisher {
       // 2. Prepare upload metadata
       const scheduledIso = options.scheduledPostTime
         ? options.scheduledPostTime.toISOString()
-        : new Date(Date.now() + 45 * 60 * 1000).toISOString();
+        : undefined;
 
       const title = `Football Predictions ${options.targetDate} #Shorts`.substring(0, 100);
       const desc = `${options.description || ''}\n\n#Shorts #football #predictions`.trim();
 
-      const metadata = {
+      const metadata: any = {
         snippet: {
           title,
           description: desc,
@@ -72,11 +72,13 @@ export class YouTubePublisher implements ISocialPublisher {
           categoryId: '17' // Sports
         },
         status: {
-          privacyStatus: 'private', // Required by YouTube for scheduled posts
-          publishAt: scheduledIso,
+          privacyStatus: scheduledIso ? 'private' : 'public',
           selfDeclaredMadeForKids: false
         }
       };
+      if (scheduledIso) {
+        metadata.status.publishAt = scheduledIso;
+      }
 
       // 3. Initiate resumable upload session
       logs.push(`[YouTube] Initiating resumable upload session with scheduled publishAt=${scheduledIso}...`);

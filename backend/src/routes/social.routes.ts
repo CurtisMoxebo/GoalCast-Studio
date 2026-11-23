@@ -74,32 +74,33 @@ function resolveVideoPath(groupId: string): string | null {
  */
 router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { groupId, scheduledPostTime, description, thumbnailTimestamp } = req.body;
+    const { groupId, scheduledPostTime, isInstant, description, thumbnailTimestamp } = req.body;
 
     if (!groupId) {
       res.status(400).json({ error: 'Missing groupId in request body.' });
       return;
     }
 
-    if (!scheduledPostTime) {
-      res.status(400).json({ error: 'Missing scheduledPostTime in request body.' });
-      return;
-    }
+    const isInstantMode = Boolean(isInstant || scheduledPostTime === 'instant' || !scheduledPostTime);
+    let scheduledDate: Date | undefined = undefined;
 
-    const scheduledDate = new Date(scheduledPostTime);
-    if (isNaN(scheduledDate.getTime())) {
-      res.status(400).json({ error: 'Invalid scheduledPostTime date format.' });
-      return;
-    }
+    if (!isInstantMode) {
+      const parsedDate = new Date(scheduledPostTime);
+      if (isNaN(parsedDate.getTime())) {
+        res.status(400).json({ error: 'Invalid scheduledPostTime date format.' });
+        return;
+      }
 
-    // Strict validation: must be at least 30 minutes in the future
-    const now = Date.now();
-    const diffMinutes = (scheduledDate.getTime() - now) / (1000 * 60);
-    if (diffMinutes < 29.5) {
-      res.status(400).json({
-        error: 'Scheduled post date & time must be at least 30 minutes in the future.'
-      });
-      return;
+      // Strict validation: must be at least 30 minutes in the future
+      const now = Date.now();
+      const diffMinutes = (parsedDate.getTime() - now) / (1000 * 60);
+      if (diffMinutes < 29.5) {
+        res.status(400).json({
+          error: 'Scheduled post date & time must be at least 30 minutes in the future.'
+        });
+        return;
+      }
+      scheduledDate = parsedDate;
     }
 
     // Resolve group details from DB or fallbacks
@@ -123,10 +124,10 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
           finalThumbnailTimestamp = group.thumbnailTimestamp;
         }
 
-        // Persist scheduledPostTime on group
+        // Persist scheduledPostTime on group (null if instant)
         await prisma.predictionGroup.update({
           where: { id: groupId },
-          data: { scheduledPostTime: scheduledDate }
+          data: { scheduledPostTime: scheduledDate ?? null }
         });
       }
     } catch {}
@@ -151,7 +152,9 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
 
     res.json({
       success: true,
-      message: 'Social media scheduled posting pipeline completed',
+      message: scheduledDate
+        ? 'Social media scheduled posting pipeline completed'
+        : 'Social media instant posting pipeline completed',
       pipeline: pipelineResult
     });
   } catch (error: any) {

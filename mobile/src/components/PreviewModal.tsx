@@ -261,7 +261,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         if (Platform.OS === 'android') {
           try {
             ToastAndroid.show('✅ Video saved to your Gallery!', ToastAndroid.LONG);
-          } catch {}
+          } catch { }
         }
         Alert.alert(
           '✅ Video Saved',
@@ -312,7 +312,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     });
   };
 
-  // Schedule All Social Media Handler
+  // Schedule or Publish All Social Media Handler
   const handleScheduleAll = async () => {
     const targetGroupId = groupId || jobId;
     if (!targetGroupId) {
@@ -320,8 +320,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
       return;
     }
 
-    // Default to 60 minutes in future if not provided
-    const targetTime = scheduledPostTime || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const isInstant = !scheduledPostTime;
 
     // Reset pipeline state
     setPipelineItems([
@@ -337,7 +336,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     try {
       const res = await mobileApi.scheduleSocialPost({
         groupId: targetGroupId,
-        scheduledPostTime: targetTime,
+        scheduledPostTime: scheduledPostTime || undefined,
+        isInstant,
         description,
         thumbnailTimestamp
       });
@@ -463,11 +463,18 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             {/* Post-Accept View: Single Master Action Button & Schedule Summary */}
             {isAccepted ? (
               <View style={styles.socialShareArea}>
-                {scheduledPostTime && (
+                {scheduledPostTime ? (
                   <View style={styles.scheduleBadgeContainer}>
                     <Ionicons name="time" size={16} color={THEME.colors.primary} />
                     <Text style={styles.scheduleBadgeText}>
                       Scheduled for: {new Date(scheduledPostTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at {new Date(scheduledPostTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.scheduleBadgeContainer, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                    <Ionicons name="flash" size={16} color="#10b981" />
+                    <Text style={[styles.scheduleBadgeText, { color: '#10b981' }]}>
+                      Instant Post: Publishing immediately
                     </Text>
                   </View>
                 )}
@@ -478,8 +485,10 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   activeOpacity={0.85}
                   disabled={isPipelineRunning}
                 >
-                  <Ionicons name="rocket" size={20} color="#020617" style={{ marginRight: 8 }} />
-                  <Text style={styles.scheduleAllBtnText}>🚀 Schedule Post to All Social Media</Text>
+                  <Ionicons name={scheduledPostTime ? "rocket" : "flash"} size={20} color="#020617" style={{ marginRight: 8 }} />
+                  <Text style={styles.scheduleAllBtnText}>
+                    {scheduledPostTime ? '🚀 Schedule Post to All Social Media' : '⚡ Publish Instantly to All Social Media'}
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity

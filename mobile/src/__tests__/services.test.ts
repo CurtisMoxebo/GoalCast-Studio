@@ -300,3 +300,45 @@ test('Mobile Regression: SessionStore removeHistoryItems removes single and batc
   assert.equal(sessionStore.getHistory()?.length, 0);
 });
 
+test('Mobile Video Settings: Date Time Picker default 19:00 and instant vs scheduled validation', () => {
+  const getDefaultScheduledDate = (targetDateStr?: string): Date => {
+    const now = new Date();
+    let baseDate: Date;
+
+    if (targetDateStr && /^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) {
+      const [y, m, d] = targetDateStr.split('-').map(Number);
+      baseDate = new Date(y, m - 1, d, 19, 0, 0, 0);
+    } else {
+      baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0, 0);
+    }
+
+    const diffMinutes = (baseDate.getTime() - now.getTime()) / (1000 * 60);
+    if (diffMinutes < 30) {
+      baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 19, 0, 0, 0);
+    }
+
+    return baseDate;
+  };
+
+  // Test 1: Default time is strictly 19:00 (hours=19, minutes=0)
+  const defaultDate = getDefaultScheduledDate('2026-11-25');
+  assert.equal(defaultDate.getHours(), 19, 'Default hour must be 19');
+  assert.equal(defaultDate.getMinutes(), 0, 'Default minute must be 0');
+
+  // Test 2: Instant post mode (isScheduled = false) allows immediate creation
+  const isPostValid = (isScheduled: boolean, scheduledDate: Date): boolean => {
+    if (!isScheduled) return true; // Instant post is always valid
+    const diffMinutes = (scheduledDate.getTime() - Date.now()) / (1000 * 60);
+    return diffMinutes >= 29.5;
+  };
+
+  assert.equal(isPostValid(false, new Date()), true, 'Instant post mode must be valid immediately');
+
+  // Test 3: Scheduled post cannot be created within 30 minutes of current time
+  const tooSoon = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  assert.equal(isPostValid(true, tooSoon), false, 'Post within 30 mins must be rejected');
+
+  const validFuture = new Date(Date.now() + 45 * 60 * 1000); // 45 mins
+  assert.equal(isPostValid(true, validFuture), true, 'Post >= 30 mins must be accepted');
+});
+

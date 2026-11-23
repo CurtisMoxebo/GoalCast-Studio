@@ -34,10 +34,10 @@ export class FacebookReelsPublisher implements ISocialPublisher {
       const stat = fs.statSync(options.videoPath);
       const fileSize = stat.size;
 
-      // Calculate Unix timestamp for scheduled publishing (Meta requires seconds)
+      // Calculate Unix timestamp for scheduled publishing if provided (Meta requires seconds)
       const scheduledEpoch = options.scheduledPostTime
         ? Math.floor(options.scheduledPostTime.getTime() / 1000)
-        : Math.floor(Date.now() / 1000) + 45 * 60;
+        : undefined;
 
       // 1. Phase 1: Initialize Reel Upload
       logs.push(`[Facebook] Phase 1: Initializing Reel upload on Page ID ${pageId}...`);
@@ -80,21 +80,25 @@ export class FacebookReelsPublisher implements ISocialPublisher {
       }
       logs.push('[Facebook] Phase 2 upload complete.');
 
-      // 3. Phase 3: Finalize and Schedule Reel
-      logs.push(`[Facebook] Phase 3: Scheduling Reel publish for Unix timestamp ${scheduledEpoch} (thumb_offset: ${thumbOffsetMs}ms / ${thumbSeconds}s)...`);
+      // 3. Phase 3: Finalize and Schedule/Publish Reel
+      logs.push(`[Facebook] Phase 3: Finalizing Reel (${scheduledEpoch ? `Scheduled publish for Unix timestamp ${scheduledEpoch}` : 'Immediate release'})...`);
       const desc = options.description || `Football Predictions ${options.targetDate} #reels #football`;
+      const finishParams: Record<string, string> = {
+        upload_phase: 'finish',
+        access_token: pageToken,
+        video_id: videoId,
+        video_state: scheduledEpoch ? 'SCHEDULED' : 'PUBLISHED',
+        description: desc,
+        thumb_offset: thumbOffsetMs.toString()
+      };
+      if (scheduledEpoch) {
+        finishParams.scheduled_publish_time = scheduledEpoch.toString();
+      }
+
       const finishRes = await fetch(initUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          upload_phase: 'finish',
-          access_token: pageToken,
-          video_id: videoId,
-          video_state: 'SCHEDULED',
-          scheduled_publish_time: scheduledEpoch.toString(),
-          description: desc,
-          thumb_offset: thumbOffsetMs.toString()
-        })
+        body: new URLSearchParams(finishParams)
       });
 
       if (!finishRes.ok) {

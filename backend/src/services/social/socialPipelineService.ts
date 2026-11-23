@@ -32,7 +32,7 @@ export class SocialPipelineService {
     videoPath: string;
     description: string;
     targetDate: string;
-    scheduledPostTime: Date;
+    scheduledPostTime?: Date;
     thumbnailTimestamp?: number;
   }): Promise<SocialPipelineRunResult> {
     const { groupId, videoPath, description, targetDate, scheduledPostTime, thumbnailTimestamp } = params;
@@ -41,7 +41,7 @@ export class SocialPipelineService {
     console.log(`\n================== [Social Pipeline Execution] ==================`);
     console.log(`[SocialPipeline] 🕒 Started at: ${new Date().toISOString()}`);
     console.log(`[SocialPipeline] 🎯 Group ID: ${groupId}`);
-    console.log(`[SocialPipeline] 📅 Scheduled Post Time: ${scheduledPostTime.toISOString()}`);
+    console.log(`[SocialPipeline] 📅 Scheduled Post Time: ${scheduledPostTime ? scheduledPostTime.toISOString() : 'INSTANT (Immediate)'}`);
     console.log(`[SocialPipeline] 🖼️ Thumbnail Timeframe: ${finalThumbTime}s`);
     console.log(`[SocialPipeline] 📝 Target Date: ${targetDate}`);
     console.log(`=================================================================\n`);
@@ -191,7 +191,7 @@ export class SocialPipelineService {
               completedAt
             }
           });
-        } catch {}
+        } catch { }
       }
     }
 
@@ -226,7 +226,7 @@ export class SocialPipelineService {
           completedAt: new Date()
         }
       });
-    } catch {}
+    } catch { }
 
     return {
       pipelineId,
