@@ -166,24 +166,32 @@ test('Social Publishers: All 4 social platforms accept and record the user-speci
     const fb = new FacebookReelsPublisher();
     const fbRes = await fb.publish(options);
     assert.equal(fbRes.success, true);
+    assert.equal(fbRes.isSimulated, true);
+    assert.ok(fbRes.warning?.includes('FB_PAGE'));
     assert.ok(fbRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
 
     // 2. Instagram Reels
     const ig = new InstagramReelsPublisher();
     const igRes = await ig.publish(options);
     assert.equal(igRes.success, true);
+    assert.equal(igRes.isSimulated, true);
+    assert.ok(igRes.warning?.includes('INSTAGRAM'));
     assert.ok(igRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
 
     // 3. TikTok
     const tt = new TikTokPublisher();
     const ttRes = await tt.publish(options);
     assert.equal(ttRes.success, true);
+    assert.equal(ttRes.isSimulated, true);
+    assert.ok(ttRes.warning?.includes('TIKTOK'));
     assert.ok(ttRes.logs.some((l) => l.includes('8.5s') && l.includes('8500ms')));
 
     // 4. YouTube Shorts
     const yt = new YouTubePublisher();
     const ytRes = await yt.publish(options);
     assert.equal(ytRes.success, true);
+    assert.equal(ytRes.isSimulated, true);
+    assert.ok(ytRes.warning?.includes('YOUTUBE'));
     assert.ok(ytRes.logs.some((l) => l.includes('8.5s')));
   } finally {
     // Restore environment
@@ -194,4 +202,37 @@ test('Social Publishers: All 4 social platforms accept and record the user-speci
     if (savedEnv.TIKTOK_CLIENT_KEY) process.env.TIKTOK_CLIENT_KEY = savedEnv.TIKTOK_CLIENT_KEY;
     if (savedEnv.YOUTUBE_CLIENT_ID) process.env.YOUTUBE_CLIENT_ID = savedEnv.YOUTUBE_CLIENT_ID;
   }
+});
+
+test('Social Pipeline: Strictly marks simulated publishers as SIMULATED to eliminate false positives', async () => {
+  const mockSimulated: ISocialPublisher = {
+    id: 'mock_sim_platform' as any,
+    name: 'Mock Staging Platform',
+    publish: async (_opts) => ({
+      success: true,
+      isSimulated: true,
+      warning: 'Missing test API token',
+      platform: 'mock_sim_platform' as any,
+      remotePostId: 'sim_12345',
+      remoteUrl: 'https://example.com/sim_12345',
+      logs: ['Simulated staging run']
+    })
+  };
+
+  socialPublisherRegistry.register(mockSimulated);
+
+  const scheduledPostTime = new Date(Date.now() + 60 * 60 * 1000);
+  const result = await socialPipelineService.executePipeline({
+    groupId: 'test_false_positives_group',
+    videoPath: 'dummy.mp4',
+    description: 'Premier League Matchday #predictions',
+    targetDate: '2026-11-25',
+    scheduledPostTime
+  });
+
+  const simItem = result.items.find((i) => i.platform === ('mock_sim_platform' as any));
+  assert.ok(simItem);
+  assert.equal(simItem.status, 'SIMULATED', 'Simulated platform must have SIMULATED status, never false positive SUCCESS');
+  assert.equal(simItem.isSimulated, true);
+  assert.ok(simItem.warning?.includes('Missing'));
 });

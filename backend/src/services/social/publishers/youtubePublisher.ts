@@ -21,10 +21,12 @@ export class YouTubePublisher implements ISocialPublisher {
       logs.push('[YouTube] ℹ No OAuth credentials found in .env; executing in simulated mode');
       const simulatedId = `yt_sim_${Date.now()}`;
       const remoteUrl = `https://youtube.com/shorts/${simulatedId}`;
-      logs.push(`[YouTube] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl} (thumbnail timeframe: ${thumbSeconds}s)`);
+      logs.push(`[YouTube] ⚠️ Simulated schedule run for ${options.scheduledPostTime?.toISOString() || 'immediate'} (Missing YouTube OAuth credentials): ${remoteUrl}`);
       return {
         success: true,
         platform: this.id,
+        isSimulated: true,
+        warning: 'Missing YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, or YOUTUBE_REFRESH_TOKEN in .env',
         remotePostId: simulatedId,
         remoteUrl,
         logs
@@ -170,6 +172,7 @@ export class YouTubePublisher implements ISocialPublisher {
       return {
         success: true,
         platform: this.id,
+        isSimulated: false,
         remotePostId: videoId,
         remoteUrl,
         logs

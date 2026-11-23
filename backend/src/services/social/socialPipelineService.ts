@@ -64,8 +64,6 @@ export class SocialPipelineService {
 
     const publishers = socialPublisherRegistry.getAll();
     const itemResults: SocialPipelineItemResult[] = [];
-    let hasFailure = false;
-    let hasSuccess = false;
 
     // 2. Execute each platform in sequence
     for (let index = 0; index < publishers.length; index++) {
@@ -111,35 +109,65 @@ export class SocialPipelineService {
 
       const completedAt = new Date();
       if (result.success) {
-        hasSuccess = true;
-        console.log(`[SocialPipeline] ✅ ${publisher.name} SUCCEEDED!`);
-        if (result.remotePostId) console.log(`[SocialPipeline]    Post ID: ${result.remotePostId}`);
-        if (result.remoteUrl) console.log(`[SocialPipeline]    URL: ${result.remoteUrl}`);
+        if (result.isSimulated) {
+          console.log(`[SocialPipeline] ⚠️ ${publisher.name} SIMULATED (missing API credentials in .env)`);
+          if (result.remotePostId) console.log(`[SocialPipeline]    Post ID: ${result.remotePostId}`);
+          if (result.remoteUrl) console.log(`[SocialPipeline]    URL: ${result.remoteUrl}`);
 
-        itemResults.push({
-          platform: publisher.id,
-          platformName: publisher.name,
-          status: 'SUCCESS',
-          remotePostId: result.remotePostId,
-          remoteUrl: result.remoteUrl,
-          logs: result.logs,
-          completedAt
-        });
-
-        try {
-          await prisma.socialPostItem.update({
-            where: { id: itemId },
-            data: {
-              status: 'SUCCESS',
-              remotePostId: result.remotePostId,
-              remoteUrl: result.remoteUrl,
-              logs: result.logs.join('\n'),
-              completedAt
-            }
+          itemResults.push({
+            platform: publisher.id,
+            platformName: publisher.name,
+            status: 'SIMULATED',
+            isSimulated: true,
+            warning: result.warning || 'Executed in simulated staging mode (missing API credentials in .env)',
+            remotePostId: result.remotePostId,
+            remoteUrl: result.remoteUrl,
+            logs: result.logs,
+            completedAt
           });
-        } catch {}
+
+          try {
+            await prisma.socialPostItem.update({
+              where: { id: itemId },
+              data: {
+                status: 'SIMULATED',
+                remotePostId: result.remotePostId,
+                remoteUrl: result.remoteUrl,
+                logs: result.logs.join('\n'),
+                completedAt
+              }
+            });
+          } catch {}
+        } else {
+          console.log(`[SocialPipeline] ✅ ${publisher.name} SUCCEEDED (LIVE POST)!`);
+          if (result.remotePostId) console.log(`[SocialPipeline]    Post ID: ${result.remotePostId}`);
+          if (result.remoteUrl) console.log(`[SocialPipeline]    URL: ${result.remoteUrl}`);
+
+          itemResults.push({
+            platform: publisher.id,
+            platformName: publisher.name,
+            status: 'SUCCESS',
+            isSimulated: false,
+            remotePostId: result.remotePostId,
+            remoteUrl: result.remoteUrl,
+            logs: result.logs,
+            completedAt
+          });
+
+          try {
+            await prisma.socialPostItem.update({
+              where: { id: itemId },
+              data: {
+                status: 'SUCCESS',
+                remotePostId: result.remotePostId,
+                remoteUrl: result.remoteUrl,
+                logs: result.logs.join('\n'),
+                completedAt
+              }
+            });
+          } catch {}
+        }
       } else {
-        hasFailure = true;
         console.error(`[SocialPipeline] ❌ ${publisher.name} FAILED: ${result.error}`);
         console.log(`[SocialPipeline] ⏩ Resilient fail-safe: Continuing to next social platform...`);
 
@@ -147,6 +175,7 @@ export class SocialPipelineService {
           platform: publisher.id,
           platformName: publisher.name,
           status: 'FAILED',
+          isSimulated: false,
           error: result.error,
           logs: result.logs,
           completedAt
@@ -167,16 +196,26 @@ export class SocialPipelineService {
     }
 
     // 3. Finalize pipeline status
-    let finalStatus: 'COMPLETED' | 'PARTIALLY_FAILED' | 'FAILED' = 'COMPLETED';
-    if (hasFailure && hasSuccess) {
+    const liveCount = itemResults.filter((i) => i.status === 'SUCCESS').length;
+    const simulatedCount = itemResults.filter((i) => i.status === 'SIMULATED').length;
+    const failedCount = itemResults.filter((i) => i.status === 'FAILED').length;
+
+    let finalStatus: 'COMPLETED' | 'PARTIALLY_FAILED' | 'FAILED' | 'SIMULATED' = 'COMPLETED';
+    if (failedCount > 0 && liveCount > 0) {
       finalStatus = 'PARTIALLY_FAILED';
-    } else if (hasFailure && !hasSuccess) {
+    } else if (failedCount > 0 && liveCount === 0 && simulatedCount === 0) {
       finalStatus = 'FAILED';
+    } else if (failedCount > 0 && simulatedCount > 0 && liveCount === 0) {
+      finalStatus = 'PARTIALLY_FAILED';
+    } else if (liveCount === 0 && simulatedCount > 0) {
+      finalStatus = 'SIMULATED';
+    } else {
+      finalStatus = 'COMPLETED';
     }
 
     console.log(`\n=================================================================`);
     console.log(`[SocialPipeline] 🏁 Pipeline finished with status: ${finalStatus}`);
-    console.log(`[SocialPipeline] 📊 Summary: ${itemResults.filter((i) => i.status === 'SUCCESS').length}/${publishers.length} succeeded`);
+    console.log(`[SocialPipeline] 📊 Summary: ${liveCount} live, ${simulatedCount} simulated, ${failedCount} failed`);
     console.log(`=================================================================\n`);
 
     try {
@@ -193,6 +232,9 @@ export class SocialPipelineService {
       pipelineId,
       groupId,
       status: finalStatus,
+      liveCount,
+      simulatedCount,
+      failedCount,
       scheduledFor: scheduledPostTime,
       items: itemResults
     };
@@ -213,10 +255,12 @@ export class SocialPipelineService {
 
       const items: SocialPipelineItemResult[] = pipeline.items.map((item) => {
         const pub = socialPublisherRegistry.get(item.platform);
+        const isSimulated = item.status === 'SIMULATED';
         return {
           platform: item.platform as any,
           platformName: pub ? pub.name : item.platform,
           status: item.status as any,
+          isSimulated,
           remotePostId: item.remotePostId || undefined,
           remoteUrl: item.remoteUrl || undefined,
           error: item.error || undefined,

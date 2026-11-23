@@ -18,10 +18,12 @@ export class FacebookReelsPublisher implements ISocialPublisher {
       logs.push('[Facebook] ℹ No FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN found in .env; executing in simulated mode');
       const simulatedId = `fb_reel_sim_${Date.now()}`;
       const remoteUrl = `https://www.facebook.com/reel/${simulatedId}`;
-      logs.push(`[Facebook] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl} (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
+      logs.push(`[Facebook] ⚠️ Simulated schedule run for ${options.scheduledPostTime?.toISOString() || 'immediate'} (Missing FB_PAGE_ID/FB_PAGE_ACCESS_TOKEN): ${remoteUrl}`);
       return {
         success: true,
         platform: this.id,
+        isSimulated: true,
+        warning: 'Missing FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN in .env',
         remotePostId: simulatedId,
         remoteUrl,
         logs
@@ -106,6 +108,7 @@ export class FacebookReelsPublisher implements ISocialPublisher {
       return {
         success: true,
         platform: this.id,
+        isSimulated: false,
         remotePostId: videoId,
         remoteUrl,
         logs

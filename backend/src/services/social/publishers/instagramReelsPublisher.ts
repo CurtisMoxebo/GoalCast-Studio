@@ -17,10 +17,12 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       logs.push('[Instagram] ℹ No INSTAGRAM_ACCOUNT_ID or FB_PAGE_ACCESS_TOKEN found in .env; executing in simulated mode');
       const simulatedId = `ig_reel_sim_${Date.now()}`;
       const remoteUrl = `https://www.instagram.com/reel/${simulatedId}`;
-      logs.push(`[Instagram] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl} (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
+      logs.push(`[Instagram] ⚠️ Simulated schedule run for ${options.scheduledPostTime?.toISOString() || 'immediate'} (Missing INSTAGRAM_ACCOUNT_ID/FB_PAGE_ACCESS_TOKEN): ${remoteUrl}`);
       return {
         success: true,
         platform: this.id,
+        isSimulated: true,
+        warning: 'Missing INSTAGRAM_ACCOUNT_ID or FB_PAGE_ACCESS_TOKEN in .env',
         remotePostId: simulatedId,
         remoteUrl,
         logs
@@ -36,19 +38,27 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       const coverUrl = `${publicBase}/api/video/thumbnail/${options.groupId}`;
       const caption = options.description || `Football Predictions ${options.targetDate} ⚽🔥 #reels #football #predictions #fyp`;
 
-      logs.push(`[Instagram] Creating media container with video URL: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms (${thumbSeconds}s), cover URL: ${coverUrl}...`);
+      const scheduledEpoch = options.scheduledPostTime
+        ? Math.floor(options.scheduledPostTime.getTime() / 1000)
+        : Math.floor(Date.now() / 1000) + 45 * 60;
+
+      logs.push(`[Instagram] Creating media container with video URL: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms (${thumbSeconds}s), cover URL: ${coverUrl}, scheduled_publish_time: ${scheduledEpoch}...`);
+      
+      const containerParams: Record<string, string> = {
+        media_type: 'REELS',
+        video_url: videoPublicUrl,
+        caption,
+        share_to_feed: 'true',
+        thumb_offset: thumbOffsetMs.toString(),
+        cover_url: coverUrl,
+        scheduled_publish_time: scheduledEpoch.toString(),
+        access_token: pageToken
+      };
+
       const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          media_type: 'REELS',
-          video_url: videoPublicUrl,
-          caption,
-          share_to_feed: 'true',
-          thumb_offset: thumbOffsetMs.toString(),
-          cover_url: coverUrl,
-          access_token: pageToken
-        })
+        body: new URLSearchParams(containerParams)
       });
 
       if (!containerRes.ok) {
@@ -68,6 +78,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       return {
         success: true,
         platform: this.id,
+        isSimulated: false,
         remotePostId: containerId,
         remoteUrl,
         logs

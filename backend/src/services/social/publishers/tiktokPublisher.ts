@@ -31,13 +31,15 @@ export class TikTokPublisher implements ISocialPublisher {
 
     // If access token is not yet generated from review OAuth, execute in graceful simulated mode
     if (!accessToken || !clientKey) {
-      logs.push('[TikTok] ℹ Client credentials present; executing in safe staging/simulated mode (pending OAuth token)');
+      logs.push('[TikTok] ℹ Missing TIKTOK_CLIENT_KEY or TIKTOK_ACCESS_TOKEN; executing in simulated mode');
       const simulatedId = `tiktok_post_${Date.now()}`;
       const remoteUrl = `https://www.tiktok.com/@goalcastxi/video/${simulatedId}`;
-      logs.push(`[TikTok] ✅ Simulated schedule success for ${options.scheduledPostTime?.toISOString() || 'immediate'}: ${remoteUrl} (thumbnail timeframe: ${thumbSeconds}s / ${thumbOffsetMs}ms)`);
+      logs.push(`[TikTok] ⚠️ Simulated schedule run for ${options.scheduledPostTime?.toISOString() || 'immediate'} (Missing TikTok credentials): ${remoteUrl}`);
       return {
         success: true,
         platform: this.id,
+        isSimulated: true,
+        warning: 'Missing TIKTOK_CLIENT_KEY or TIKTOK_ACCESS_TOKEN in .env',
         remotePostId: simulatedId,
         remoteUrl,
         logs
@@ -87,6 +89,7 @@ export class TikTokPublisher implements ISocialPublisher {
       return {
         success: true,
         platform: this.id,
+        isSimulated: false,
         remotePostId: publishId,
         remoteUrl,
         logs

@@ -91,7 +91,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     name: string;
     icon: any;
     color: string;
-    status: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED';
+    status: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED' | 'SIMULATED';
+    isSimulated?: boolean;
+    warning?: string;
     remotePostId?: string;
     remoteUrl?: string;
     error?: string;
@@ -345,22 +347,48 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           prev.map((item) => {
             const matched = res.pipeline.items.find((i: any) => i.platform === item.platform);
             if (matched) {
+              const isSim = matched.status === 'SIMULATED' || matched.isSimulated === true;
               return {
                 ...item,
-                status: matched.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+                status: isSim ? 'SIMULATED' : matched.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+                isSimulated: isSim,
+                warning: matched.warning,
                 remotePostId: matched.remotePostId,
                 remoteUrl: matched.remoteUrl,
                 error: matched.error
               };
             }
-            return { ...item, status: 'SUCCESS' };
+            return {
+              ...item,
+              status: 'FAILED',
+              error: 'Platform skipped or not processed by pipeline'
+            };
           })
         );
-        const successCount = res.pipeline.items.filter((i: any) => i.status === 'SUCCESS').length;
-        setPipelineSummary(`${successCount}/${res.pipeline.items.length} Platforms Scheduled Successfully!`);
+        const liveCount = res.pipeline.items.filter((i: any) => i.status === 'SUCCESS' && !i.isSimulated).length;
+        const simulatedCount = res.pipeline.items.filter((i: any) => i.status === 'SIMULATED' || i.isSimulated).length;
+        const failedCount = res.pipeline.items.filter((i: any) => i.status === 'FAILED').length;
+
+        if (liveCount > 0 && failedCount === 0 && simulatedCount === 0) {
+          setPipelineSummary(`✅ All ${liveCount} Platforms Scheduled Live!`);
+        } else if (liveCount > 0 && simulatedCount > 0) {
+          setPipelineSummary(`${liveCount} Live Scheduled, ${simulatedCount} Simulated (Missing API Keys)`);
+        } else if (simulatedCount > 0 && liveCount === 0) {
+          setPipelineSummary(`⚠️ All Platforms in Simulated Test Mode (Missing API Keys in .env)`);
+        } else if (failedCount > 0) {
+          setPipelineSummary(`⚠️ ${failedCount} Platform(s) Failed to Publish`);
+        } else {
+          setPipelineSummary('Pipeline processing completed.');
+        }
       } else {
-        setPipelineItems((prev) => prev.map((item) => ({ ...item, status: 'SUCCESS' })));
-        setPipelineSummary('All Platforms Scheduled Successfully! 🎉');
+        setPipelineItems((prev) =>
+          prev.map((item) => ({
+            ...item,
+            status: 'FAILED',
+            error: 'No pipeline response received from server'
+          }))
+        );
+        setPipelineSummary('⚠️ Scheduling failed: Invalid server response');
       }
     } catch (err: any) {
       console.warn('[PreviewModal] Schedule error:', err);
@@ -543,6 +571,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 const isPending = item.status === 'PENDING';
                 const isInProgress = item.status === 'IN_PROGRESS';
                 const isSuccess = item.status === 'SUCCESS';
+                const isSimulated = item.status === 'SIMULATED';
                 const isFailed = item.status === 'FAILED';
 
                 return (
@@ -559,7 +588,12 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       {isInProgress && <Text style={styles.pipelineStatusInProgress}>Uploading &amp; Scheduling...</Text>}
                       {isSuccess && (
                         <Text style={styles.pipelineStatusSuccess}>
-                          ✅ Scheduled {item.remotePostId ? `(#${item.remotePostId.substring(0, 8)})` : ''}
+                          ✅ Scheduled Live {item.remotePostId ? `(#${item.remotePostId.substring(0, 8)})` : ''}
+                        </Text>
+                      )}
+                      {isSimulated && (
+                        <Text style={styles.pipelineStatusSimulated} numberOfLines={2}>
+                          ⚠️ Simulated (Missing API keys in .env)
                         </Text>
                       )}
                       {isFailed && (
@@ -584,6 +618,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       {isSuccess && !item.remoteUrl && (
                         <Ionicons name="checkmark-circle" size={22} color="#10b981" />
                       )}
+                      {isSimulated && (
+                        <Ionicons name="alert-circle-outline" size={22} color="#f59e0b" />
+                      )}
                       {isFailed && <Ionicons name="alert-circle" size={22} color="#ef4444" />}
                     </View>
                   </View>
@@ -593,7 +630,12 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
             {/* Pipeline Summary Banner */}
             {pipelineSummary && (
-              <View style={[styles.summaryBanner, pipelineSummary.includes('halted') && styles.summaryBannerWarn]}>
+              <View
+                style={[
+                  styles.summaryBanner,
+                  (pipelineSummary.includes('⚠️') || pipelineSummary.includes('halted') || pipelineSummary.includes('Simulated') || pipelineSummary.includes('Failed')) && styles.summaryBannerWarn
+                ]}
+              >
                 <Text style={styles.summaryBannerText}>{pipelineSummary}</Text>
               </View>
             )}
@@ -955,6 +997,11 @@ const styles = StyleSheet.create({
   pipelineStatusSuccess: {
     fontSize: 11,
     color: '#34d399',
+    fontWeight: '600'
+  },
+  pipelineStatusSimulated: {
+    fontSize: 11,
+    color: '#f59e0b',
     fontWeight: '600'
   },
   pipelineStatusFailed: {

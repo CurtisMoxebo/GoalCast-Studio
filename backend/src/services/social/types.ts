@@ -14,6 +14,8 @@ export interface PublishResult {
   platform: SocialPlatformId;
   remotePostId?: string;
   remoteUrl?: string;
+  isSimulated?: boolean;
+  warning?: string;
   error?: string;
   logs: string[];
 }
@@ -27,7 +29,9 @@ export interface ISocialPublisher {
 export interface SocialPipelineItemResult {
   platform: SocialPlatformId;
   platformName: string;
-  status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'IN_PROGRESS';
+  status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'IN_PROGRESS' | 'SIMULATED';
+  isSimulated?: boolean;
+  warning?: string;
   remotePostId?: string;
   remoteUrl?: string;
   error?: string;
@@ -38,7 +42,10 @@ export interface SocialPipelineItemResult {
 export interface SocialPipelineRunResult {
   pipelineId: string;
   groupId: string;
-  status: 'COMPLETED' | 'PARTIALLY_FAILED' | 'FAILED';
+  status: 'COMPLETED' | 'PARTIALLY_FAILED' | 'FAILED' | 'SIMULATED';
+  liveCount?: number;
+  simulatedCount?: number;
+  failedCount?: number;
   scheduledFor?: Date;
   items: SocialPipelineItemResult[];
 }
