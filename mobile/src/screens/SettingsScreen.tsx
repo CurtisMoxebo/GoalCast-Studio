@@ -158,7 +158,7 @@ export const SettingsScreen: React.FC = () => {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>⏱️ Default Thumbnail Timeframe</Text>
         <Text style={styles.cardDesc}>
-          Default frame timestamp for capturing reel thumbnails (Range 00:00 to 00:20).
+          Default frame timestamp for capturing reel thumbnails (Range 00:00 to 01:00).
         </Text>
         <TextInput
           style={styles.input}

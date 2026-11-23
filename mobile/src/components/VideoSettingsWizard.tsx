@@ -68,7 +68,7 @@ interface ThumbnailTimeSliderProps {
 const ThumbnailTimeSlider: React.FC<ThumbnailTimeSliderProps> = ({
   seconds,
   min = 0,
-  max = 20,
+  max = 60,
   onChange
 }) => {
   const [trackWidth, setTrackWidth] = useState(0);
@@ -109,7 +109,7 @@ const ThumbnailTimeSlider: React.FC<ThumbnailTimeSliderProps> = ({
   );
 
   const percentage = Math.max(0, Math.min(100, ((seconds - min) / (max - min)) * 100));
-  const ticks = [0, 5, 10, 15, 20];
+  const ticks = [0, 15, 30, 45, 60];
 
   return (
     <View style={sliderStyles.container}>
@@ -395,24 +395,24 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           />
         </View>
 
-        {/* 5. Thumbnail Frame Selector (Slider from 00:00 to 00:20) */}
+        {/* 5. Thumbnail Frame Selector (Slider from 0 to 60 seconds) */}
         <View style={styles.section}>
           <View style={styles.thumbHeader}>
             <Text style={styles.sectionTitle}>📸 Thumbnail Frame Time</Text>
             <View style={styles.thumbTimeBadge}>
               <Text style={styles.thumbTimeDisplay}>
-                {formatSecondsToMMSS(thumbnailSeconds)}
+                {formatSecondsToMMSS(thumbnailSeconds)} ({Math.round(thumbnailSeconds)}s)
               </Text>
             </View>
           </View>
           <Text style={styles.sectionSubtitle}>
-            Slide or tap to choose the exact frame timestamp (00:00 to 00:20)
+            Slide or tap to choose the video timestamp (0 to 60s) that social media will use for the thumbnail
           </Text>
 
           <ThumbnailTimeSlider
             seconds={thumbnailSeconds}
             min={0}
-            max={20}
+            max={60}
             onChange={setThumbnailSeconds}
           />
         </View>

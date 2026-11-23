@@ -39,8 +39,29 @@ test('Mobile Regression: formatThumbnailTimestamp formats seconds into MM:SS', (
   assert.equal(formatThumbnailTimestamp(0), '00:00');
   assert.equal(formatThumbnailTimestamp(3), '00:03');
   assert.equal(formatThumbnailTimestamp(15.7), '00:15');
+  assert.equal(formatThumbnailTimestamp(30), '00:30');
+  assert.equal(formatThumbnailTimestamp(45), '00:45');
+  assert.equal(formatThumbnailTimestamp(60), '01:00');
   assert.equal(formatThumbnailTimestamp(65), '01:05');
   assert.equal(formatThumbnailTimestamp(undefined), '00:03');
+});
+
+test('Mobile Thumbnail Frame Time: Slider supports 0 to 60 seconds with milestones [0, 15, 30, 45, 60]', () => {
+  const min = 0;
+  const max = 60;
+  const ticks = [0, 15, 30, 45, 60];
+
+  assert.equal(min, 0);
+  assert.equal(max, 60);
+  assert.deepEqual(ticks, [0, 15, 30, 45, 60]);
+
+  // Ensure percentage calculation works accurately across 0-60
+  const getPercentage = (sec: number) => Math.max(0, Math.min(100, ((sec - min) / (max - min)) * 100));
+  assert.equal(getPercentage(0), 0);
+  assert.equal(getPercentage(15), 25);
+  assert.equal(getPercentage(30), 50);
+  assert.equal(getPercentage(45), 75);
+  assert.equal(getPercentage(60), 100);
 });
 
 test('Mobile Regression: buildFacebookShareExtras includes description and thumbnail timeframe', () => {

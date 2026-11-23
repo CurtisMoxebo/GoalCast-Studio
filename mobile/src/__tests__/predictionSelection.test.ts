@@ -76,8 +76,8 @@ function validateVideoJobPayload(payload: {
   if (payload.games && payload.games.length > 10) {
     errors.push('Maximum 10 games allowed per video');
   }
-  if (payload.thumbnailTimestamp < 0 || payload.thumbnailTimestamp > 20) {
-    errors.push('Thumbnail frame must be between 00:00 and 00:20');
+  if (payload.thumbnailTimestamp < 0 || payload.thumbnailTimestamp > 60) {
+    errors.push('Thumbnail frame must be between 00:00 and 01:00');
   }
   if (!payload.description || payload.description.trim().length === 0) {
     errors.push('Description cannot be empty');
@@ -137,14 +137,22 @@ test('Mobile Regression: Validate video job constraints', () => {
   assert.equal(rOver.valid, false);
   assert.ok(rOver.errors.some((e) => e.includes('Maximum 10 games')));
 
-  // Invalid thumbnail timestamp (> 20s)
+  // Invalid thumbnail timestamp (> 60s)
   const rThumb = validateVideoJobPayload({
     games: [{ id: 'g_1' }],
-    thumbnailTimestamp: 25.0,
+    thumbnailTimestamp: 65.0,
     description: 'test'
   });
   assert.equal(rThumb.valid, false);
-  assert.ok(rThumb.errors.some((e) => e.includes('between 00:00 and 00:20')));
+  assert.ok(rThumb.errors.some((e) => e.includes('between 00:00 and 01:00')));
+
+  // Valid thumbnail timestamp at 45.0s (within 0-60s)
+  const rThumb45 = validateVideoJobPayload({
+    games: [{ id: 'g_1' }],
+    thumbnailTimestamp: 45.0,
+    description: 'test'
+  });
+  assert.equal(rThumb45.valid, true);
 
   // Valid payload with default 3.0s thumbnail
   const rValid = validateVideoJobPayload({
