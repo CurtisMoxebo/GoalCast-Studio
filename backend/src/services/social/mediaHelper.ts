@@ -59,3 +59,36 @@ export function getSafeThumbnailOffset(
     ms: Math.round(safeSec * 1000)
   };
 }
+
+/**
+ * Extracts a single JPEG frame at a specific timestamp from a video file into a Buffer.
+ */
+export function extractThumbnailBuffer(
+  videoPath: string,
+  timestampSeconds: number
+): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    try {
+      const fs = require('fs');
+      if (!fs.existsSync(videoPath)) {
+        return resolve(null);
+      }
+      const chunks: Buffer[] = [];
+      const proc = ffmpeg(videoPath)
+        .seekInput(Math.max(0.5, timestampSeconds))
+        .frames(1)
+        .format('image2')
+        .outputOptions(['-vcodec', 'mjpeg'])
+        .pipe();
+
+      proc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      proc.on('end', () => resolve(Buffer.concat(chunks)));
+      proc.on('error', (err: any) => {
+        console.warn('[mediaHelper] Failed to extract thumbnail frame:', err.message);
+        resolve(null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}

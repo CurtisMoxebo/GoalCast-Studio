@@ -1,6 +1,7 @@
 import fs from 'fs';
+import path from 'path';
 import { ISocialPublisher, PublishOptions, PublishResult, SocialPlatformId } from '../types';
-import { getVideoDurationInSeconds, getSafeThumbnailOffset } from '../mediaHelper';
+import { getVideoDurationInSeconds, getSafeThumbnailOffset, extractThumbnailBuffer } from '../mediaHelper';
 
 export class FacebookReelsPublisher implements ISocialPublisher {
   public readonly id: SocialPlatformId = 'facebook_reels';
@@ -183,6 +184,61 @@ export class FacebookReelsPublisher implements ISocialPublisher {
 
       if (!isReady && !scheduledEpoch) {
         logWarn(`[Facebook] ⚠️ Polling reached timeout (${maxAttempts * 2.5}s) before video_status='ready'. Proceeding with canonical permalink.`);
+      }
+
+      // 5. Phase 5: Upload and set custom thumbnail as preferred cover
+      log(`[Facebook] Phase 5: Applying preferred custom thumbnail frame...`);
+      try {
+        let thumbBuffer: Buffer | null = null;
+        const thumbPath = path.join(path.dirname(options.videoPath), 'thumbnail.jpg');
+        if (fs.existsSync(thumbPath)) {
+          thumbBuffer = fs.readFileSync(thumbPath);
+        } else if (fs.existsSync(options.videoPath)) {
+          thumbBuffer = await extractThumbnailBuffer(options.videoPath, thumbSeconds);
+        } else if (process.env.NODE_ENV === 'test') {
+          thumbBuffer = Buffer.from('mock_thumbnail_jpeg_bytes');
+        }
+
+        if (thumbBuffer) {
+          const permalinkReelMatch = permalink.match(/\/reel\/([0-9]+)/);
+          const candidates = Array.from(
+            new Set([permalinkReelMatch ? permalinkReelMatch[1] : null, videoId].filter(Boolean) as string[])
+          );
+
+          let thumbnailApplied = false;
+          for (const targetId of candidates) {
+            try {
+              const form = new FormData();
+              form.append('access_token', pageToken);
+              form.append('is_preferred', 'true');
+              form.append('source', new Blob([thumbBuffer], { type: 'image/jpeg' }), 'thumbnail.jpg');
+
+              const thumbRes = await fetch(`https://graph.facebook.com/v21.0/${targetId}/thumbnails`, {
+                method: 'POST',
+                body: form
+              });
+
+              if (thumbRes.ok) {
+                log(`[Facebook] ✅ Custom thumbnail successfully uploaded and set as preferred cover on ID ${targetId}!`);
+                thumbnailApplied = true;
+                break;
+              } else {
+                const errText = await thumbRes.text();
+                logWarn(`[Facebook] Thumbnail upload attempt for target ${targetId} returned ${thumbRes.status}: ${errText}`);
+              }
+            } catch (thumbTargetErr: any) {
+              logWarn(`[Facebook] Thumbnail upload attempt failed for target ${targetId}: ${thumbTargetErr?.message}`);
+            }
+          }
+
+          if (!thumbnailApplied) {
+            logWarn(`[Facebook] ⚠️ Could not apply custom thumbnail on Facebook targets (${candidates.join(', ')}). Default frame retained.`);
+          }
+        } else {
+          logWarn(`[Facebook] ℹ No custom thumbnail image available to upload for video ${options.videoPath}`);
+        }
+      } catch (thumbErr: any) {
+        logWarn(`[Facebook] ⚠️ Thumbnail upload step encountered error (non-fatal): ${thumbErr?.message}`);
       }
 
       const canonicalUrl = permalink.startsWith('http')

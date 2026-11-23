@@ -268,6 +268,13 @@ test('Instagram Reels Publisher: performs full 4-phase container creation, polli
     (globalThis as any).fetch = async (url: string, init?: any) => {
       const urlStr = url.toString();
       calls.push(urlStr);
+      if (urlStr.includes('/thumbnails')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true })
+        } as any;
+      }
       if (urlStr.includes('rupload.facebook.com')) {
         return {
           ok: true,
@@ -372,6 +379,13 @@ test('Facebook Reels Publisher: performs full 4-phase start, upload, finish, pol
           })
         } as any;
       }
+      if (urlStr.includes('/thumbnails')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true })
+        } as any;
+      }
       if (urlStr.includes('rupload.facebook.com')) {
         return {
           ok: true,
@@ -417,6 +431,7 @@ test('Facebook Reels Publisher: performs full 4-phase start, upload, finish, pol
     assert.equal(result.remoteUrl, 'https://www.facebook.com/reel/fb_vid_123/');
     assert.ok(calls.some((u) => u.includes('rupload.facebook.com')), 'Must upload binary stream directly to rupload');
     assert.ok(calls.some((u) => u.includes('fields=id,permalink_url,status')), 'Must poll status until ready');
+    assert.ok(calls.some((u) => u.includes('/thumbnails')), 'Must upload custom thumbnail via thumbnails edge');
     assert.ok(pollCount >= 2, 'Must poll at least twice until ready');
   } finally {
     globalThis.fetch = originalFetch;
