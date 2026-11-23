@@ -52,26 +52,28 @@ export class OverlayGenerator {
   }
 
   /**
-   * Format date display for match card: "Tomorrow" if match is tomorrow, else "DD/MM/YYYY"
+   * Format date display for match card: "Tomorrow" if match is tomorrow, else "DD/MM/YYYY" in UTC+1
    */
   private formatGameDateDisplay(kickoffTime: string): string {
     try {
       const matchDate = new Date(kickoffTime);
+      if (isNaN(matchDate.getTime())) return 'Tomorrow';
+      const utcPlusOne = new Date(matchDate.getTime() + 60 * 60 * 1000);
       const now = new Date();
       const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
       const isTomorrow =
-        matchDate.getFullYear() === tomorrow.getFullYear() &&
-        matchDate.getMonth() === tomorrow.getMonth() &&
-        matchDate.getDate() === tomorrow.getDate();
+        utcPlusOne.getUTCFullYear() === tomorrow.getFullYear() &&
+        utcPlusOne.getUTCMonth() === tomorrow.getMonth() &&
+        utcPlusOne.getUTCDate() === tomorrow.getDate();
 
       if (isTomorrow) {
         return 'Tomorrow';
       }
 
-      const day = String(matchDate.getDate()).padStart(2, '0');
-      const month = String(matchDate.getMonth() + 1).padStart(2, '0');
-      const year = matchDate.getFullYear();
+      const day = String(utcPlusOne.getUTCDate()).padStart(2, '0');
+      const month = String(utcPlusOne.getUTCMonth() + 1).padStart(2, '0');
+      const year = utcPlusOne.getUTCFullYear();
       return `${day}/${month}/${year}`;
     } catch {
       return 'Tomorrow';
@@ -79,19 +81,31 @@ export class OverlayGenerator {
   }
 
   /**
-   * Format kickoff time to 12-hour AM/PM (e.g. "05:00 PM")
+   * Format kickoff time to 12-hour am/pm in UTC+1 (GMT+1) timezone (e.g. "2:00pm", "10:30am")
+   * without a leading 0 on the hour.
    */
-  private formatKickoffTimeAmPm(kickoffTime: string): string {
+  public formatKickoffTimeUtcPlusOne(kickoffTime: string): string {
     try {
       const matchDate = new Date(kickoffTime);
-      return matchDate.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
+      if (isNaN(matchDate.getTime())) return '3:00pm';
+      // Shift UTC timestamp by +1 hour (3600000 ms) for UTC+1 (GMT+1)
+      const utcPlusOne = new Date(matchDate.getTime() + 60 * 60 * 1000);
+      const hours24 = utcPlusOne.getUTCHours();
+      const mins = utcPlusOne.getUTCMinutes();
+      const ampm = hours24 >= 12 ? 'pm' : 'am';
+      const hours12 = hours24 % 12 || 12;
+      const minsStr = String(mins).padStart(2, '0');
+      return `${hours12}:${minsStr}${ampm}`;
     } catch {
-      return '05:00 PM';
+      return '3:00pm';
     }
+  }
+
+  /**
+   * Format kickoff time to 12-hour am/pm in UTC+1 (e.g. "2:00pm", "10:30am")
+   */
+  private formatKickoffTimeAmPm(kickoffTime: string): string {
+    return this.formatKickoffTimeUtcPlusOne(kickoffTime);
   }
 
   /**
@@ -215,11 +229,7 @@ export class OverlayGenerator {
         const home = this.escapeXml(game.homeTeam);
         const away = this.escapeXml(game.awayTeam);
         const comp = this.escapeXml(game.competition);
-        const time = new Date(game.kickoffTime).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
+        const time = this.formatKickoffTimeUtcPlusOne(game.kickoffTime);
 
         // Team line offsets (home on top half, away on bottom half)
         const rowHalf = rowHeight / 2;
@@ -265,14 +275,13 @@ export class OverlayGenerator {
             ${away}
           </text>
 
-          <!-- Competition & Kickoff Time Badge on Right -->
+          <!-- Competition & Kickoff Time on Right (No white background rectangle, no clock icon) -->
           <g transform="translate(${tableWidth - 192}, ${rowY + Math.round((rowHeight - badgeHeight) / 2)})">
-            <rect width="176" height="${badgeHeight}" rx="14" fill="#f8fafc" fill-opacity="0.80" stroke="#e2e8f0" stroke-width="1.5"/>
             <text x="88" y="${Math.round(badgeHeight * 0.44)}" fill="#64748b" font-size="${comp.length > 12 ? 20 : (comp.length > 8 ? 23 : 26)}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle">
               ${comp}
             </text>
-            <text x="88" y="${Math.round(badgeHeight * 0.82)}" fill="#0f172a" font-size="30" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
-              ⏰ ${time}
+            <text x="88" y="${Math.round(badgeHeight * 0.82)}" fill="#0f172a" font-size="28" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle">
+              ${time}
             </text>
           </g>
 
@@ -457,10 +466,7 @@ export class OverlayGenerator {
         else if (shortPred.length > 5) predFontSize = Math.min(26, Math.round(highlightHeight * 0.44));
 
         const badgeContent = `
-          <!-- Section Container on Right -->
-          <rect width="${badgeWidth}" height="${badgeHeight}" rx="18" fill="#f8fafc" fill-opacity="0.80" stroke="#e2e8f0" stroke-width="1.5"/>
-
-          <!-- Green Highlight with Bold Black Text (Short Version) -->
+          <!-- Green Highlight with Bold Black Text (Short Version) - No white background container -->
           <rect x="14" y="${highlightY}" width="${highlightWidth}" height="${highlightHeight}" rx="12" fill="#22c55e"/>
           <text x="${14 + highlightWidth / 2}" y="${Math.round(highlightY + highlightHeight / 2 + predFontSize * 0.35)}" fill="#000000" font-size="${predFontSize}" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="0.5">
             ${this.escapeXml(shortPred)}

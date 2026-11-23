@@ -765,8 +765,43 @@ export class VideoComposer {
   }
 
   /**
+   * Split words into short chunks that strictly fit on ONE single line
+   * (e.g. 3-4 words, max ~28 chars) so subtitles never wrap into multiple lines.
+   */
+  private splitIntoSingleLineChunks(words: string[], maxWords = 4, maxChars = 28): string[][] {
+    if (words.length <= maxWords && words.join(' ').length <= maxChars) {
+      return [words];
+    }
+
+    const chunks: string[][] = [];
+    let current: string[] = [];
+    let currentLen = 0;
+
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      current.push(w);
+      currentLen += current.length === 1 ? w.length : 1 + w.length;
+
+      const hasPunctuation = /[.!?]$/.test(w) && i < words.length - 1;
+      const isNextTooLong =
+        i < words.length - 1 && currentLen + 1 + words[i + 1].length > maxChars;
+
+      if (current.length >= maxWords || isNextTooLong || hasPunctuation) {
+        chunks.push(current);
+        current = [];
+        currentLen = 0;
+      }
+    }
+    if (current.length > 0) {
+      chunks.push(current);
+    }
+    return chunks;
+  }
+
+  /**
    * Generate ASS subtitles file with dynamic active-word highlighting
-   * positioned at the top of the video canvas (MarginV: 100, Alignment: 8 / \an8)
+   * positioned at the top of the video canvas (MarginV: 100, Alignment: 8 / \an8),
+   * formatted strictly one line at a time (no multiple lines).
    */
   public generateKaraokeAssFile(
     phrases: { text: string; startTime: number; duration: number; marginV?: number }[],
@@ -783,11 +818,11 @@ export class VideoComposer {
 
       if (!cleanText) continue;
 
-      const words = cleanText.split(/\s+/).filter(Boolean);
-      if (words.length === 0) continue;
+      const allWords = cleanText.split(/\s+/).filter(Boolean);
+      if (allWords.length === 0) continue;
 
       // Weight words by character length plus pause on ending punctuation
-      const weights = words.map((w) => {
+      const weights = allWords.map((w) => {
         const letters = w.replace(/[^a-zA-Z0-9]/g, '').length;
         const base = Math.max(1, letters);
         const pause = /[.,!?]$/.test(w) ? 1.5 : 0;
@@ -796,40 +831,62 @@ export class VideoComposer {
       const totalWeight = weights.reduce((a, b) => a + b, 0);
 
       const marginV = phrase.marginV !== undefined ? phrase.marginV : 100;
-      let elapsed = 0;
 
-      for (let i = 0; i < words.length; i++) {
-        const wordDur =
+      // Split into single-line chunks so subtitles are displayed strictly ONE line at a time
+      const chunks = this.splitIntoSingleLineChunks(allWords, 4, 28);
+      let wordCursor = 0;
+      let chunkStartTime = phrase.startTime;
+
+      for (let c = 0; c < chunks.length; c++) {
+        const chunkWords = chunks[c];
+        const chunkWeight = chunkWords.reduce((acc, _, idx) => acc + weights[wordCursor + idx], 0);
+        const chunkDuration =
           totalWeight > 0
-            ? (weights[i] / totalWeight) * phrase.duration
-            : phrase.duration / words.length;
+            ? (chunkWeight / totalWeight) * phrase.duration
+            : phrase.duration / chunks.length;
 
-        const wStart = phrase.startTime + elapsed;
-        const wEnd =
-          i === words.length - 1 ? phrase.startTime + phrase.duration : wStart + wordDur;
-        elapsed += wordDur;
+        let elapsedInChunk = 0;
 
-        // Render full phrase with currently spoken word in vibrant green highlight, explicitly anchored at top center (\an8)
-        const line = words
-          .map((w, idx) => {
-            if (idx === i) {
-              return `{\\c&H0000FF00&}${w}{\\c&H00FFFFFF&}`;
-            }
-            return w;
-          })
-          .join(' ');
+        for (let i = 0; i < chunkWords.length; i++) {
+          const wWeight = weights[wordCursor + i];
+          const wordDur =
+            chunkWeight > 0
+              ? (wWeight / chunkWeight) * chunkDuration
+              : chunkDuration / chunkWords.length;
 
-        dialogues.push(
-          `Dialogue: 0,${this.formatAssTime(wStart)},${this.formatAssTime(wEnd)},TopKaraoke,,0,0,${marginV},,{\\an8}${line}`
-        );
+          const wStart = chunkStartTime + elapsedInChunk;
+          const wEnd =
+            i === chunkWords.length - 1 ? chunkStartTime + chunkDuration : wStart + wordDur;
+          elapsedInChunk += wordDur;
+
+          // Render single-line chunk with currently spoken word in vibrant green highlight,
+          // explicitly anchored at top center (\an8) with \q2 (no line wrap)
+          const line = chunkWords
+            .map((w, idx) => {
+              if (idx === i) {
+                return `{\\c&H0000FF00&}${w}{\\c&H00FFFFFF&}`;
+              }
+              return w;
+            })
+            .join(' ');
+
+          dialogues.push(
+            `Dialogue: 0,${this.formatAssTime(wStart)},${this.formatAssTime(wEnd)},TopKaraoke,,0,0,${marginV},,{\\an8}{\\q2}${line}`
+          );
+        }
+
+        // If it's the very last chunk of the phrase, hold the clean text for 0.25s after audio ends before clearing
+        if (c === chunks.length - 1) {
+          const holdStart = chunkStartTime + chunkDuration;
+          const holdEnd = holdStart + 0.25;
+          dialogues.push(
+            `Dialogue: 0,${this.formatAssTime(holdStart)},${this.formatAssTime(holdEnd)},TopKaraoke,,0,0,${marginV},,{\\an8}{\\q2}${chunkWords.join(' ')}`
+          );
+        }
+
+        chunkStartTime += chunkDuration;
+        wordCursor += chunkWords.length;
       }
-
-      // Hold complete phrase in crisp white for 0.35s after audio ends before clearing, explicitly anchored at top center (\an8)
-      const holdStart = phrase.startTime + phrase.duration;
-      const holdEnd = holdStart + 0.35;
-      dialogues.push(
-        `Dialogue: 0,${this.formatAssTime(holdStart)},${this.formatAssTime(holdEnd)},TopKaraoke,,0,0,${marginV},,{\\an8}${words.join(' ')}`
-      );
     }
 
     const assContent = [
@@ -838,6 +895,7 @@ export class VideoComposer {
       'PlayResX: 1080',
       'PlayResY: 1920',
       'ScaledBorderAndShadow: yes',
+      'WrapStyle: 2',
       '',
       '[V4+ Styles]',
       'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
