@@ -267,6 +267,13 @@ test('Instagram Reels Publisher: performs full 4-phase container creation, polli
     (globalThis as any).fetch = async (url: string, init?: any) => {
       const urlStr = url.toString();
       calls.push(urlStr);
+      if (urlStr.includes('rupload.facebook.com')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => '{"success":true}'
+        } as any;
+      }
       if (urlStr.includes('/media_publish')) {
         return {
           ok: true,
@@ -294,7 +301,7 @@ test('Instagram Reels Publisher: performs full 4-phase container creation, polli
         return {
           ok: true,
           status: 200,
-          json: async () => ({ id: 'container_111' })
+          json: async () => ({ id: 'container_111', uri: 'https://rupload.facebook.com/ig-api-upload/v21.0/container_111' })
         } as any;
       }
       return { ok: false, status: 404, text: async () => 'Not Found' } as any;
@@ -313,6 +320,7 @@ test('Instagram Reels Publisher: performs full 4-phase container creation, polli
     assert.equal(result.isSimulated, false);
     assert.equal(result.remotePostId, 'ig_published_media_999');
     assert.equal(result.remoteUrl, 'https://www.instagram.com/reel/C_REAL_POST_123/');
+    assert.ok(calls.some((u) => u.includes('rupload.facebook.com')), 'Must upload binary stream directly to rupload.facebook.com');
     assert.ok(calls.some((u) => u.includes('/media_publish')), 'Must call media_publish to push post live');
     assert.ok(calls.some((u) => u.includes('fields=status_code')), 'Must poll status_code');
     assert.ok(calls.some((u) => u.includes('fields=permalink')), 'Must fetch permalink');

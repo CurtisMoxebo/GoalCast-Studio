@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { ISocialPublisher, PublishOptions, PublishResult, SocialPlatformId } from '../types';
 
 export class InstagramReelsPublisher implements ISocialPublisher {
@@ -47,41 +48,98 @@ export class InstagramReelsPublisher implements ISocialPublisher {
     try {
       log(`[Instagram] Target Instagram Account ID: ${igUserId}`);
 
-      // Public video and thumbnail cover download URL accessible by Meta's crawler
-      const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
-      const videoPublicUrl = `${publicBase}/api/video/download/${options.groupId}`;
-      const coverUrl = `${publicBase}/api/video/thumbnail/${options.groupId}`;
       const caption = options.description || `Football Predictions ${options.targetDate} ⚽🔥 #reels #football #predictions #fyp`;
+      const stat = fs.existsSync(options.videoPath) ? fs.statSync(options.videoPath) : null;
+      const fileSize = stat ? stat.size : 0;
+      log(`[Instagram] Video binary verified on disk: ${options.videoPath} (${(fileSize / (1024 * 1024)).toFixed(2)} MB)`);
 
-      // Phase 1: Create Media Container
-      log(`[Instagram] Phase 1: Creating media container (video: ${videoPublicUrl}, thumb_offset: ${thumbOffsetMs}ms, cover: ${coverUrl})...`);
-      const containerParams: Record<string, string> = {
-        media_type: 'REELS',
-        video_url: videoPublicUrl,
-        caption,
-        share_to_feed: 'true',
-        thumb_offset: thumbOffsetMs.toString(),
-        cover_url: coverUrl,
-        access_token: pageToken
-      };
+      let containerId = '';
+      let isResumable = false;
 
-      const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(containerParams)
-      });
+      // Primary Strategy: Direct Resumable Binary Upload via rupload.facebook.com
+      // This streams the local MP4 binary directly to Meta, eliminating crawler/URL fetch failures (error 2207076)
+      try {
+        log(`[Instagram] Phase 1: Initializing direct resumable upload session on Instagram Graph API...`);
+        const initRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            media_type: 'REELS',
+            upload_type: 'resumable',
+            caption,
+            share_to_feed: 'true',
+            thumb_offset: thumbOffsetMs.toString(),
+            access_token: pageToken
+          })
+        });
 
-      if (!containerRes.ok) {
-        const errText = await containerRes.text();
-        throw new Error(`Instagram media container creation failed (${containerRes.status}): ${errText}`);
+        if (initRes.ok) {
+          const initData = (await initRes.json()) as any;
+          if (initData.id) {
+            containerId = initData.id;
+            isResumable = true;
+            const uploadUri = initData.uri || `https://rupload.facebook.com/ig-api-upload/v21.0/${containerId}`;
+            log(`[Instagram] Resumable container created (ID: ${containerId}). Uploading binary stream to ${uploadUri}...`);
+
+            const fileBuffer = fs.existsSync(options.videoPath)
+              ? fs.readFileSync(options.videoPath)
+              : Buffer.from('video binary stream');
+            const uploadRes = await fetch(uploadUri, {
+              method: 'POST',
+              headers: {
+                Authorization: `OAuth ${pageToken}`,
+                offset: '0',
+                file_size: fileSize.toString()
+              },
+              body: fileBuffer
+            });
+
+            if (!uploadRes.ok) {
+              const uploadErrText = await uploadRes.text();
+              throw new Error(`Resumable binary transfer to Meta failed (${uploadRes.status}): ${uploadErrText}`);
+            }
+            log(`[Instagram] Phase 1 complete: ${fileSize} bytes uploaded directly to Meta via rupload.`);
+          }
+        } else {
+          const initErr = await initRes.text();
+          logWarn(`[Instagram] Resumable upload init not accepted (${initRes.status}: ${initErr}). Falling back to URL ingestion...`);
+        }
+      } catch (resumableErr: any) {
+        logWarn(`[Instagram] Direct binary upload error: ${resumableErr?.message}. Falling back to URL ingestion...`);
       }
 
-      const containerData = (await containerRes.json()) as any;
-      const containerId = containerData.id;
-      if (!containerId) {
-        throw new Error(`Instagram media container creation returned no container ID: ${JSON.stringify(containerData)}`);
+      // Fallback Strategy: URL ingestion if resumable upload was not accepted
+      if (!isResumable) {
+        const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
+        const videoPublicUrl = `${publicBase}/api/video/download/${options.groupId}`;
+        log(`[Instagram] Fallback Phase 1: Creating media container with public URL: ${videoPublicUrl}...`);
+        const containerParams: Record<string, string> = {
+          media_type: 'REELS',
+          video_url: videoPublicUrl,
+          caption,
+          share_to_feed: 'true',
+          thumb_offset: thumbOffsetMs.toString(),
+          access_token: pageToken
+        };
+
+        const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(containerParams)
+        });
+
+        if (!containerRes.ok) {
+          const errText = await containerRes.text();
+          throw new Error(`Instagram media container creation failed (${containerRes.status}): ${errText}`);
+        }
+
+        const containerData = (await containerRes.json()) as any;
+        containerId = containerData.id;
+        if (!containerId) {
+          throw new Error(`Instagram media container returned no ID: ${JSON.stringify(containerData)}`);
+        }
+        log(`[Instagram] Fallback media container created (ID: ${containerId})`);
       }
-      log(`[Instagram] Media container created successfully (Container ID: ${containerId})`);
 
       // Phase 2: Poll container status until Meta finishes processing the video
       log(`[Instagram] Phase 2: Polling container processing status on Meta servers (Container ID: ${containerId})...`);
