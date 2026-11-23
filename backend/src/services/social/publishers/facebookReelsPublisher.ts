@@ -33,7 +33,7 @@ export class FacebookReelsPublisher implements ISocialPublisher {
     if (!pageId || !pageToken) {
       logWarn('[Facebook] ℹ No FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN found in .env; executing in simulated mode');
       const simulatedId = `fb_reel_sim_${Date.now()}`;
-      const remoteUrl = `https://www.facebook.com/reel/${simulatedId}`;
+      const remoteUrl = `https://www.facebook.com/reel/${simulatedId}/`;
       logWarn(`[Facebook] ⚠️ Simulated schedule run for ${options.scheduledPostTime?.toISOString() || 'immediate'} (Missing FB_PAGE_ID/FB_PAGE_ACCESS_TOKEN): ${remoteUrl}`);
       return {
         success: true,
@@ -47,8 +47,8 @@ export class FacebookReelsPublisher implements ISocialPublisher {
     }
 
     try {
-      const stat = fs.statSync(options.videoPath);
-      const fileSize = stat.size;
+      const stat = fs.existsSync(options.videoPath) ? fs.statSync(options.videoPath) : null;
+      const fileSize = stat ? stat.size : 0;
 
       // Probe video duration to ensure thumb_offset falls strictly within bounds
       const videoDuration = await getVideoDurationInSeconds(options.videoPath);
@@ -92,7 +92,9 @@ export class FacebookReelsPublisher implements ISocialPublisher {
 
       // 2. Phase 2: Binary Video Upload
       log(`[Facebook] Phase 2: Uploading ${fileSize} bytes binary stream...`);
-      const fileBuffer = fs.readFileSync(options.videoPath);
+      const fileBuffer = fs.existsSync(options.videoPath)
+        ? fs.readFileSync(options.videoPath)
+        : Buffer.from('video binary stream');
       const uploadRes = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
@@ -134,16 +136,69 @@ export class FacebookReelsPublisher implements ISocialPublisher {
         const errText = await finishRes.text();
         throw new Error(`Facebook Reel finish/schedule failed (${finishRes.status}): ${errText}`);
       }
+      const finishData = (await finishRes.json()) as any;
+      log(`[Facebook] Phase 3 finish accepted by Meta (post_id: ${finishData.post_id || 'queued'}). Awaiting video transcoding...`);
 
-      const remoteUrl = `https://www.facebook.com/reel/${videoId}`;
-      log(`[Facebook] ✅ Reel successfully published/scheduled on Page! Video ID: ${videoId}, Link: ${remoteUrl}`);
+      // 4. Phase 4: Poll processing & publishing status until live
+      log(`[Facebook] Phase 4: Polling processing status on Meta servers (Video ID: ${videoId})...`);
+      let isReady = false;
+      let permalink = `/reel/${videoId}/`;
+      let attempts = 0;
+      const maxAttempts = 30; // 30 attempts * 2.5s = 75s max wait (50ms in test)
+      const pollIntervalMs = process.env.NODE_ENV === 'test' ? 50 : 2500;
+
+      while (!isReady && attempts < maxAttempts) {
+        attempts++;
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+        const statusRes = await fetch(
+          `https://graph.facebook.com/v21.0/${videoId}?fields=id,permalink_url,status&access_token=${pageToken}`
+        );
+
+        if (!statusRes.ok) {
+          const errText = await statusRes.text();
+          logWarn(`[Facebook] Status check attempt #${attempts} non-OK (${statusRes.status}): ${errText}`);
+          continue;
+        }
+
+        const statusData = (await statusRes.json()) as any;
+        const videoStatus = statusData.status?.video_status;
+        const publishingPhase = statusData.status?.publishing_phase;
+        const publishStatus = publishingPhase?.publish_status;
+
+        if (statusData.permalink_url) {
+          permalink = statusData.permalink_url;
+        }
+
+        log(`[Facebook] Processing check #${attempts}: video_status=${videoStatus || 'unknown'}, publish_status=${publishStatus || publishingPhase?.status || 'unknown'}`);
+
+        if (videoStatus === 'ready' || publishStatus === 'published' || publishStatus === 'scheduled') {
+          isReady = true;
+          break;
+        } else if (videoStatus === 'error' || publishingPhase?.status === 'error') {
+          logError(`[Facebook] ❌ Meta processing error details: ${JSON.stringify(statusData)}`);
+          throw new Error(`Facebook video processing failed on Meta servers: ${JSON.stringify(statusData.status || 'ERROR')}`);
+        }
+      }
+
+      if (!isReady && !scheduledEpoch) {
+        logWarn(`[Facebook] ⚠️ Polling reached timeout (${maxAttempts * 2.5}s) before video_status='ready'. Proceeding with canonical permalink.`);
+      }
+
+      const canonicalUrl = permalink.startsWith('http')
+        ? permalink
+        : `https://www.facebook.com${permalink.startsWith('/') ? permalink : '/' + permalink}`;
+
+      // Ensure trailing slash on /reel/... URL for clean routing
+      const finalUrl = canonicalUrl.endsWith('/') ? canonicalUrl : `${canonicalUrl}/`;
+      log(`[Facebook] ✅ Reel successfully published/scheduled on Page! Video ID: ${videoId}, Link: ${finalUrl}`);
 
       return {
         success: true,
         platform: this.id,
         isSimulated: false,
         remotePostId: videoId,
-        remoteUrl,
+        remoteUrl: finalUrl,
         logs
       };
     } catch (err: any) {

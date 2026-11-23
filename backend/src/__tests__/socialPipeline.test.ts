@@ -341,6 +341,90 @@ test('Instagram Reels Publisher: performs full 4-phase container creation, polli
   }
 });
 
+test('Facebook Reels Publisher: performs full 4-phase start, upload, finish, polling and canonical permalink retrieval', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  let pollCount = 0;
+
+  try {
+    process.env.FB_PAGE_ID = 'test_fb_page_123';
+    process.env.FB_PAGE_ACCESS_TOKEN = 'test_fb_page_token_abc';
+
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const urlStr = input.toString();
+      calls.push(urlStr);
+
+      if (urlStr.includes('fields=id,permalink_url,status')) {
+        pollCount++;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'fb_vid_123',
+            permalink_url: '/reel/fb_vid_123/',
+            status: {
+              video_status: pollCount > 1 ? 'ready' : 'processing',
+              publishing_phase: {
+                status: pollCount > 1 ? 'complete' : 'in_progress',
+                publish_status: pollCount > 1 ? 'published' : 'not_started'
+              }
+            }
+          })
+        } as any;
+      }
+      if (urlStr.includes('rupload.facebook.com')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true })
+        } as any;
+      }
+      if (urlStr.includes('/video_reels')) {
+        const bodyStr = init?.body?.toString() || '';
+        if (bodyStr.includes('upload_phase=start')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              video_id: 'fb_vid_123',
+              upload_url: 'https://rupload.facebook.com/video-upload/v27.0/fb_vid_123'
+            })
+          } as any;
+        }
+        if (bodyStr.includes('upload_phase=finish')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true, post_id: '122099' })
+          } as any;
+        }
+      }
+      return { ok: false, status: 404, text: async () => 'Not Found' } as any;
+    };
+
+    const fb = new FacebookReelsPublisher();
+    const result = await fb.publish({
+      groupId: 'group_test_fb_live',
+      videoPath: 'dummy.mp4',
+      description: 'Test Facebook reel',
+      targetDate: '2026-11-25',
+      thumbnailTimestamp: 3
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.isSimulated, false);
+    assert.equal(result.remotePostId, 'fb_vid_123');
+    assert.equal(result.remoteUrl, 'https://www.facebook.com/reel/fb_vid_123/');
+    assert.ok(calls.some((u) => u.includes('rupload.facebook.com')), 'Must upload binary stream directly to rupload');
+    assert.ok(calls.some((u) => u.includes('fields=id,permalink_url,status')), 'Must poll status until ready');
+    assert.ok(pollCount >= 2, 'Must poll at least twice until ready');
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.FB_PAGE_ID;
+    delete process.env.FB_PAGE_ACCESS_TOKEN;
+  }
+});
+
 test('Media Helper: getSafeThumbnailOffset clamps out-of-bounds thumbnails to video duration and avoids black intro fade', () => {
   // Test 1: Requested 47s on a 30.7s video -> must be clamped to active prediction content (30.7 - 5.0 = 25.7s / 25700ms)
   const clampedOut = getSafeThumbnailOffset(47, 30.7);

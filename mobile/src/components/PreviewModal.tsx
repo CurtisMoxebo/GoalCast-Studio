@@ -471,6 +471,40 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
+  const handleViewRemotePost = async (item: { platform: string; remoteUrl?: string; remotePostId?: string }) => {
+    if (!item.remoteUrl) return;
+    try {
+      if (item.platform === 'facebook_reels') {
+        const videoId = item.remotePostId || item.remoteUrl.match(/\/reel\/([0-9]+)/)?.[1];
+        if (videoId) {
+          const fbAppUrl = `fb://reel/${videoId}`;
+          const canOpen = await Linking.canOpenURL(fbAppUrl).catch(() => false);
+          if (canOpen) {
+            await Linking.openURL(fbAppUrl);
+            return;
+          }
+        }
+      } else if (item.platform === 'instagram_reels') {
+        const match = item.remoteUrl.match(/\/reel\/([A-Za-z0-9_-]+)/);
+        const shortcode = match ? match[1] : null;
+        if (shortcode) {
+          const igAppUrl = `instagram://media?id=${shortcode}`;
+          const canOpen = await Linking.canOpenURL(igAppUrl).catch(() => false);
+          if (canOpen) {
+            await Linking.openURL(igAppUrl);
+            return;
+          }
+        }
+      }
+      await Linking.openURL(item.remoteUrl);
+    } catch (err) {
+      console.warn('[PreviewModal] Failed to open remote URL:', err);
+      try {
+        await Linking.openURL(item.remoteUrl);
+      } catch (_) {}
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleCancelPress}>
       <View style={styles.container}>
@@ -779,7 +813,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       {isSuccess && item.remoteUrl && (
                         <TouchableOpacity
                           style={styles.viewPostBtn}
-                          onPress={() => Linking.openURL(item.remoteUrl!)}
+                          onPress={() => handleViewRemotePost(item)}
                         >
                           <Text style={styles.viewPostBtnText}>View ↗</Text>
                         </TouchableOpacity>
