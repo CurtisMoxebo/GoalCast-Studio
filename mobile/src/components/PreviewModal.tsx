@@ -558,15 +558,6 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       : '⚡ Post to Social Media'}
                   </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.nativeShareSecondaryBtn}
-                  onPress={handleGeneralShare}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="share-social-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
-                  <Text style={styles.nativeShareSecondaryText}>More Sharing Options</Text>
-                </TouchableOpacity>
               </View>
             ) : (
               /* Pre-Accept Actions: Accept, Modify, Cancel */
@@ -1089,18 +1080,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.3
-  },
-  nativeShareSecondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    marginTop: 8
-  },
-  nativeShareSecondaryText: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '600'
   },
   pipelineOverlay: {
     flex: 1,
