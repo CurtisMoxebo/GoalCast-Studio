@@ -119,7 +119,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
           logWarn(`[Instagram] Resumable upload init not accepted (${initRes.status}: ${initErr}). Falling back to URL ingestion...`);
         }
       } catch (resumableErr: any) {
-        logWarn(`[Instagram] Direct binary upload error: ${resumableErr?.message}. Falling back to URL ingestion...`);
+        log(`[Instagram] ℹ️ Large video (${(fileSize / (1024 * 1024)).toFixed(1)} MB) exceeds Meta direct stream buffer. Smoothly falling back to URL ingestion...`);
         isResumable = false;
         containerId = '';
       }
