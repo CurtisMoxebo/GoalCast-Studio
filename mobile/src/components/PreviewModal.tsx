@@ -437,9 +437,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         const failedCount = res.pipeline.items.filter((i: any) => i.status === 'FAILED').length;
 
         if (liveCount > 0 && failedCount === 0 && simulatedCount === 0) {
-          setPipelineSummary(`✅ All ${liveCount} Selected Platforms Scheduled Live!`);
+          setPipelineSummary(isInstant ? `✅ All ${liveCount} Selected Platforms Published Live!` : `📅 All ${liveCount} Selected Platforms Staged & Scheduled!`);
         } else if (liveCount > 0 && simulatedCount > 0) {
-          setPipelineSummary(`${liveCount} Live Scheduled, ${simulatedCount} Simulated (Missing API Keys)`);
+          setPipelineSummary(isInstant ? `${liveCount} Live Published, ${simulatedCount} Simulated (Missing API Keys)` : `${liveCount} Live Scheduled, ${simulatedCount} Simulated (Missing API Keys)`);
         } else if (simulatedCount > 0 && liveCount === 0) {
           setPipelineSummary(`⚠️ All Selected Platforms in Simulated Test Mode (Missing API Keys in .env)`);
         } else if (failedCount > 0) {
@@ -473,7 +473,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   };
 
   const handleViewRemotePost = async (item: { platform: string; remoteUrl?: string; remotePostId?: string }) => {
-    if (!item.remoteUrl) return;
+    if (!item.remoteUrl || item.remoteUrl.includes('scheduled_')) return;
     try {
       if (item.platform === 'facebook_reels') {
         // Facebook's native app has a known intent routing flaw where external https://facebook.com/*
@@ -797,7 +797,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                       {isInProgress && <Text style={styles.pipelineStatusInProgress}>Uploading &amp; Scheduling...</Text>}
                       {isSuccess && (
                         <Text style={styles.pipelineStatusSuccess}>
-                          ✅ Scheduled Live {item.remotePostId ? `(#${item.remotePostId.substring(0, 8)})` : ''}
+                          {item.remoteUrl && !item.remoteUrl.includes('scheduled_')
+                            ? `✅ Published Live ${item.remotePostId ? `(#${item.remotePostId.substring(0, 8)})` : ''}`
+                            : `📅 Staged & Scheduled ${item.remotePostId ? `(#${item.remotePostId.substring(0, 8)})` : ''}`}
                         </Text>
                       )}
                       {isSimulated && (
@@ -816,7 +818,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                     <View style={styles.pipelineStatusRight}>
                       {isInProgress && <ActivityIndicator size="small" color={THEME.colors.primary} />}
                       {isPending && <Ionicons name="time-outline" size={20} color="#64748b" />}
-                      {isSuccess && item.remoteUrl && (
+                      {isSuccess && item.remoteUrl && !item.remoteUrl.includes('scheduled_') && (
                         <TouchableOpacity
                           style={styles.viewPostBtn}
                           onPress={() => handleViewRemotePost(item)}
@@ -824,8 +826,8 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                           <Text style={styles.viewPostBtnText}>View ↗</Text>
                         </TouchableOpacity>
                       )}
-                      {isSuccess && !item.remoteUrl && (
-                        <Ionicons name="checkmark-circle" size={22} color="#10b981" />
+                      {isSuccess && (!item.remoteUrl || item.remoteUrl.includes('scheduled_')) && (
+                        <Ionicons name="time-outline" size={22} color="#10b981" />
                       )}
                       {isSimulated && (
                         <Ionicons name="alert-circle-outline" size={22} color="#f59e0b" />

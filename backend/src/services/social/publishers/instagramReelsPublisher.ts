@@ -223,6 +223,33 @@ export class InstagramReelsPublisher implements ISocialPublisher {
             if (pubRes.ok) {
               const pubData = (await pubRes.json()) as any;
               console.log(`[Instagram] ✅ Scheduled Reel successfully published live! Media ID: ${pubData.id}`);
+
+              // Fetch public permalink
+              let livePermalink: string | undefined;
+              try {
+                const permRes = await fetch(`https://graph.facebook.com/v21.0/${pubData.id}?fields=permalink&access_token=${pageToken}`);
+                if (permRes.ok) {
+                  const permJson = (await permRes.json()) as any;
+                  livePermalink = permJson.permalink;
+                  console.log(`[Instagram] 🔗 Live Reel Permalink: ${livePermalink}`);
+                }
+              } catch (_) {}
+
+              // Update database record with live post details
+              try {
+                const { PrismaClient } = await import('@prisma/client');
+                const prisma = new PrismaClient();
+                await prisma.socialPostItem.updateMany({
+                  where: { remotePostId: containerId },
+                  data: {
+                    remotePostId: pubData.id,
+                    remoteUrl: livePermalink || null
+                  }
+                });
+                await prisma.$disconnect();
+              } catch (dbErr: any) {
+                console.error(`[Instagram] ⚠️ Could not update DB with published media ID:`, dbErr?.message);
+              }
             } else {
               const pubErr = await pubRes.text();
               console.error(`[Instagram] ❌ Scheduled publish failed (${pubRes.status}): ${pubErr}`);
@@ -239,7 +266,6 @@ export class InstagramReelsPublisher implements ISocialPublisher {
           platform: this.id,
           isSimulated: false,
           remotePostId: containerId,
-          remoteUrl: `https://www.instagram.com/reel/scheduled_${containerId}`,
           logs
         };
       }

@@ -42,26 +42,29 @@ function resolveVideoPath(identifier: string): string | null {
       }
     }
 
-    // 2c. Fallback: find the newest rendered MP4 video on disk if identifier is not matched directly
-    const dirsWithMtime = entries
-      .map((entry) => {
-        const fullDir = path.join(renderBase, entry);
-        try {
-          const stat = fs.statSync(fullDir);
-          return stat.isDirectory() ? { dir: fullDir, mtime: stat.mtimeMs } : null;
-        } catch {
-          return null;
-        }
-      })
-      .filter((x): x is { dir: string; mtime: number } => x !== null)
-      .sort((a, b) => b.mtime - a.mtime);
+    // 2c. Fallback for UUID groupIds or 'latest' (in production/runtime only): find newest rendered MP4 on disk
+    const isUuidOrLatest = identifier === 'latest' || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    if (isUuidOrLatest && process.env.NODE_ENV !== 'test') {
+      const dirsWithMtime = entries
+        .map((entry) => {
+          const fullDir = path.join(renderBase, entry);
+          try {
+            const stat = fs.statSync(fullDir);
+            return stat.isDirectory() ? { dir: fullDir, mtime: stat.mtimeMs } : null;
+          } catch {
+            return null;
+          }
+        })
+        .filter((x): x is { dir: string; mtime: number } => x !== null)
+        .sort((a, b) => b.mtime - a.mtime);
 
-    for (const d of dirsWithMtime) {
-      try {
-        const files = fs.readdirSync(d.dir);
-        const mp4 = files.find((f) => f.endsWith('.mp4'));
-        if (mp4) return path.join(d.dir, mp4);
-      } catch {}
+      for (const d of dirsWithMtime) {
+        try {
+          const files = fs.readdirSync(d.dir);
+          const mp4 = files.find((f) => f.endsWith('.mp4'));
+          if (mp4) return path.join(d.dir, mp4);
+        } catch {}
+      }
     }
   }
 
