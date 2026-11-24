@@ -90,7 +90,6 @@ export class InstagramReelsPublisher implements ISocialPublisher {
           const initData = (await initRes.json()) as any;
           if (initData.id) {
             containerId = initData.id;
-            isResumable = true;
             const uploadUri = initData.uri || `https://rupload.facebook.com/ig-api-upload/v21.0/${containerId}`;
             log(`[Instagram] Resumable container created (ID: ${containerId}). Uploading binary stream to ${uploadUri}...`);
 
@@ -111,6 +110,7 @@ export class InstagramReelsPublisher implements ISocialPublisher {
               const uploadErrText = await uploadRes.text();
               throw new Error(`Resumable binary transfer to Meta failed (${uploadRes.status}): ${uploadErrText}`);
             }
+            isResumable = true;
             log(`[Instagram] Phase 1 complete: ${fileSize} bytes uploaded directly to Meta via rupload.`);
           }
         } else {
@@ -119,6 +119,8 @@ export class InstagramReelsPublisher implements ISocialPublisher {
         }
       } catch (resumableErr: any) {
         logWarn(`[Instagram] Direct binary upload error: ${resumableErr?.message}. Falling back to URL ingestion...`);
+        isResumable = false;
+        containerId = '';
       }
 
       // Fallback Strategy: URL ingestion if resumable upload was not accepted
@@ -195,6 +197,51 @@ export class InstagramReelsPublisher implements ISocialPublisher {
       }
 
       // Phase 3: Publish the container using media_publish
+      const scheduledTime = options.scheduledPostTime;
+      const isScheduled = scheduledTime && scheduledTime.getTime() > Date.now() + 60000;
+
+      if (isScheduled && process.env.NODE_ENV !== 'test') {
+        const delayMs = Math.max(0, scheduledTime.getTime() - Date.now());
+        const scheduledIso = scheduledTime.toISOString();
+        log(`[Instagram] Phase 3: Container ${containerId} is FINISHED and staged on Meta servers.`);
+        log(`[Instagram] 📅 Scheduled Mode: Queued media_publish to execute at ${scheduledIso} (~${(delayMs / 60000).toFixed(1)} mins from now).`);
+
+        // Queue deferred media_publish call for the exact scheduled time
+        const scheduledTimer = setTimeout(async () => {
+          try {
+            console.log(`[Instagram] ⏰ Scheduled trigger firing: Publishing container ${containerId} to Instagram via media_publish...`);
+            const pubRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                creation_id: containerId,
+                access_token: pageToken
+              })
+            });
+            if (pubRes.ok) {
+              const pubData = (await pubRes.json()) as any;
+              console.log(`[Instagram] ✅ Scheduled Reel successfully published live! Media ID: ${pubData.id}`);
+            } else {
+              const pubErr = await pubRes.text();
+              console.error(`[Instagram] ❌ Scheduled publish failed (${pubRes.status}): ${pubErr}`);
+            }
+          } catch (pubErr: any) {
+            console.error(`[Instagram] ❌ Deferred publish execution error:`, pubErr?.message);
+          }
+        }, delayMs);
+
+        if (scheduledTimer.unref) scheduledTimer.unref();
+
+        return {
+          success: true,
+          platform: this.id,
+          isSimulated: false,
+          remotePostId: containerId,
+          remoteUrl: `https://www.instagram.com/reel/scheduled_${containerId}`,
+          logs
+        };
+      }
+
       log(`[Instagram] Phase 3: Container is FINISHED. Publishing Reel to Instagram via media_publish...`);
       const publishRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
         method: 'POST',
