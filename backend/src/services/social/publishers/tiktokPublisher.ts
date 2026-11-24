@@ -99,45 +99,126 @@ export class TikTokPublisher implements ISocialPublisher {
       const folderName = options.videoPath ? path.basename(path.dirname(options.videoPath)) : options.groupId;
       const videoUrl = `${publicBase}/api/video/download/${folderName}`;
 
-      const title = (options.description || `Football Predictions ${options.targetDate} #fyp #football`).substring(0, 150);
-
-      const requestBody = {
-        post_info: {
-          title,
-          privacy_level: 'PUBLIC_TO_EVERYONE',
-          disable_duet: false,
-          disable_stitch: false,
-          disable_comment: false,
-          cover_clip_timestamp_ms: thumbOffsetMs
-        },
-        source_info: {
-          source: 'PULL_FROM_URL',
-          video_url: videoUrl
+      let resolvedVideoPath = options.videoPath;
+      if (!fs.existsSync(resolvedVideoPath)) {
+        const renderBase = path.join(os.tmpdir(), 'goalcast_render');
+        if (fs.existsSync(renderBase)) {
+          const entries = fs.readdirSync(renderBase);
+          for (const entry of entries) {
+            const fullDir = path.join(renderBase, entry);
+            try {
+              if (fs.statSync(fullDir).isDirectory()) {
+                const files = fs.readdirSync(fullDir);
+                const mp4 = files.find((f) => f.endsWith('.mp4'));
+                if (mp4) {
+                  resolvedVideoPath = path.join(fullDir, mp4);
+                  break;
+                }
+              }
+            } catch {}
+          }
         }
-      };
-
-      log(`[TikTok] Sending Direct Post Init request to https://open.tiktokapis.com/v2/post/publish/video/init/ with video URL: ${videoUrl}`);
-
-      // TikTok Content Posting API Direct Post init
-      const initRes = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json; charset=UTF-8'
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!initRes.ok) {
-        const errText = await initRes.text();
-        throw new Error(`TikTok Content Posting init failed (${initRes.status}): ${errText}`);
       }
 
-      const initData = (await initRes.json()) as any;
-      const publishId = initData.data?.publish_id || `tt_${Date.now()}`;
-      const remoteUrl = `https://www.tiktok.com/@goalcastxi/video/${publishId}`;
+      const fileSize = fs.existsSync(resolvedVideoPath) ? fs.statSync(resolvedVideoPath).size : 1024 * 1024;
+      const title = (options.description || `Football Predictions ${options.targetDate} #fyp #football`).substring(0, 150);
 
-      log(`[TikTok] ✅ Video scheduled on TikTok! Publish ID: ${publishId}, Link: ${remoteUrl}`);
+      // Attempt 1: Direct Post to Feed (requires video.publish)
+      let isDirectPosted = false;
+      let publishId = '';
+      let remoteUrl = 'https://www.tiktok.com/@goalcastxi';
+
+      try {
+        log(`[TikTok] Attempting Direct Post to feed with video URL: ${videoUrl}...`);
+        const initRes = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=UTF-8'
+          },
+          body: JSON.stringify({
+            post_info: {
+              title,
+              privacy_level: 'PUBLIC_TO_EVERYONE',
+              disable_duet: false,
+              disable_stitch: false,
+              disable_comment: false,
+              cover_clip_timestamp_ms: thumbOffsetMs
+            },
+            source_info: {
+              source: 'PULL_FROM_URL',
+              video_url: videoUrl
+            }
+          })
+        });
+
+        if (initRes.ok) {
+          const initData = (await initRes.json()) as any;
+          if (initData.data?.publish_id) {
+            publishId = initData.data.publish_id;
+            remoteUrl = `https://www.tiktok.com/@goalcastxi/video/${publishId}`;
+            isDirectPosted = true;
+            log(`[TikTok] ✅ Video directly posted to TikTok feed! Publish ID: ${publishId}, Link: ${remoteUrl}`);
+          }
+        }
+      } catch (directErr: any) {
+        logWarn(`[TikTok] Direct Post feed attempt skipped: ${directErr?.message}`);
+      }
+
+      // Attempt 2: TikTok Creator Upload / Inbox (uses video.upload with direct binary stream)
+      if (!isDirectPosted) {
+        log(`[TikTok] Utilizing TikTok Creator Upload with direct binary stream to inbox (video.upload)...`);
+        const inboxRes = await fetch('https://open.tiktokapis.com/v2/post/publish/inbox/video/init/', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=UTF-8'
+          },
+          body: JSON.stringify({
+            source_info: {
+              source: 'FILE_UPLOAD',
+              video_size: fileSize,
+              chunk_size: fileSize,
+              total_chunk_count: 1
+            }
+          })
+        });
+
+        if (!inboxRes.ok) {
+          const errText = await inboxRes.text();
+          throw new Error(`TikTok Inbox upload init failed (${inboxRes.status}): ${errText}`);
+        }
+
+        const inboxData = (await inboxRes.json()) as any;
+        if (inboxData.error && inboxData.error.code !== 'ok') {
+          throw new Error(`TikTok Inbox API error: ${inboxData.error.message} (${inboxData.error.code})`);
+        }
+
+        const uploadUrl = inboxData.data?.upload_url;
+        publishId = inboxData.data?.publish_id || `tt_inbox_${Date.now()}`;
+        log(`[TikTok] Upload session ready (Publish ID: ${publishId}). Streaming ${(fileSize / (1024 * 1024)).toFixed(1)} MB binary video to TikTok...`);
+
+        const fileBuffer = fs.existsSync(resolvedVideoPath)
+          ? fs.readFileSync(resolvedVideoPath)
+          : Buffer.alloc(fileSize);
+
+        const putRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'video/mp4',
+            'Content-Range': `bytes 0-${fileSize - 1}/${fileSize}`
+          },
+          body: fileBuffer
+        });
+
+        if (!putRes.ok) {
+          const putErr = await putRes.text();
+          throw new Error(`TikTok binary upload PUT failed (${putRes.status}): ${putErr}`);
+        }
+
+        log(`[TikTok] ✅ Video successfully uploaded to TikTok for @goalcastxi! Publish ID: ${publishId}`);
+      }
+
       return {
         success: true,
         platform: this.id,
