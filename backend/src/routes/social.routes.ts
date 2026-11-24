@@ -209,8 +209,8 @@ router.get('/tiktok/login', (_req: Request, res: Response): void => {
     return;
   }
   const redirectUri = encodeURIComponent('https://goalcast-zone-api.moxebocurtis.com/api/social/tiktok/callback');
-  // Must match the products/scopes configured on the TikTok Developer App
-  const scopes = encodeURIComponent('user.info.basic,video.upload,video.publish');
+  // Standard approved scopes: user.info.basic and video.upload (Upload to TikTok)
+  const scopes = encodeURIComponent('user.info.basic,video.upload');
   const csrfState = Math.random().toString(36).substring(2);
 
   const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${scopes}&response_type=code&redirect_uri=${redirectUri}&state=${csrfState}`;
