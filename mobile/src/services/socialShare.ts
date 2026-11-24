@@ -1,3 +1,5 @@
+import { DEFAULT_THUMBNAIL_TIMESTAMP, DEFAULT_THUMBNAIL_TIME_STR } from '../constants/config';
+
 export type SocialPlatform = 'facebook' | 'instagram' | 'tiktok' | 'youtube';
 
 export interface SocialSharePayload {
@@ -41,7 +43,7 @@ export const SOCIAL_PLATFORMS: PlatformConfig[] = [
 ];
 
 export function formatThumbnailTimestamp(seconds?: number): string {
-  if (typeof seconds !== 'number' || isNaN(seconds)) return '00:05';
+  if (typeof seconds !== 'number' || isNaN(seconds)) return DEFAULT_THUMBNAIL_TIME_STR;
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
@@ -59,7 +61,7 @@ export function buildFacebookShareExtras(
   const thumbSeconds =
     typeof payload.thumbnailTimestamp === 'number' && !isNaN(payload.thumbnailTimestamp)
       ? payload.thumbnailTimestamp
-      : 5.0;
+      : DEFAULT_THUMBNAIL_TIMESTAMP;
   const thumbStr = formatThumbnailTimestamp(thumbSeconds);
   const thumbMs = Math.round(thumbSeconds * 1000);
 
@@ -102,7 +104,7 @@ export function buildInstagramShareExtras(
   const thumbSeconds =
     typeof payload.thumbnailTimestamp === 'number' && !isNaN(payload.thumbnailTimestamp)
       ? payload.thumbnailTimestamp
-      : 5.0;
+      : DEFAULT_THUMBNAIL_TIMESTAMP;
   const thumbStr = formatThumbnailTimestamp(thumbSeconds);
   const thumbMs = Math.round(thumbSeconds * 1000);
 
@@ -145,7 +147,7 @@ export function buildTikTokShareExtras(
   const thumbSeconds =
     typeof payload.thumbnailTimestamp === 'number' && !isNaN(payload.thumbnailTimestamp)
       ? payload.thumbnailTimestamp
-      : 5.0;
+      : DEFAULT_THUMBNAIL_TIMESTAMP;
   const thumbStr = formatThumbnailTimestamp(thumbSeconds);
   const thumbMs = Math.round(thumbSeconds * 1000);
 
@@ -181,7 +183,7 @@ export function buildYouTubeShareExtras(
   const thumbSeconds =
     typeof payload.thumbnailTimestamp === 'number' && !isNaN(payload.thumbnailTimestamp)
       ? payload.thumbnailTimestamp
-      : 5.0;
+      : DEFAULT_THUMBNAIL_TIMESTAMP;
   const thumbStr = formatThumbnailTimestamp(thumbSeconds);
   const thumbMs = Math.round(thumbSeconds * 1000);
 
@@ -226,7 +228,7 @@ export async function shareToSocialMedia(
   const thumbSeconds =
     typeof payload.thumbnailTimestamp === 'number' && !isNaN(payload.thumbnailTimestamp)
       ? payload.thumbnailTimestamp
-      : 5.0;
+      : DEFAULT_THUMBNAIL_TIMESTAMP;
   const thumbStr = formatThumbnailTimestamp(thumbSeconds);
 
   // Android Direct App Intent Launch (Bypasses system chooser directly into Reel/Post edit mode)

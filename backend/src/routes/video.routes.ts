@@ -5,6 +5,7 @@ import os from 'os';
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
 import { getPreviousHitGameGroup } from '../services/predictions/previousHitService';
+import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
 
 const router = Router();
 
@@ -184,7 +185,7 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
     const backgroundVideo = params.backgroundVideo || 'background_video_1.mp4';
     const backgroundAudio = params.backgroundAudio || 'background_track_1.mp3';
     const voiceActor = params.voiceActor || 'hearth';
-    const thumbnailTimestamp = parseFloat(params.thumbnailTimestamp) || 5.0;
+    const thumbnailTimestamp = parseFloat(params.thumbnailTimestamp) || DEFAULT_THUMBNAIL_TIMESTAMP;
 
     const defaultGames = [
       {

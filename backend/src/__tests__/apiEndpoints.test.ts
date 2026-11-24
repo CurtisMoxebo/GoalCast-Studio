@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../index';
+import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
 
 test('Regression API: GET /api/health', async () => {
   const res = await request(app).get('/api/health');
@@ -31,7 +32,7 @@ test('Regression API: GET /api/media/assets', async () => {
   // Default settings
   assert.ok(res.body.defaultSettings);
   assert.equal(res.body.defaultSettings.voiceActor, 'hearth');
-  assert.equal(res.body.defaultSettings.thumbnailTimestamp, 5.0);
+  assert.equal(res.body.defaultSettings.thumbnailTimestamp, DEFAULT_THUMBNAIL_TIMESTAMP);
   assert.ok(res.body.defaultSettings.descriptionTemplate.includes('{date}'));
 });
 

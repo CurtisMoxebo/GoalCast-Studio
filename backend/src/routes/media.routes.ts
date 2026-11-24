@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { assetsManager } from '../services/video/assetsManager';
 import { AVAILABLE_VOICES } from '../services/tts/kokoroTtsService';
+import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.get('/assets', (_req: Request, res: Response) => {
       backgroundVideo: videos[0]?.filename || 'background_video_1.mp4',
       backgroundAudio: audio[0]?.filename || 'background_track_1.mp3',
       voiceActor: 'hearth',
-      thumbnailTimestamp: 5.0,
+      thumbnailTimestamp: DEFAULT_THUMBNAIL_TIMESTAMP,
       descriptionTemplate:
         'Football predictions for {date} ⚽🔥 \n #football #soccer #predictions #fyp'
     }

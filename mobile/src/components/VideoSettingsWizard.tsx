@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME } from '../constants/theme';
+import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/config';
 import { MediaAsset, VoiceOption, VideoSettings } from '../types';
 import { formatOrdinalDate } from '../utils/dateUtils';
 import { triggerHaptic } from '../utils/haptics';
@@ -173,7 +174,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     availableAudio[0]?.filename || 'background_track_1.mp3'
   );
   const [selectedVoice, setSelectedVoice] = useState('hearth');
-  const [thumbnailSeconds, setThumbnailSeconds] = useState(5.0); // 00:05 default
+  const [thumbnailSeconds, setThumbnailSeconds] = useState(DEFAULT_THUMBNAIL_TIMESTAMP);
   const [description, setDescription] = useState(defaultDesc);
 
   // Option to schedule the post or create it instantly

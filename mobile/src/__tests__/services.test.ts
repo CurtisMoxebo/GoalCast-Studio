@@ -10,6 +10,7 @@ import {
 } from '../services/socialShare';
 import { MobileApiService } from '../services/api';
 import { sessionStore } from '../services/sessionStore';
+import { DEFAULT_THUMBNAIL_TIMESTAMP, DEFAULT_THUMBNAIL_TIME_STR } from '../constants/config';
 import { UpcomingGame, HistoryItem } from '../types';
 
 test('Mobile Regression: Social platforms configuration', () => {
@@ -44,7 +45,8 @@ test('Mobile Regression: formatThumbnailTimestamp formats seconds into MM:SS', (
   assert.equal(formatThumbnailTimestamp(45), '00:45');
   assert.equal(formatThumbnailTimestamp(60), '01:00');
   assert.equal(formatThumbnailTimestamp(65), '01:05');
-  assert.equal(formatThumbnailTimestamp(undefined), '00:05');
+  assert.equal(formatThumbnailTimestamp(undefined), DEFAULT_THUMBNAIL_TIME_STR);
+  assert.equal(formatThumbnailTimestamp(DEFAULT_THUMBNAIL_TIMESTAMP), DEFAULT_THUMBNAIL_TIME_STR);
 });
 
 test('Mobile Thumbnail Frame Time: Slider supports 0 to 60 seconds with milestones [0, 15, 30, 45, 60]', () => {

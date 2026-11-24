@@ -38,3 +38,13 @@ export const resolveApiBaseUrl = (): string => {
 };
 
 export const API_BASE_URL = resolveApiBaseUrl();
+
+/**
+ * Default timestamp offset (in seconds) used for video thumbnail frames across the mobile studio.
+ */
+export const DEFAULT_THUMBNAIL_TIMESTAMP = 5.0;
+
+/**
+ * Formatted string representation (MM:SS) of the default thumbnail timestamp.
+ */
+export const DEFAULT_THUMBNAIL_TIME_STR = '00:05';

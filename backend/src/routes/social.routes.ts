@@ -5,6 +5,7 @@ import os from 'os';
 import prisma from '../db/prisma';
 import { socialPipelineService } from '../services/social/socialPipelineService';
 import { videoJobManager } from '../services/video/jobManager';
+import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
 
 const router = Router();
 
@@ -172,7 +173,7 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       description: finalDesc,
       targetDate,
       scheduledPostTime: scheduledDate,
-      thumbnailTimestamp: finalThumbnailTimestamp ?? 5.0,
+      thumbnailTimestamp: finalThumbnailTimestamp ?? DEFAULT_THUMBNAIL_TIMESTAMP,
       platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : undefined
     });
 
