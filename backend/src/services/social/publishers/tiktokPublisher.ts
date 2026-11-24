@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { ISocialPublisher, PublishOptions, PublishResult, SocialPlatformId } from '../types';
 
 export class TikTokPublisher implements ISocialPublisher {
