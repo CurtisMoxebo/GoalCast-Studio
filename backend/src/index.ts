@@ -7,6 +7,7 @@ import predictionsRoutes from './routes/predictions.routes';
 import mediaRoutes from './routes/media.routes';
 import videoRoutes from './routes/video.routes';
 import socialRoutes from './routes/social.routes';
+import { socialSchedulerService } from './services/social/socialSchedulerService';
 
 dotenv.config();
 
@@ -102,6 +103,9 @@ if (!isTest) {
     console.log(`🎥 Video Test:  http://localhost:${port}/api/video/test`);
     console.log(`📡 Ready to receive connections from mobile app & LAN`);
     console.log(`====================================================\n`);
+
+    // Start 15-minute aligned persistent social scheduler (:00, :15, :30, :45)
+    socialSchedulerService.start();
   });
 }
 
