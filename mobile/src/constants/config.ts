@@ -48,3 +48,25 @@ export const DEFAULT_THUMBNAIL_TIMESTAMP = 5.0;
  * Formatted string representation (MM:SS) of the default thumbnail timestamp.
  */
 export const DEFAULT_THUMBNAIL_TIME_STR = '00:05';
+
+/**
+ * Video, Media & Scheduling Default Constants across the mobile studio.
+ */
+export const DEFAULT_BACKGROUND_VIDEO = 'background_video_1.mp4';
+export const DEFAULT_BACKGROUND_AUDIO = 'background_track_1.mp3';
+export const DEFAULT_VOICE_ACTOR = 'hearth';
+export const DEFAULT_DESCRIPTION_TEMPLATE =
+  'Football predictions for {date} ⚽🔥\n#football #soccer #predictions #fyp';
+export const MIN_SCHEDULE_ADVANCE_MINUTES = 29.5;
+export const DEFAULT_SCHEDULE_HOUR = 19;
+export const DEFAULT_SCHEDULE_MINUTE = 0;
+
+/**
+ * Default list of social platforms enabled on initial render.
+ */
+export const DEFAULT_SELECTED_SOCIAL_PLATFORMS = [
+  'facebook_reels',
+  'instagram_reels',
+  'tiktok',
+  'youtube_shorts'
+] as const;

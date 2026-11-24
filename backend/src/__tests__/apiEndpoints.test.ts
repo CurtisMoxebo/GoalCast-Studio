@@ -3,7 +3,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../index';
-import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
+import {
+  DEFAULT_BACKGROUND_VIDEO,
+  DEFAULT_BACKGROUND_AUDIO,
+  DEFAULT_VOICE_ACTOR,
+  DEFAULT_THUMBNAIL_TIMESTAMP,
+  DEFAULT_DESCRIPTION_TEMPLATE
+} from '../constants/videoDefaults';
 
 test('Regression API: GET /api/health', async () => {
   const res = await request(app).get('/api/health');
@@ -31,9 +37,11 @@ test('Regression API: GET /api/media/assets', async () => {
 
   // Default settings
   assert.ok(res.body.defaultSettings);
-  assert.equal(res.body.defaultSettings.voiceActor, 'hearth');
+  assert.equal(res.body.defaultSettings.voiceActor, DEFAULT_VOICE_ACTOR);
   assert.equal(res.body.defaultSettings.thumbnailTimestamp, DEFAULT_THUMBNAIL_TIMESTAMP);
-  assert.ok(res.body.defaultSettings.descriptionTemplate.includes('{date}'));
+  assert.equal(res.body.defaultSettings.backgroundVideo, DEFAULT_BACKGROUND_VIDEO);
+  assert.equal(res.body.defaultSettings.backgroundAudio, DEFAULT_BACKGROUND_AUDIO);
+  assert.equal(res.body.defaultSettings.descriptionTemplate, DEFAULT_DESCRIPTION_TEMPLATE);
 });
 
 test('Regression API: GET /api/predictions/options', async () => {

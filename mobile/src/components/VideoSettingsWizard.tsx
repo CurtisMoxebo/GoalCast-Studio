@@ -16,7 +16,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME } from '../constants/theme';
-import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/config';
+import {
+  DEFAULT_BACKGROUND_VIDEO,
+  DEFAULT_BACKGROUND_AUDIO,
+  DEFAULT_VOICE_ACTOR,
+  DEFAULT_THUMBNAIL_TIMESTAMP,
+  MIN_SCHEDULE_ADVANCE_MINUTES,
+  DEFAULT_SCHEDULE_HOUR,
+  DEFAULT_SCHEDULE_MINUTE
+} from '../constants/config';
 import { MediaAsset, VoiceOption, VideoSettings } from '../types';
 import { formatOrdinalDate } from '../utils/dateUtils';
 import { triggerHaptic } from '../utils/haptics';
@@ -40,15 +48,15 @@ const formatSecondsToMMSS = (sec: number): string => {
 };
 
 export const getDefaultScheduledDate = (now: Date = new Date()): Date => {
-  const today19 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0, 0);
+  const today19 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), DEFAULT_SCHEDULE_HOUR, DEFAULT_SCHEDULE_MINUTE, 0, 0);
   const diffMinutes = (today19.getTime() - now.getTime()) / (1000 * 60);
 
-  // If the current time is more than 30 minutes before 19:00 today, default date is today at 19:00.
-  // Otherwise, default date is tomorrow at 19:00.
-  if (diffMinutes > 30) {
+  // If the current time is more than MIN_SCHEDULE_ADVANCE_MINUTES before scheduled hour today, default date is today.
+  // Otherwise, default date is tomorrow.
+  if (diffMinutes > MIN_SCHEDULE_ADVANCE_MINUTES) {
     return today19;
   } else {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 19, 0, 0, 0);
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, DEFAULT_SCHEDULE_HOUR, DEFAULT_SCHEDULE_MINUTE, 0, 0);
   }
 };
 
@@ -168,12 +176,12 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const defaultDesc = `Football predictions for ${formattedDate} ⚽🔥\n#football #soccer #predictions #fyp`;
 
   const [selectedVideo, setSelectedVideo] = useState(
-    availableVideos[0]?.filename || 'background_video_1.mp4'
+    availableVideos[0]?.filename || DEFAULT_BACKGROUND_VIDEO
   );
   const [selectedAudio, setSelectedAudio] = useState(
-    availableAudio[0]?.filename || 'background_track_1.mp3'
+    availableAudio[0]?.filename || DEFAULT_BACKGROUND_AUDIO
   );
-  const [selectedVoice, setSelectedVoice] = useState('hearth');
+  const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_ACTOR);
   const [thumbnailSeconds, setThumbnailSeconds] = useState(DEFAULT_THUMBNAIL_TIMESTAMP);
   const [description, setDescription] = useState(defaultDesc);
 
@@ -188,7 +196,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     return (scheduledDate.getTime() - Date.now()) / (1000 * 60);
   }, [scheduledDate]);
 
-  const isScheduleValid = !isScheduled || diffMinutes >= 29.5;
+  const isScheduleValid = !isScheduled || diffMinutes >= MIN_SCHEDULE_ADVANCE_MINUTES;
 
   // Next 10 days for rapid day picking
   const selectableDays = useMemo(() => {

@@ -10,7 +10,12 @@ import {
 } from '../services/socialShare';
 import { MobileApiService } from '../services/api';
 import { sessionStore } from '../services/sessionStore';
-import { DEFAULT_THUMBNAIL_TIMESTAMP, DEFAULT_THUMBNAIL_TIME_STR } from '../constants/config';
+import {
+  DEFAULT_THUMBNAIL_TIMESTAMP,
+  DEFAULT_THUMBNAIL_TIME_STR,
+  DEFAULT_SELECTED_SOCIAL_PLATFORMS,
+  MIN_SCHEDULE_ADVANCE_MINUTES
+} from '../constants/config';
 import { UpcomingGame, HistoryItem } from '../types';
 
 test('Mobile Regression: Social platforms configuration', () => {
@@ -188,7 +193,7 @@ test('Mobile Regression: MobileApiService URL builder methods and social endpoin
 test('Mobile Regression: 30-minute advance scheduling strictly enforces >= 29.5 minutes rule', () => {
   const isScheduleValid = (scheduledDate: Date): boolean => {
     const diffMinutes = (scheduledDate.getTime() - Date.now()) / (1000 * 60);
-    return diffMinutes >= 29.5;
+    return diffMinutes >= MIN_SCHEDULE_ADVANCE_MINUTES;
   };
 
   // 10 minutes in future -> rejected
@@ -368,7 +373,7 @@ test('Mobile Video Settings: Date Time Picker default 19:00 and instant vs sched
   const isPostValid = (isScheduled: boolean, scheduledDate: Date): boolean => {
     if (!isScheduled) return true; // Instant post is always valid
     const diffMinutes = (scheduledDate.getTime() - Date.now()) / (1000 * 60);
-    return diffMinutes >= 29.5;
+    return diffMinutes >= MIN_SCHEDULE_ADVANCE_MINUTES;
   };
 
   assert.equal(isPostValid(false, new Date()), true, 'Instant post mode must be valid immediately');
@@ -382,7 +387,7 @@ test('Mobile Video Settings: Date Time Picker default 19:00 and instant vs sched
 });
 
 test('Mobile Social Selection: Default platforms include all 4 platforms and support user toggling', () => {
-  const defaultPlatforms = ['facebook_reels', 'instagram_reels', 'tiktok', 'youtube_shorts'];
+  const defaultPlatforms = [...DEFAULT_SELECTED_SOCIAL_PLATFORMS];
   assert.equal(defaultPlatforms.length, 4, 'By default, all 4 platforms must be selected');
 
   // Verify toggling off and on

@@ -1,7 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { assetsManager } from '../services/video/assetsManager';
 import { AVAILABLE_VOICES } from '../services/tts/kokoroTtsService';
-import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
+import {
+  DEFAULT_BACKGROUND_VIDEO,
+  DEFAULT_BACKGROUND_AUDIO,
+  DEFAULT_VOICE_ACTOR,
+  DEFAULT_THUMBNAIL_TIMESTAMP,
+  DEFAULT_DESCRIPTION_TEMPLATE
+} from '../constants/videoDefaults';
 
 const router = Router();
 
@@ -26,12 +32,11 @@ router.get('/assets', (_req: Request, res: Response) => {
     })),
     voices: AVAILABLE_VOICES,
     defaultSettings: {
-      backgroundVideo: videos[0]?.filename || 'background_video_1.mp4',
-      backgroundAudio: audio[0]?.filename || 'background_track_1.mp3',
-      voiceActor: 'hearth',
+      backgroundVideo: videos[0]?.filename || DEFAULT_BACKGROUND_VIDEO,
+      backgroundAudio: audio[0]?.filename || DEFAULT_BACKGROUND_AUDIO,
+      voiceActor: DEFAULT_VOICE_ACTOR,
       thumbnailTimestamp: DEFAULT_THUMBNAIL_TIMESTAMP,
-      descriptionTemplate:
-        'Football predictions for {date} ⚽🔥 \n #football #soccer #predictions #fyp'
+      descriptionTemplate: DEFAULT_DESCRIPTION_TEMPLATE
     }
   });
 });

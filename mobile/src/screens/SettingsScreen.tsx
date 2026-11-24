@@ -10,7 +10,12 @@ import {
   Alert
 } from 'react-native';
 import { THEME } from '../constants/theme';
-import { PROD_API_HOST, LOCAL_DEV_FALLBACK, DEFAULT_THUMBNAIL_TIME_STR } from '../constants/config';
+import {
+  PROD_API_HOST,
+  LOCAL_DEV_FALLBACK,
+  DEFAULT_THUMBNAIL_TIME_STR,
+  DEFAULT_DESCRIPTION_TEMPLATE
+} from '../constants/config';
 import { mobileApi } from '../services/api';
 
 export const SettingsScreen: React.FC = () => {
@@ -20,9 +25,7 @@ export const SettingsScreen: React.FC = () => {
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
   const [cloudProvider, setCloudProvider] = useState('AWS S3');
   const [defaultThumbnailTime, setDefaultThumbnailTime] = useState(DEFAULT_THUMBNAIL_TIME_STR);
-  const [defaultDescription, setDefaultDescription] = useState(
-    'Football predictions for {date} ⚽🔥\n#football #soccer #predictions #fyp'
-  );
+  const [defaultDescription, setDefaultDescription] = useState(DEFAULT_DESCRIPTION_TEMPLATE);
 
   const handleSave = () => {
     mobileApi.setBaseUrl(apiUrl);

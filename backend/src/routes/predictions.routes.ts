@@ -13,7 +13,12 @@ import {
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
 import { getPreviousHitGameGroup } from '../services/predictions/previousHitService';
-import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
+import {
+  DEFAULT_BACKGROUND_VIDEO,
+  DEFAULT_BACKGROUND_AUDIO,
+  DEFAULT_VOICE_ACTOR,
+  DEFAULT_THUMBNAIL_TIMESTAMP
+} from '../constants/videoDefaults';
 import { overlayGenerator } from '../services/video/overlayGenerator';
 
 const router = Router();
@@ -113,9 +118,9 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
     const {
       targetDate,
       games,
-      backgroundVideo = 'background_video_1.mp4',
-      backgroundAudio = 'background_track_1.mp3',
-      voiceActor = 'hearth',
+      backgroundVideo = DEFAULT_BACKGROUND_VIDEO,
+      backgroundAudio = DEFAULT_BACKGROUND_AUDIO,
+      voiceActor = DEFAULT_VOICE_ACTOR,
       thumbnailTimestamp = DEFAULT_THUMBNAIL_TIMESTAMP,
       description = '',
       scheduledPostTime

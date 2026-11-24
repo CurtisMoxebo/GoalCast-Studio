@@ -3,10 +3,11 @@ import path from 'path';
 import os from 'os';
 import prisma from '../../db/prisma';
 import { videoJobManager } from './jobManager';
+import { DEFAULT_VIDEO_RETENTION_HOURS } from '../../constants/videoDefaults';
 
 export class VideoCleanupService {
   private timer: NodeJS.Timeout | null = null;
-  private readonly defaultRetentionHours: number = 72;
+  private readonly defaultRetentionHours: number = DEFAULT_VIDEO_RETENTION_HOURS;
 
   /**
    * Calculates total byte size of a directory recursively

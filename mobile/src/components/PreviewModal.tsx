@@ -15,6 +15,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { THEME } from '../constants/theme';
+import { DEFAULT_SELECTED_SOCIAL_PLATFORMS } from '../constants/config';
 import * as FileSystem from 'expo-file-system/legacy';
 import { mobileApi } from '../services/api';
 import { deviceStorage } from '../services/deviceStorage';
@@ -125,10 +126,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   // Social Platform Selection & Pipeline State
   // By default, they should all be selected
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
-    'facebook_reels',
-    'instagram_reels',
-    'tiktok',
-    'youtube_shorts'
+    ...DEFAULT_SELECTED_SOCIAL_PLATFORMS
   ]);
   const [isPlatformPickerVisible, setIsPlatformPickerVisible] = useState(false);
   const [isPipelineModalVisible, setIsPipelineModalVisible] = useState(false);

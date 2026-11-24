@@ -5,7 +5,12 @@ import os from 'os';
 import { videoComposer } from '../services/video/videoComposer';
 import { videoJobManager } from '../services/video/jobManager';
 import { getPreviousHitGameGroup } from '../services/predictions/previousHitService';
-import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
+import {
+  DEFAULT_BACKGROUND_VIDEO,
+  DEFAULT_BACKGROUND_AUDIO,
+  DEFAULT_VOICE_ACTOR,
+  DEFAULT_THUMBNAIL_TIMESTAMP
+} from '../constants/videoDefaults';
 
 const router = Router();
 
@@ -182,9 +187,9 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
 
     // Defaults for testing
     const targetDate = params.targetDate || new Date(Date.now() + 86400000).toISOString().split('T')[0];
-    const backgroundVideo = params.backgroundVideo || 'background_video_1.mp4';
-    const backgroundAudio = params.backgroundAudio || 'background_track_1.mp3';
-    const voiceActor = params.voiceActor || 'hearth';
+    const backgroundVideo = params.backgroundVideo || DEFAULT_BACKGROUND_VIDEO;
+    const backgroundAudio = params.backgroundAudio || DEFAULT_BACKGROUND_AUDIO;
+    const voiceActor = params.voiceActor || DEFAULT_VOICE_ACTOR;
     const thumbnailTimestamp = parseFloat(params.thumbnailTimestamp) || DEFAULT_THUMBNAIL_TIMESTAMP;
 
     const defaultGames = [

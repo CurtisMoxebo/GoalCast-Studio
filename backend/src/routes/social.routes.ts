@@ -5,7 +5,7 @@ import os from 'os';
 import prisma from '../db/prisma';
 import { socialPipelineService } from '../services/social/socialPipelineService';
 import { videoJobManager } from '../services/video/jobManager';
-import { DEFAULT_THUMBNAIL_TIMESTAMP } from '../constants/videoDefaults';
+import { DEFAULT_THUMBNAIL_TIMESTAMP, MIN_SCHEDULE_ADVANCE_MINUTES } from '../constants/videoDefaults';
 
 const router = Router();
 
@@ -103,7 +103,7 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       // Strict validation: must be at least 30 minutes in the future
       const now = Date.now();
       const diffMinutes = (parsedDate.getTime() - now) / (1000 * 60);
-      if (diffMinutes < 29.5) {
+      if (diffMinutes < MIN_SCHEDULE_ADVANCE_MINUTES) {
         console.warn(`[SocialRoutes] ❌ Rejected: Scheduled post time (${parsedDate.toISOString()}) is only ${diffMinutes.toFixed(1)}m in the future. Must be >= 30m.`);
         res.status(400).json({
           error: 'Scheduled post date & time must be at least 30 minutes in the future.'
