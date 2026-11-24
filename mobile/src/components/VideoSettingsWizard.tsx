@@ -173,7 +173,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     availableAudio[0]?.filename || 'background_track_1.mp3'
   );
   const [selectedVoice, setSelectedVoice] = useState('hearth');
-  const [thumbnailSeconds, setThumbnailSeconds] = useState(3.0); // 00:03 default
+  const [thumbnailSeconds, setThumbnailSeconds] = useState(5.0); // 00:05 default
   const [description, setDescription] = useState(defaultDesc);
 
   // Option to schedule the post or create it instantly

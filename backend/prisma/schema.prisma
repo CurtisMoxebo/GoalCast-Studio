@@ -31,7 +31,7 @@ model PredictionGroup {
   backgroundVideo      String                 @default("background_video_1.mp4")
   backgroundAudio      String                 @default("background_track_1.mp3")
   voiceActor           String                 @default("hearth")
-  thumbnailTimestamp   Float                  @default(3.0)
+  thumbnailTimestamp   Float                  @default(5.0)
   scheduledPostTime    DateTime?
   
   groupOutcome         String                 @default("PENDING") // PENDING, HIT, MISS

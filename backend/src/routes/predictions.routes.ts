@@ -115,7 +115,7 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
       backgroundVideo = 'background_video_1.mp4',
       backgroundAudio = 'background_track_1.mp3',
       voiceActor = 'hearth',
-      thumbnailTimestamp = 3.0,
+      thumbnailTimestamp = 5.0,
       description = '',
       scheduledPostTime
     } = req.body;
@@ -190,7 +190,7 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
           backgroundVideo,
           backgroundAudio,
           voiceActor,
-          thumbnailTimestamp: parseFloat(thumbnailTimestamp) || 3.0,
+          thumbnailTimestamp: parseFloat(thumbnailTimestamp) || 5.0,
           scheduledPostTime: scheduledPostTime ? new Date(scheduledPostTime) : null,
           games: {
             create: mappedGames.map((g: any) => ({

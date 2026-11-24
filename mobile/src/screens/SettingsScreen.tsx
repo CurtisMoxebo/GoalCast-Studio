@@ -19,7 +19,7 @@ export const SettingsScreen: React.FC = () => {
   const [pingMessage, setPingMessage] = useState<string>('');
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false);
   const [cloudProvider, setCloudProvider] = useState('AWS S3');
-  const [defaultThumbnailTime, setDefaultThumbnailTime] = useState('00:03');
+  const [defaultThumbnailTime, setDefaultThumbnailTime] = useState('00:05');
   const [defaultDescription, setDefaultDescription] = useState(
     'Football predictions for {date} ⚽🔥\n#football #soccer #predictions #fyp'
   );

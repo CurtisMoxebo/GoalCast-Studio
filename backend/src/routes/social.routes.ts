@@ -172,7 +172,7 @@ router.post('/schedule', async (req: Request, res: Response): Promise<void> => {
       description: finalDesc,
       targetDate,
       scheduledPostTime: scheduledDate,
-      thumbnailTimestamp: finalThumbnailTimestamp ?? 3.0,
+      thumbnailTimestamp: finalThumbnailTimestamp ?? 5.0,
       platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : undefined
     });
 

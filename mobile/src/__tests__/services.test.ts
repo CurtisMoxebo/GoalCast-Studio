@@ -38,12 +38,13 @@ test('Mobile Regression: Social platforms configuration', () => {
 test('Mobile Regression: formatThumbnailTimestamp formats seconds into MM:SS', () => {
   assert.equal(formatThumbnailTimestamp(0), '00:00');
   assert.equal(formatThumbnailTimestamp(3), '00:03');
+  assert.equal(formatThumbnailTimestamp(5), '00:05');
   assert.equal(formatThumbnailTimestamp(15.7), '00:15');
   assert.equal(formatThumbnailTimestamp(30), '00:30');
   assert.equal(formatThumbnailTimestamp(45), '00:45');
   assert.equal(formatThumbnailTimestamp(60), '01:00');
   assert.equal(formatThumbnailTimestamp(65), '01:05');
-  assert.equal(formatThumbnailTimestamp(undefined), '00:03');
+  assert.equal(formatThumbnailTimestamp(undefined), '00:05');
 });
 
 test('Mobile Thumbnail Frame Time: Slider supports 0 to 60 seconds with milestones [0, 15, 30, 45, 60]', () => {

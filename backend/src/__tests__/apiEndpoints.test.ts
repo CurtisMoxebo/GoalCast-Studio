@@ -31,7 +31,7 @@ test('Regression API: GET /api/media/assets', async () => {
   // Default settings
   assert.ok(res.body.defaultSettings);
   assert.equal(res.body.defaultSettings.voiceActor, 'hearth');
-  assert.equal(res.body.defaultSettings.thumbnailTimestamp, 3.0);
+  assert.equal(res.body.defaultSettings.thumbnailTimestamp, 5.0);
   assert.ok(res.body.defaultSettings.descriptionTemplate.includes('{date}'));
 });
 

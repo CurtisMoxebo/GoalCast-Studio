@@ -28,7 +28,7 @@ router.get('/assets', (_req: Request, res: Response) => {
       backgroundVideo: videos[0]?.filename || 'background_video_1.mp4',
       backgroundAudio: audio[0]?.filename || 'background_track_1.mp3',
       voiceActor: 'hearth',
-      thumbnailTimestamp: 3.0,
+      thumbnailTimestamp: 5.0,
       descriptionTemplate:
         'Football predictions for {date} ⚽🔥 \n #football #soccer #predictions #fyp'
     }
