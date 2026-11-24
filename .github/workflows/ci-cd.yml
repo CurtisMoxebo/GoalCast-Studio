@@ -156,10 +156,23 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           $env:COMPOSE_CONVERT_WINDOWS_PATHS = "1"
-          if (-not (Test-Path "resources")) { New-Item -ItemType Directory -Force -Path "resources" | Out-Null }
           if (Test-Path "C:\actions-runner\GoalCast-Studio\resources") {
-            Write-Host "Syncing resources into workspace..."
-            Copy-Item -Path "C:\actions-runner\GoalCast-Studio\resources\*" -Destination "resources" -Recurse -Force -ErrorAction SilentlyContinue
+            $isJunction = $false
+            if (Test-Path "resources") {
+              $item = Get-Item "resources"
+              if ($item.Attributes -match "ReparsePoint") {
+                $isJunction = $true
+              } else {
+                Write-Host "Replacing legacy duplicated resources folder with zero-copy NTFS Junction..."
+                Remove-Item -Path "resources" -Recurse -Force
+              }
+            }
+            if (-not $isJunction) {
+              Write-Host "Creating zero-copy NTFS Junction: resources -> C:\actions-runner\GoalCast-Studio\resources"
+              New-Item -ItemType Junction -Path "resources" -Target "C:\actions-runner\GoalCast-Studio\resources" | Out-Null
+            }
+          } elseif (-not (Test-Path "resources")) {
+            New-Item -ItemType Directory -Force -Path "resources" | Out-Null
           }
           Write-Host "Deploying Docker containers..."
           docker compose down --remove-orphans
