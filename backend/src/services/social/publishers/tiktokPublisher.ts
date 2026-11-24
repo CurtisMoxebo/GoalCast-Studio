@@ -45,9 +45,9 @@ export class TikTokPublisher implements ISocialPublisher {
     // If access token is missing locally, attempt to auto-sync from production server
     if (!accessToken && clientKey && process.env.NODE_ENV !== 'test') {
       try {
-        const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
-        log(`[TikTok] Access token not found locally. Attempting to fetch from remote server (${publicBase}/api/social/tiktok/token)...`);
-        const syncRes = await fetch(`${publicBase}/api/social/tiktok/token`);
+        const prodHost = 'https://goalcast-zone-api.moxebocurtis.com';
+        log(`[TikTok] Access token not found locally. Attempting to fetch from remote server (${prodHost}/api/social/tiktok/token)...`);
+        const syncRes = await fetch(`${prodHost}/api/social/tiktok/token`);
         if (syncRes.ok) {
           const syncData = (await syncRes.json()) as any;
           if (syncData.accessToken) {
