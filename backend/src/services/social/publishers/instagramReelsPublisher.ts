@@ -211,6 +211,20 @@ export class InstagramReelsPublisher implements ISocialPublisher {
         // Queue deferred media_publish call for the exact scheduled time
         const scheduledTimer = setTimeout(async () => {
           try {
+            // Verify item has not been cancelled before firing
+            try {
+              const { PrismaClient } = await import('@prisma/client');
+              const prisma = new PrismaClient();
+              const item = await prisma.socialPostItem.findFirst({
+                where: { remotePostId: containerId }
+              });
+              await prisma.$disconnect();
+              if (item?.status === 'CANCELLED') {
+                console.log(`[Instagram] 🛑 Scheduled post ${containerId} was cancelled. Aborting media_publish.`);
+                return;
+              }
+            } catch (_) {}
+
             console.log(`[Instagram] ⏰ Scheduled trigger firing: Publishing container ${containerId} to Instagram via media_publish...`);
             const pubRes = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
               method: 'POST',
