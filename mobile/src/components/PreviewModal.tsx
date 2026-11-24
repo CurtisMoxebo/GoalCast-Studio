@@ -400,41 +400,79 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     setIsPipelineRunning(true);
 
     try {
-      const res = await mobileApi.scheduleSocialPost({
-        groupId: targetGroupId,
-        scheduledPostTime: scheduledPostTime || undefined,
-        isInstant,
-        description,
-        thumbnailTimestamp,
-        platforms: platformsToRun
-      });
+      // Execute each selected social platform step-by-step
+      for (let i = 0; i < platformsToRun.length; i++) {
+        const currentPlatform = platformsToRun[i];
 
-      if (res.pipeline?.items && Array.isArray(res.pipeline.items)) {
+        // 1. Visually mark current platform as IN_PROGRESS with spinner
         setPipelineItems((prev) =>
-          prev.map((item) => {
-            const matched = res.pipeline.items.find((i: any) => i.platform === item.platform);
-            if (matched) {
-              const isSim = matched.status === 'SIMULATED' || matched.isSimulated === true;
-              return {
-                ...item,
-                status: isSim ? 'SIMULATED' : matched.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
-                isSimulated: isSim,
-                warning: matched.warning,
-                remotePostId: matched.remotePostId,
-                remoteUrl: matched.remoteUrl,
-                error: matched.error
-              };
-            }
-            return {
-              ...item,
-              status: 'FAILED',
-              error: 'Platform skipped or not processed by pipeline'
-            };
-          })
+          prev.map((item) =>
+            item.platform === currentPlatform
+              ? { ...item, status: 'IN_PROGRESS' }
+              : item
+          )
         );
-        const liveCount = res.pipeline.items.filter((i: any) => i.status === 'SUCCESS' && !i.isSimulated).length;
-        const simulatedCount = res.pipeline.items.filter((i: any) => i.status === 'SIMULATED' || i.isSimulated).length;
-        const failedCount = res.pipeline.items.filter((i: any) => i.status === 'FAILED').length;
+
+        // 2. Dispatch request for this specific platform
+        try {
+          const res = await mobileApi.scheduleSocialPost({
+            groupId: targetGroupId,
+            scheduledPostTime: scheduledPostTime || undefined,
+            isInstant,
+            description,
+            thumbnailTimestamp,
+            platforms: [currentPlatform]
+          });
+
+          const matched = res?.pipeline?.items?.find((p: any) => p.platform === currentPlatform);
+          if (matched) {
+            const isSim = matched.status === 'SIMULATED' || matched.isSimulated === true;
+            setPipelineItems((prev) =>
+              prev.map((item) =>
+                item.platform === currentPlatform
+                  ? {
+                      ...item,
+                      status: isSim ? 'SIMULATED' : matched.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+                      isSimulated: isSim,
+                      warning: matched.warning,
+                      remotePostId: matched.remotePostId,
+                      remoteUrl: matched.remoteUrl,
+                      error: matched.error
+                    }
+                  : item
+              )
+            );
+          } else {
+            setPipelineItems((prev) =>
+              prev.map((item) =>
+                item.platform === currentPlatform
+                  ? { ...item, status: 'FAILED', error: 'No response received from server' }
+                  : item
+              )
+            );
+          }
+        } catch (stepErr: any) {
+          console.warn(`[PreviewModal] Error publishing to ${currentPlatform}:`, stepErr);
+          // If a platform fails, display its failure outcome and immediately proceed to the next platform!
+          setPipelineItems((prev) =>
+            prev.map((item) =>
+              item.platform === currentPlatform
+                ? {
+                    ...item,
+                    status: 'FAILED',
+                    error: stepErr?.message || 'Failed to publish'
+                  }
+                : item
+            )
+          );
+        }
+      }
+
+      // 3. Once all platforms have completed, summarize the overall pipeline result
+      setPipelineItems((finalItems) => {
+        const liveCount = finalItems.filter((i) => i.status === 'SUCCESS' && !i.isSimulated).length;
+        const simulatedCount = finalItems.filter((i) => i.status === 'SIMULATED' || i.isSimulated).length;
+        const failedCount = finalItems.filter((i) => i.status === 'FAILED').length;
 
         if (liveCount > 0 && failedCount === 0 && simulatedCount === 0) {
           setPipelineSummary(isInstant ? `✅ All ${liveCount} Selected Platforms Published Live!` : `📅 All ${liveCount} Selected Platforms Staged & Scheduled!`);
@@ -447,25 +485,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         } else {
           setPipelineSummary('Pipeline processing completed.');
         }
-      } else {
-        setPipelineItems((prev) =>
-          prev.map((item) => ({
-            ...item,
-            status: 'FAILED',
-            error: 'No pipeline response received from server'
-          }))
-        );
-        setPipelineSummary('⚠️ Scheduling failed: Invalid server response');
-      }
+
+        return finalItems;
+      });
     } catch (err: any) {
       console.warn('[PreviewModal] Schedule error:', err);
-      setPipelineItems((prev) =>
-        prev.map((item) => ({
-          ...item,
-          status: item.status === 'IN_PROGRESS' ? 'FAILED' : item.status,
-          error: err?.message || 'Network or server error'
-        }))
-      );
       setPipelineSummary(`Pipeline result: ${err?.message || 'Error occurred'}`);
     } finally {
       setIsPipelineRunning(false);

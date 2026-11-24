@@ -8,6 +8,7 @@ import mediaRoutes from './routes/media.routes';
 import videoRoutes from './routes/video.routes';
 import socialRoutes from './routes/social.routes';
 import { socialSchedulerService } from './services/social/socialSchedulerService';
+import { videoCleanupService } from './services/video/videoCleanupService';
 
 dotenv.config();
 
@@ -106,6 +107,9 @@ if (!isTest) {
 
     // Start 15-minute aligned persistent social scheduler (:00, :15, :30, :45)
     socialSchedulerService.start();
+
+    // Start 72-hour automated video render cleanup service (runs hourly)
+    videoCleanupService.start();
   });
 }
 
