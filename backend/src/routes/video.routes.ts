@@ -42,28 +42,26 @@ function resolveVideoPath(identifier: string): string | null {
       }
     }
 
-    // 2c. Fallback: find the newest rendered MP4 video on disk only if specifically requested as 'latest' or 'default'
-    if (identifier === 'latest' || identifier === 'default') {
-      const dirsWithMtime = entries
-        .map((entry) => {
-          const fullDir = path.join(renderBase, entry);
-          try {
-            const stat = fs.statSync(fullDir);
-            return stat.isDirectory() ? { dir: fullDir, mtime: stat.mtimeMs } : null;
-          } catch {
-            return null;
-          }
-        })
-        .filter((x): x is { dir: string; mtime: number } => x !== null)
-        .sort((a, b) => b.mtime - a.mtime);
-
-      for (const d of dirsWithMtime) {
+    // 2c. Fallback: find the newest rendered MP4 video on disk if identifier is not matched directly
+    const dirsWithMtime = entries
+      .map((entry) => {
+        const fullDir = path.join(renderBase, entry);
         try {
-          const files = fs.readdirSync(d.dir);
-          const mp4 = files.find((f) => f.endsWith('.mp4'));
-          if (mp4) return path.join(d.dir, mp4);
-        } catch {}
-      }
+          const stat = fs.statSync(fullDir);
+          return stat.isDirectory() ? { dir: fullDir, mtime: stat.mtimeMs } : null;
+        } catch {
+          return null;
+        }
+      })
+      .filter((x): x is { dir: string; mtime: number } => x !== null)
+      .sort((a, b) => b.mtime - a.mtime);
+
+    for (const d of dirsWithMtime) {
+      try {
+        const files = fs.readdirSync(d.dir);
+        const mp4 = files.find((f) => f.endsWith('.mp4'));
+        if (mp4) return path.join(d.dir, mp4);
+      } catch {}
     }
   }
 

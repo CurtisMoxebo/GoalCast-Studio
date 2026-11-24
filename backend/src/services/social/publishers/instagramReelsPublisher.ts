@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { ISocialPublisher, PublishOptions, PublishResult, SocialPlatformId } from '../types';
 import { getVideoDurationInSeconds, getSafeThumbnailOffset } from '../mediaHelper';
 
@@ -125,8 +126,9 @@ export class InstagramReelsPublisher implements ISocialPublisher {
 
       // Fallback Strategy: URL ingestion if resumable upload was not accepted
       if (!isResumable) {
-        const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
-        const videoPublicUrl = `${publicBase}/api/video/download/${options.groupId}`;
+        const publicBase = (process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com').replace(/\/+$/, '');
+        const folderName = options.videoPath ? path.basename(path.dirname(options.videoPath)) : options.groupId;
+        const videoPublicUrl = `${publicBase}/api/video/download/${folderName}`;
         log(`[Instagram] Fallback Phase 1: Creating media container with public URL: ${videoPublicUrl}...`);
         const containerParams: Record<string, string> = {
           media_type: 'REELS',

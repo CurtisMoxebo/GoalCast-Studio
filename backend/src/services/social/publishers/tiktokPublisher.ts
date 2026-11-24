@@ -95,8 +95,9 @@ export class TikTokPublisher implements ISocialPublisher {
 
     try {
       log(`[TikTok] Initializing Content Posting API with Client Key: ${clientKey}, cover_clip_timestamp_ms: ${thumbOffsetMs} (${thumbSeconds}s)...`);
-      const publicBase = process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com';
-      const videoUrl = `${publicBase}/api/video/download/${options.groupId}`;
+      const publicBase = (process.env.PUBLIC_API_URL || 'https://goalcast-zone-api.moxebocurtis.com').replace(/\/+$/, '');
+      const folderName = options.videoPath ? path.basename(path.dirname(options.videoPath)) : options.groupId;
+      const videoUrl = `${publicBase}/api/video/download/${folderName}`;
 
       const title = (options.description || `Football Predictions ${options.targetDate} #fyp #football`).substring(0, 150);
 
