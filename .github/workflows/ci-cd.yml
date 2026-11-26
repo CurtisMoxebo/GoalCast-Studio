@@ -167,8 +167,8 @@ jobs:
                 Remove-Item -Path "resources" -Recurse -Force
               }
             }
-            Write-Host "Mounting canonical resources directly: C:/actions-runner/GoalCast-Studio/resources -> /resources"
-            $env:RESOURCES_HOST_PATH = "C:/actions-runner/GoalCast-Studio/resources"
+            Write-Host "Mounting canonical resources directly via WSL2 path: /mnt/c/actions-runner/GoalCast-Studio/resources -> /resources"
+            $env:RESOURCES_HOST_PATH = "/mnt/c/actions-runner/GoalCast-Studio/resources"
           } elseif (-not (Test-Path "resources")) {
             New-Item -ItemType Directory -Force -Path "resources" | Out-Null
           }
