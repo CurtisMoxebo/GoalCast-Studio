@@ -36,7 +36,7 @@ services:
       RESOURCES_DIR: /resources
     volumes:
       - type: bind
-        source: ./resources
+        source: ${RESOURCES_HOST_PATH:-./resources}
         target: /resources
 
 volumes:

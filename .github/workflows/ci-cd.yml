@@ -157,20 +157,18 @@ jobs:
         run: |
           $env:COMPOSE_CONVERT_WINDOWS_PATHS = "1"
           if (Test-Path "C:\actions-runner\GoalCast-Studio\resources") {
-            $isJunction = $false
             if (Test-Path "resources") {
               $item = Get-Item "resources"
               if ($item.Attributes -match "ReparsePoint") {
-                $isJunction = $true
+                Write-Host "Removing legacy NTFS Junction safely (target files untouched)..."
+                cmd /c rmdir "resources"
               } else {
-                Write-Host "Replacing legacy duplicated resources folder with zero-copy NTFS Junction..."
+                Write-Host "Removing legacy duplicated resources folder..."
                 Remove-Item -Path "resources" -Recurse -Force
               }
             }
-            if (-not $isJunction) {
-              Write-Host "Creating zero-copy NTFS Junction: resources -> C:\actions-runner\GoalCast-Studio\resources"
-              New-Item -ItemType Junction -Path "resources" -Target "C:\actions-runner\GoalCast-Studio\resources" | Out-Null
-            }
+            Write-Host "Mounting canonical resources directly: C:/actions-runner/GoalCast-Studio/resources -> /resources"
+            $env:RESOURCES_HOST_PATH = "C:/actions-runner/GoalCast-Studio/resources"
           } elseif (-not (Test-Path "resources")) {
             New-Item -ItemType Directory -Force -Path "resources" | Out-Null
           }

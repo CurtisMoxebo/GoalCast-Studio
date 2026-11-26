@@ -42,7 +42,11 @@ export class AssetsManager {
 
     const files = fs.readdirSync(this.resourcesDir);
     return files
-      .filter((file) => file.startsWith('background_video_') && file.endsWith('.mp4'))
+      .filter((file) => {
+        const lower = file.toLowerCase();
+        return lower.startsWith('background_video_') && lower.endsWith('.mp4');
+      })
+      .sort()
       .map((file, idx) => ({
         id: file,
         filename: file,
@@ -57,11 +61,14 @@ export class AssetsManager {
 
     const files = fs.readdirSync(this.resourcesDir);
     return files
-      .filter(
-        (file) =>
-          (file.startsWith('background_audio_') || file.startsWith('background_track_')) &&
-          (file.endsWith('.mp3') || file.endsWith('.wav'))
-      )
+      .filter((file) => {
+        const lower = file.toLowerCase();
+        return (
+          (lower.startsWith('background_audio_') || lower.startsWith('background_track_')) &&
+          (lower.endsWith('.mp3') || lower.endsWith('.wav'))
+        );
+      })
+      .sort()
       .map((file, idx) => ({
         id: file,
         filename: file,
