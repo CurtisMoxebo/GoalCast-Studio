@@ -528,18 +528,15 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         <View style={styles.section}>
           <View style={styles.mediaSectionHeader}>
             <Text style={styles.sectionTitle}>🎬 Background Video</Text>
-            <View style={styles.mediaHeaderRight}>
-              <Text style={styles.mediaCountPill}>{availableVideos.length} available</Text>
-              <TouchableOpacity
-                style={styles.customHeaderBtn}
-                onPress={() => handlePickCustomMedia('video')}
-                activeOpacity={0.75}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel="Add custom background video"
-              >
-                <Ionicons name="add" size={16} color={THEME.colors.primary} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.customHeaderBtn}
+              onPress={() => handlePickCustomMedia('video')}
+              activeOpacity={0.75}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Add custom background video"
+            >
+              <Ionicons name="add" size={16} color={THEME.colors.primary} />
+            </TouchableOpacity>
           </View>
           <View style={styles.compactSelectorRow}>
             <TouchableOpacity
@@ -605,18 +602,15 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         <View style={styles.section}>
           <View style={styles.mediaSectionHeader}>
             <Text style={styles.sectionTitle}>🎵 Background Beat</Text>
-            <View style={styles.mediaHeaderRight}>
-              <Text style={styles.mediaCountPill}>{availableAudio.length} available</Text>
-              <TouchableOpacity
-                style={styles.customHeaderBtn}
-                onPress={() => handlePickCustomMedia('audio')}
-                activeOpacity={0.75}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel="Add custom background audio"
-              >
-                <Ionicons name="add" size={16} color={THEME.colors.primary} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.customHeaderBtn}
+              onPress={() => handlePickCustomMedia('audio')}
+              activeOpacity={0.75}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Add custom background audio"
+            >
+              <Ionicons name="add" size={16} color={THEME.colors.primary} />
+            </TouchableOpacity>
           </View>
           <View style={styles.compactSelectorRow}>
             <TouchableOpacity
@@ -701,7 +695,6 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         <View style={styles.section}>
           <View style={styles.mediaSectionHeader}>
             <Text style={styles.sectionTitle}>🎙️ Voice Actor</Text>
-            <Text style={styles.mediaCountPill}>{availableVoices.length} available</Text>
           </View>
           <View style={styles.compactSelectorRow}>
             <TouchableOpacity
@@ -1554,20 +1547,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8
-  },
-  mediaHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  mediaCountPill: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94a3b8',
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8
   },
   customHeaderBtn: {
     width: 26,
