@@ -162,14 +162,17 @@ const ThumbnailTimeSlider: React.FC<ThumbnailTimeSliderProps> = ({
   );
 };
 
-const BackgroundVideoPreviewPlayer: React.FC<{ uri: string }> = ({ uri }) => {
+const BackgroundVideoPreviewPlayer: React.FC<{ uri: string; compact?: boolean }> = ({
+  uri,
+  compact = false
+}) => {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.play();
   });
 
   return (
-    <View style={styles.previewModalVideoWrap}>
+    <View style={[styles.previewModalVideoWrap, compact && styles.previewModalVideoWrapCompact]}>
       <VideoView
         player={player}
         style={styles.previewModalVideo}
@@ -212,8 +215,42 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_ACTOR);
   const [thumbnailSeconds, setThumbnailSeconds] = useState(DEFAULT_THUMBNAIL_TIMESTAMP);
   const [description, setDescription] = useState(defaultDesc);
+  const [activePicker, setActivePicker] = useState<'video' | 'audio' | null>(null);
+  const [pickerSearch, setPickerSearch] = useState('');
   const [previewingVideo, setPreviewingVideo] = useState<MediaAsset | null>(null);
   const [previewingAudio, setPreviewingAudio] = useState<MediaAsset | null>(null);
+
+  const selectedVideoAsset = useMemo(
+    () =>
+      availableVideos.find((v) => v.filename === selectedVideo) || {
+        id: selectedVideo,
+        filename: selectedVideo,
+        name: selectedVideo,
+        type: 'video' as const
+      },
+    [availableVideos, selectedVideo]
+  );
+
+  const selectedAudioAsset = useMemo(
+    () =>
+      availableAudio.find((a) => a.filename === selectedAudio) || {
+        id: selectedAudio,
+        filename: selectedAudio,
+        name: selectedAudio,
+        type: 'audio' as const
+      },
+    [availableAudio, selectedAudio]
+  );
+
+  const filteredPickerItems = useMemo(() => {
+    const source = activePicker === 'video' ? availableVideos : availableAudio;
+    const q = pickerSearch.trim().toLowerCase();
+    if (!q) return source;
+    return source.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) || item.filename.toLowerCase().includes(q)
+    );
+  }, [activePicker, availableVideos, availableAudio, pickerSearch]);
 
   // Option to schedule the post or create it instantly
   const [isScheduled, setIsScheduled] = useState<boolean>(true);
@@ -267,15 +304,31 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   };
 
   const handleBackPress = () => {
+    setActivePicker(null);
     setPreviewingAudio(null);
     setPreviewingVideo(null);
     onBack();
   };
 
+  const handleOpenPicker = (type: 'video' | 'audio') => {
+    triggerHaptic();
+    setPickerSearch('');
+    setPreviewingAudio(null);
+    setPreviewingVideo(null);
+    setActivePicker(type);
+  };
+
+  const handleClosePicker = () => {
+    setActivePicker(null);
+    setPickerSearch('');
+    setPreviewingAudio(null);
+    setPreviewingVideo(null);
+  };
+
   const handleOpenVideoPreview = (video: MediaAsset) => {
     triggerHaptic();
     setPreviewingAudio(null);
-    setPreviewingVideo(video);
+    setPreviewingVideo((prev) => (prev?.filename === video.filename && activePicker === 'video' ? null : video));
   };
 
   const handleToggleAudioPreview = (audio: MediaAsset) => {
@@ -285,6 +338,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   };
 
   const handleStartGeneration = () => {
+    setActivePicker(null);
     setPreviewingAudio(null);
     setPreviewingVideo(null);
     if (isScheduled && !isScheduleValid) {
@@ -337,115 +391,100 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           </Text>
         </View>
 
-        {/* 1. Background Video Selector (Vertical List + Preview Button) */}
+        {/* 1. Background Video Compact Selector (Opens Scrollable Picker Sheet) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎬 Background Video (Looped)</Text>
-          <View style={styles.mediaList}>
-            {availableVideos.map((video) => {
-              const isSelected = selectedVideo === video.filename;
-              return (
-                <View
-                  key={video.id}
-                  style={[styles.mediaListRow, isSelected && styles.mediaListRowSelected]}
-                >
-                  <TouchableOpacity
-                    style={styles.mediaListSelectArea}
-                    onPress={() => {
-                      triggerHaptic();
-                      setSelectedVideo(video.filename);
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[styles.mediaRadio, isSelected && styles.mediaRadioSelected]}>
-                      {isSelected && <Ionicons name="checkmark" size={13} color="#020617" />}
-                    </View>
-                    <View style={styles.mediaListTextWrap}>
-                      <Text
-                        style={[styles.mediaListName, isSelected && styles.mediaListNameSelected]}
-                        numberOfLines={1}
-                      >
-                        {video.name}
-                      </Text>
-                      <Text style={styles.mediaListFilename} numberOfLines={1}>
-                        {video.filename}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+          <View style={styles.mediaSectionHeader}>
+            <Text style={styles.sectionTitle}>🎬 Background Video (Looped)</Text>
+            <Text style={styles.mediaCountPill}>{availableVideos.length} available</Text>
+          </View>
+          <View style={styles.compactSelectorRow}>
+            <TouchableOpacity
+              style={styles.compactSelectorMain}
+              onPress={() => handleOpenPicker('video')}
+              activeOpacity={0.75}
+            >
+              <View style={styles.compactIconBox}>
+                <Ionicons name="videocam" size={20} color={THEME.colors.primary} />
+              </View>
+              <View style={styles.mediaListTextWrap}>
+                <Text style={styles.mediaListName} numberOfLines={1}>
+                  {selectedVideoAsset.name}
+                </Text>
+                <Text style={styles.mediaListFilename} numberOfLines={1}>
+                  {selectedVideoAsset.filename}
+                </Text>
+              </View>
+              <View style={styles.changeChip}>
+                <Text style={styles.changeChipText}>Change</Text>
+                <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
+              </View>
+            </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.mediaPreviewBtn}
-                    onPress={() => handleOpenVideoPreview(video)}
-                    activeOpacity={0.75}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <Ionicons name="play-circle-outline" size={16} color={THEME.colors.primary} />
-                    <Text style={styles.mediaPreviewBtnText}>Preview</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
+            <TouchableOpacity
+              style={styles.compactPreviewBtn}
+              onPress={() => handleOpenVideoPreview(selectedVideoAsset)}
+              activeOpacity={0.75}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="play-circle" size={20} color={THEME.colors.primary} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* 2. Background Audio Selector (Vertical List + Inline Play/Stop Preview) */}
+        {/* 2. Background Audio Compact Selector (Opens Scrollable Picker Sheet) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎵 Background Beat (Low Volume)</Text>
-          <View style={styles.mediaList}>
-            {availableAudio.map((audio) => {
-              const isSelected = selectedAudio === audio.filename;
-              const isPlaying = previewingAudio?.filename === audio.filename;
-              return (
-                <View
-                  key={audio.id}
-                  style={[styles.mediaListRow, isSelected && styles.mediaListRowSelected]}
-                >
-                  <TouchableOpacity
-                    style={styles.mediaListSelectArea}
-                    onPress={() => {
-                      triggerHaptic();
-                      setSelectedAudio(audio.filename);
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[styles.mediaRadio, isSelected && styles.mediaRadioSelected]}>
-                      {isSelected && <Ionicons name="checkmark" size={13} color="#020617" />}
-                    </View>
-                    <View style={styles.mediaListTextWrap}>
-                      <Text
-                        style={[styles.mediaListName, isSelected && styles.mediaListNameSelected]}
-                        numberOfLines={1}
-                      >
-                        {audio.name}
-                      </Text>
-                      <Text style={styles.mediaListFilename} numberOfLines={1}>
-                        {audio.filename}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+          <View style={styles.mediaSectionHeader}>
+            <Text style={styles.sectionTitle}>🎵 Background Beat (Low Volume)</Text>
+            <Text style={styles.mediaCountPill}>{availableAudio.length} available</Text>
+          </View>
+          <View style={styles.compactSelectorRow}>
+            <TouchableOpacity
+              style={styles.compactSelectorMain}
+              onPress={() => handleOpenPicker('audio')}
+              activeOpacity={0.75}
+            >
+              <View style={styles.compactIconBox}>
+                <Ionicons name="musical-notes" size={20} color={THEME.colors.primary} />
+              </View>
+              <View style={styles.mediaListTextWrap}>
+                <Text style={styles.mediaListName} numberOfLines={1}>
+                  {selectedAudioAsset.name}
+                </Text>
+                <Text style={styles.mediaListFilename} numberOfLines={1}>
+                  {selectedAudioAsset.filename}
+                </Text>
+              </View>
+              <View style={styles.changeChip}>
+                <Text style={styles.changeChipText}>Change</Text>
+                <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
+              </View>
+            </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.mediaPreviewBtn, isPlaying && styles.mediaPreviewBtnActive]}
-                    onPress={() => handleToggleAudioPreview(audio)}
-                    activeOpacity={0.75}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <Ionicons
-                      name={isPlaying ? 'stop-circle' : 'play-circle-outline'}
-                      size={16}
-                      color={isPlaying ? '#020617' : THEME.colors.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.mediaPreviewBtnText,
-                        isPlaying && styles.mediaPreviewBtnTextActive
-                      ]}
-                    >
-                      {isPlaying ? 'Stop' : 'Preview'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
+            <TouchableOpacity
+              style={[
+                styles.compactPreviewBtn,
+                previewingAudio?.filename === selectedAudioAsset.filename &&
+                  activePicker === null &&
+                  styles.mediaPreviewBtnActive
+              ]}
+              onPress={() => handleToggleAudioPreview(selectedAudioAsset)}
+              activeOpacity={0.75}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons
+                name={
+                  previewingAudio?.filename === selectedAudioAsset.filename && activePicker === null
+                    ? 'stop-circle'
+                    : 'play-circle'
+                }
+                size={20}
+                color={
+                  previewingAudio?.filename === selectedAudioAsset.filename && activePicker === null
+                    ? '#020617'
+                    : THEME.colors.primary
+                }
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -777,9 +816,166 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         />
       )}
 
-      {/* Background Video Preview Modal */}
+      {/* Scrollable Media Picker Bottom Sheet (Scales cleanly to any number of videos/audios) */}
       <Modal
-        visible={previewingVideo !== null}
+        visible={activePicker !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleClosePicker}
+      >
+        <View style={styles.pickerSheetOverlay}>
+          <TouchableOpacity
+            style={styles.pickerSheetBackdrop}
+            activeOpacity={1}
+            onPress={handleClosePicker}
+          />
+          <View style={[styles.pickerSheetCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.pickerSheetHandle} />
+
+            {/* Sheet Header */}
+            <View style={styles.previewModalHeader}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.previewModalTitle}>
+                  {activePicker === 'video' ? '🎬 Select Background Video' : '🎵 Select Background Beat'}
+                </Text>
+                <Text style={styles.previewModalSubtitle}>
+                  {(activePicker === 'video' ? availableVideos : availableAudio).length} items • Tap Preview to audition
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleClosePicker}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Filter (auto-shown when there are 5+ items) */}
+            {(activePicker === 'video' ? availableVideos : availableAudio).length > 4 && (
+              <View style={styles.pickerSearchWrap}>
+                <Ionicons name="search" size={16} color="#64748b" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.pickerSearchInput}
+                  value={pickerSearch}
+                  onChangeText={setPickerSearch}
+                  placeholder={`Search ${activePicker === 'video' ? 'videos' : 'audio tracks'}...`}
+                  placeholderTextColor="#64748b"
+                  autoCorrect={false}
+                />
+                {pickerSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setPickerSearch('')}>
+                    <Ionicons name="close-circle" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Embedded Live Video Preview Stage (when previewing a video inside the sheet) */}
+            {activePicker === 'video' && previewingVideo && (
+              <View style={styles.sheetVideoStage}>
+                <View style={styles.sheetVideoStageHeader}>
+                  <Text style={styles.sheetVideoStageLabel} numberOfLines={1}>
+                    Previewing: {previewingVideo.name}
+                  </Text>
+                  <TouchableOpacity onPress={() => setPreviewingVideo(null)}>
+                    <Text style={styles.sheetVideoHideText}>Hide</Text>
+                  </TouchableOpacity>
+                </View>
+                <BackgroundVideoPreviewPlayer
+                  key={previewingVideo.filename}
+                  uri={mobileApi.getMediaAssetUrl(previewingVideo.filename)}
+                  compact={true}
+                />
+              </View>
+            )}
+
+            {/* Scrollable Media List */}
+            <ScrollView
+              style={styles.pickerSheetScroll}
+              contentContainerStyle={styles.mediaList}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredPickerItems.length === 0 ? (
+                <Text style={styles.pickerEmptyText}>No matching items found.</Text>
+              ) : (
+                filteredPickerItems.map((item) => {
+                  const isVideo = activePicker === 'video';
+                  const isSelected = isVideo
+                    ? selectedVideo === item.filename
+                    : selectedAudio === item.filename;
+                  const isPreviewing = isVideo
+                    ? previewingVideo?.filename === item.filename
+                    : previewingAudio?.filename === item.filename;
+
+                  return (
+                    <View
+                      key={item.id}
+                      style={[styles.mediaListRow, isSelected && styles.mediaListRowSelected]}
+                    >
+                      <TouchableOpacity
+                        style={styles.mediaListSelectArea}
+                        onPress={() => {
+                          triggerHaptic();
+                          if (isVideo) {
+                            setSelectedVideo(item.filename);
+                          } else {
+                            setSelectedAudio(item.filename);
+                          }
+                          handleClosePicker();
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[styles.mediaRadio, isSelected && styles.mediaRadioSelected]}>
+                          {isSelected && <Ionicons name="checkmark" size={13} color="#020617" />}
+                        </View>
+                        <View style={styles.mediaListTextWrap}>
+                          <Text
+                            style={[styles.mediaListName, isSelected && styles.mediaListNameSelected]}
+                            numberOfLines={1}
+                          >
+                            {item.name}
+                          </Text>
+                          <Text style={styles.mediaListFilename} numberOfLines={1}>
+                            {item.filename}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.mediaPreviewBtn, isPreviewing && styles.mediaPreviewBtnActive]}
+                        onPress={() =>
+                          isVideo ? handleOpenVideoPreview(item) : handleToggleAudioPreview(item)
+                        }
+                        activeOpacity={0.75}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Ionicons
+                          name={isPreviewing ? 'stop-circle' : 'play-circle-outline'}
+                          size={16}
+                          color={isPreviewing ? '#020617' : THEME.colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.mediaPreviewBtnText,
+                            isPreviewing && styles.mediaPreviewBtnTextActive
+                          ]}
+                        >
+                          {isPreviewing ? 'Stop' : 'Preview'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Quick Standalone Background Video Preview Modal (when triggered directly from main screen) */}
+      <Modal
+        visible={previewingVideo !== null && activePicker === null}
         transparent={true}
         animationType="fade"
         onRequestClose={() => setPreviewingVideo(null)}
@@ -985,6 +1181,144 @@ const styles = StyleSheet.create({
     color: THEME.colors.textSecondary,
     marginBottom: 10
   },
+  mediaSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  mediaCountPill: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8
+  },
+  compactSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  compactSelectorMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(56, 189, 248, 0.35)'
+  },
+  compactIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(14, 165, 233, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10
+  },
+  changeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginLeft: 8
+  },
+  changeChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#cbd5e1'
+  },
+  compactPreviewBtn: {
+    width: 46,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#0f172a',
+    borderWidth: 1.5,
+    borderColor: 'rgba(56, 189, 248, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  pickerSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(2, 6, 23, 0.78)'
+  },
+  pickerSheetBackdrop: {
+    flex: 1
+  },
+  pickerSheetCard: {
+    backgroundColor: '#0f172a',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    maxHeight: '82%',
+    borderTopWidth: 1,
+    borderColor: '#334155'
+  },
+  pickerSheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#475569',
+    alignSelf: 'center',
+    marginBottom: 12
+  },
+  pickerSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  pickerSearchInput: {
+    flex: 1,
+    color: '#f8fafc',
+    fontSize: 14,
+    padding: 0
+  },
+  sheetVideoStage: {
+    marginBottom: 12
+  },
+  sheetVideoStageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6
+  },
+  sheetVideoStageLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.primary,
+    flex: 1,
+    marginRight: 8
+  },
+  sheetVideoHideText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8'
+  },
+  pickerSheetScroll: {
+    maxHeight: 360
+  },
+  pickerEmptyText: {
+    textAlign: 'center',
+    color: '#64748b',
+    paddingVertical: 24,
+    fontSize: 14
+  },
   mediaList: {
     marginTop: 6,
     gap: 8
@@ -1102,6 +1436,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 14
+  },
+  previewModalVideoWrapCompact: {
+    height: 220,
+    marginBottom: 4
   },
   previewModalVideo: {
     width: '100%',
