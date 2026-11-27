@@ -189,6 +189,14 @@ test('Mobile Regression: MobileApiService URL builder methods and social endpoin
   assert.equal(api.getMediaAssetUrl('background_video_1.mp4'), 'http://test-server:5000/api/media/stream/background_video_1.mp4');
   assert.equal(api.getMediaAssetUrl('background_track_2.mp3'), 'http://test-server:5000/api/media/stream/background_track_2.mp3');
   assert.equal(api.getVoicePreviewUrl('hearth'), 'http://test-server:5000/api/media/voice-preview/hearth');
+  assert.equal(
+    api.getCustomMediaUploadUrl('video', 'my_clip.mp4'),
+    'http://test-server:5000/api/media/upload-custom?type=video&filename=my_clip.mp4'
+  );
+  assert.equal(
+    api.getCustomMediaUploadUrl('audio', 'my_beat.mp3'),
+    'http://test-server:5000/api/media/upload-custom?type=audio&filename=my_beat.mp3'
+  );
   assert.equal(typeof api.scheduleSocialPost, 'function');
   assert.equal(typeof api.getSocialPipeline, 'function');
 });

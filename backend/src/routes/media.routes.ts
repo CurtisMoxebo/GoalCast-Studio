@@ -139,4 +139,94 @@ router.get('/voice-preview/:voiceId', async (req: Request, res: Response): Promi
   }
 });
 
+/**
+ * POST /api/media/upload-custom?type=video|audio&filename=...
+ * Streams a one-time custom background video or audio file into temp storage
+ * (`%TEMP%/goalcast_render/custom_uploads/`) so it is only used for the generated
+ * video and never added to the permanent `resources/` library.
+ */
+router.post('/upload-custom', (req: Request, res: Response): void => {
+  const mediaType = String(req.query.type || '').toLowerCase();
+  const rawFilename = String(req.query.filename || '');
+
+  if (mediaType !== 'video' && mediaType !== 'audio') {
+    res.status(400).json({ error: 'Query parameter "type" must be "video" or "audio".' });
+    return;
+  }
+
+  const allowedVideoExts = new Set(['.mp4', '.mov', '.m4v', '.webm']);
+  const allowedAudioExts = new Set(['.mp3', '.wav', '.m4a', '.aac', '.ogg']);
+  const rawExt = path.extname(path.basename(rawFilename)).toLowerCase();
+  const fallbackExt = mediaType === 'video' ? '.mp4' : '.mp3';
+  const ext =
+    mediaType === 'video'
+      ? allowedVideoExts.has(rawExt) ? rawExt : fallbackExt
+      : allowedAudioExts.has(rawExt) ? rawExt : fallbackExt;
+
+  const token = `custom_${mediaType}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
+  const uploadsDir = assetsManager.getCustomUploadsDir();
+  const destPath = path.join(uploadsDir, token);
+
+  const MAX_BYTES = 200 * 1024 * 1024; // 200 MB safety cap
+  let receivedBytes = 0;
+  let aborted = false;
+
+  const writeStream = fs.createWriteStream(destPath);
+
+  req.on('data', (chunk: Buffer) => {
+    receivedBytes += chunk.length;
+    if (receivedBytes > MAX_BYTES && !aborted) {
+      aborted = true;
+      writeStream.destroy();
+      try {
+        if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+      } catch {}
+      res.status(413).json({ error: 'Custom media file exceeds 200 MB limit.' });
+      req.destroy();
+    }
+  });
+
+  req.on('error', (err) => {
+    if (aborted) return;
+    aborted = true;
+    writeStream.destroy();
+    try {
+      if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+    } catch {}
+    res.status(500).json({ error: err?.message || 'Upload stream interrupted.' });
+  });
+
+  writeStream.on('error', (err) => {
+    if (aborted) return;
+    aborted = true;
+    try {
+      if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+    } catch {}
+    res.status(500).json({ error: err?.message || 'Failed to write custom media file.' });
+  });
+
+  writeStream.on('finish', () => {
+    if (aborted) return;
+    if (receivedBytes === 0) {
+      try {
+        if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+      } catch {}
+      res.status(400).json({ error: 'Empty file uploaded.' });
+      return;
+    }
+
+    console.log(
+      `[MediaRoutes] 📤 Stored ephemeral custom ${mediaType}: ${token} (${(receivedBytes / (1024 * 1024)).toFixed(2)} MB)`
+    );
+    res.status(201).json({
+      success: true,
+      token,
+      type: mediaType,
+      sizeBytes: receivedBytes
+    });
+  });
+
+  req.pipe(writeStream);
+});
+
 export default router;

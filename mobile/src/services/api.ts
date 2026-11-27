@@ -159,6 +159,32 @@ export class MobileApiService {
     return `${this.baseUrl}/api/media/voice-preview/${encodeURIComponent(voiceId)}`;
   }
 
+  getCustomMediaUploadUrl(type: 'video' | 'audio', filename: string): string {
+    return `${this.baseUrl}/api/media/upload-custom?type=${encodeURIComponent(type)}&filename=${encodeURIComponent(filename)}`;
+  }
+
+  async uploadCustomMedia(
+    localUri: string,
+    type: 'video' | 'audio',
+    filename: string
+  ): Promise<{ token: string; sizeBytes: number }> {
+    const FileSystem = await import('expo-file-system/legacy');
+    const url = this.getCustomMediaUploadUrl(type, filename);
+    const result = await FileSystem.uploadAsync(url, localUri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        'Content-Type': 'application/octet-stream'
+      }
+    });
+
+    const parsed = JSON.parse(result.body || '{}');
+    if (result.status < 200 || result.status >= 300 || !parsed.token) {
+      throw new Error(parsed.error || `Failed to upload custom ${type} (Status ${result.status})`);
+    }
+    return { token: parsed.token, sizeBytes: parsed.sizeBytes || 0 };
+  }
+
   getRecapImageUrl(groupId: string, download = false): string {
     return `${this.baseUrl}/api/predictions/recap-image/${groupId}${download ? '?download=1' : ''}`;
   }

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 export interface MediaAssetInfo {
   id: string;
@@ -99,8 +100,25 @@ export class AssetsManager {
     }
   }
 
+  getCustomUploadsDir(): string {
+    const dir = path.join(os.tmpdir(), 'goalcast_render', 'custom_uploads');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    return dir;
+  }
+
   getAssetPath(filename: string): string {
     const safeName = path.basename(filename);
+
+    // Ephemeral one-time custom uploads (used only for the generated video)
+    if (safeName.startsWith('custom_video_') || safeName.startsWith('custom_audio_')) {
+      const customCandidate = path.join(os.tmpdir(), 'goalcast_render', 'custom_uploads', safeName);
+      if (fs.existsSync(customCandidate)) {
+        return customCandidate;
+      }
+    }
+
     const searchOrder = [
       path.join(this.resourcesDir, RESOURCE_SUBDIRS.backgroundVideos, safeName),
       path.join(this.resourcesDir, RESOURCE_SUBDIRS.backgroundAudio, safeName),

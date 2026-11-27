@@ -82,6 +82,29 @@ test('Regression API: GET /api/media/voice-preview/:voiceId streams valid voice 
   assert.equal(validRes.headers['accept-ranges'], 'bytes');
 });
 
+test('Regression API: POST /api/media/upload-custom stores ephemeral media outside permanent resources', async () => {
+  const badTypeRes = await request(app)
+    .post('/api/media/upload-custom?type=invalid&filename=test.mp4')
+    .set('Content-Type', 'application/octet-stream')
+    .send(Buffer.from('dummy'));
+  assert.equal(badTypeRes.status, 400);
+
+  const uploadRes = await request(app)
+    .post('/api/media/upload-custom?type=video&filename=my_clip.mp4')
+    .set('Content-Type', 'application/octet-stream')
+    .send(Buffer.from('fake-mp4-binary-payload'));
+  assert.equal(uploadRes.status, 201);
+  assert.equal(uploadRes.body.success, true);
+  assert.equal(uploadRes.body.type, 'video');
+  assert.ok(String(uploadRes.body.token).startsWith('custom_video_'));
+  assert.ok(String(uploadRes.body.token).endsWith('.mp4'));
+
+  // Confirm it does NOT pollute the permanent /api/media/assets library
+  const assetsRes = await request(app).get('/api/media/assets');
+  const videoFilenames = assetsRes.body.backgroundVideos.map((v: any) => v.filename);
+  assert.equal(videoFilenames.includes(uploadRes.body.token), false);
+});
+
 test('Regression API: GET /api/predictions/options', async () => {
   const res = await request(app).get('/api/predictions/options');
   assert.equal(res.status, 200);

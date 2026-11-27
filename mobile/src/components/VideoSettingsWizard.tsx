@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import * as DocumentPicker from 'expo-document-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME } from '../constants/theme';
 import {
@@ -232,9 +233,12 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const [description, setDescription] = useState(defaultDesc);
   const [activePicker, setActivePicker] = useState<'video' | 'audio' | 'voice' | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
-  const [previewingVideo, setPreviewingVideo] = useState<MediaAsset | null>(null);
-  const [previewingAudio, setPreviewingAudio] = useState<MediaAsset | null>(null);
+  const [previewingVideo, setPreviewingVideo] = useState<(MediaAsset & { localUri?: string }) | null>(null);
+  const [previewingAudio, setPreviewingAudio] = useState<(MediaAsset & { localUri?: string }) | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<VoiceOption | null>(null);
+  const [customVideo, setCustomVideo] = useState<{ uri: string; name: string; uploadedToken?: string } | null>(null);
+  const [customAudio, setCustomAudio] = useState<{ uri: string; name: string; uploadedToken?: string } | null>(null);
+  const [isUploadingCustom, setIsUploadingCustom] = useState(false);
 
   const selectedVideoAsset = useMemo(
     () =>
@@ -366,14 +370,14 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     setPreviewingVoice(null);
   };
 
-  const handleOpenVideoPreview = (video: MediaAsset) => {
+  const handleOpenVideoPreview = (video: MediaAsset & { localUri?: string }) => {
     triggerHaptic();
     setPreviewingAudio(null);
     setPreviewingVoice(null);
     setPreviewingVideo((prev) => (prev?.filename === video.filename && activePicker === 'video' ? null : video));
   };
 
-  const handleToggleAudioPreview = (audio: MediaAsset) => {
+  const handleToggleAudioPreview = (audio: MediaAsset & { localUri?: string }) => {
     triggerHaptic();
     setPreviewingVideo(null);
     setPreviewingVoice(null);
@@ -387,7 +391,39 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     setPreviewingVoice((prev) => (prev?.id === voice.id ? null : voice));
   };
 
-  const handleStartGeneration = () => {
+  const handlePickCustomMedia = async (type: 'video' | 'audio') => {
+    triggerHaptic();
+    setPreviewingAudio(null);
+    setPreviewingVideo(null);
+    setPreviewingVoice(null);
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: type === 'video' ? 'video/*' : 'audio/*',
+        copyToCacheDirectory: true,
+        multiple: false
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const picked = result.assets[0];
+      const displayName = picked.name || (type === 'video' ? 'custom_video.mp4' : 'custom_audio.mp3');
+
+      if (type === 'video') {
+        setCustomVideo({ uri: picked.uri, name: displayName });
+      } else {
+        setCustomAudio({ uri: picked.uri, name: displayName });
+      }
+      setActivePicker(null);
+      setPickerSearch('');
+    } catch (err: any) {
+      Alert.alert('File Picker Error', err?.message || `Could not pick custom ${type} file.`);
+    }
+  };
+
+  const handleStartGeneration = async () => {
     setActivePicker(null);
     setPreviewingAudio(null);
     setPreviewingVideo(null);
@@ -399,9 +435,55 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
       );
       return;
     }
+
+    let finalVideo = selectedVideo;
+    let finalAudio = selectedAudio;
+
+    try {
+      if (customVideo || customAudio) {
+        setIsUploadingCustom(true);
+      }
+
+      if (customVideo) {
+        if (customVideo.uploadedToken) {
+          finalVideo = customVideo.uploadedToken;
+        } else {
+          const uploaded = await mobileApi.uploadCustomMedia(
+            customVideo.uri,
+            'video',
+            customVideo.name
+          );
+          finalVideo = uploaded.token;
+          setCustomVideo((prev) => (prev ? { ...prev, uploadedToken: uploaded.token } : null));
+        }
+      }
+
+      if (customAudio) {
+        if (customAudio.uploadedToken) {
+          finalAudio = customAudio.uploadedToken;
+        } else {
+          const uploaded = await mobileApi.uploadCustomMedia(
+            customAudio.uri,
+            'audio',
+            customAudio.name
+          );
+          finalAudio = uploaded.token;
+          setCustomAudio((prev) => (prev ? { ...prev, uploadedToken: uploaded.token } : null));
+        }
+      }
+    } catch (uploadErr: any) {
+      Alert.alert(
+        'Custom Media Upload Failed',
+        uploadErr?.message || 'Could not upload your custom media file to the server.'
+      );
+      return;
+    } finally {
+      setIsUploadingCustom(false);
+    }
+
     onPreview({
-      backgroundVideo: selectedVideo,
-      backgroundAudio: selectedAudio,
+      backgroundVideo: finalVideo,
+      backgroundAudio: finalAudio,
       voiceActor: selectedVoice,
       thumbnailTimestamp: thumbnailSeconds,
       description,
@@ -442,35 +524,75 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           </Text>
         </View>
 
-        {/* 1. Background Video Compact Selector (Opens Scrollable Picker Sheet) */}
+        {/* 1. Background Video Compact Selector (Opens Scrollable Picker Sheet or Custom Upload) */}
         <View style={styles.section}>
           <View style={styles.mediaSectionHeader}>
             <Text style={styles.sectionTitle}>🎬 Background Video (Looped)</Text>
-            <Text style={styles.mediaCountPill}>{availableVideos.length} available</Text>
+            <View style={styles.mediaHeaderRight}>
+              <Text style={styles.mediaCountPill}>{availableVideos.length} available</Text>
+              <TouchableOpacity
+                style={styles.customHeaderBtn}
+                onPress={() => handlePickCustomMedia('video')}
+                activeOpacity={0.75}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons name="add-circle-outline" size={14} color={THEME.colors.primary} />
+                <Text style={styles.customHeaderBtnText}>Custom</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={styles.compactSelectorRow}>
             <TouchableOpacity
-              style={styles.compactSelectorMain}
+              style={[styles.compactSelectorMain, customVideo && styles.compactSelectorMainCustom]}
               onPress={() => handleOpenPicker('video')}
               activeOpacity={0.75}
             >
               <View style={styles.compactIconBox}>
-                <Ionicons name="videocam" size={20} color={THEME.colors.primary} />
+                <Ionicons
+                  name={customVideo ? 'cloud-upload' : 'videocam'}
+                  size={20}
+                  color={customVideo ? '#10b981' : THEME.colors.primary}
+                />
               </View>
               <View style={styles.mediaListTextWrap}>
                 <Text style={styles.mediaListName} numberOfLines={1}>
-                  {selectedVideoAsset.name}
+                  {customVideo ? customVideo.name : selectedVideoAsset.name}
                 </Text>
                 <Text style={styles.mediaListFilename} numberOfLines={1}>
-                  {selectedVideoAsset.filename}
+                  {customVideo ? 'Custom file · This video only' : selectedVideoAsset.filename}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
+              {customVideo ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    setPreviewingVideo(null);
+                    setCustomVideo(null);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ marginLeft: 8 }}
+                >
+                  <Ionicons name="close-circle" size={20} color="#94a3b8" />
+                </TouchableOpacity>
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.compactPreviewBtn}
-              onPress={() => handleOpenVideoPreview(selectedVideoAsset)}
+              onPress={() =>
+                handleOpenVideoPreview(
+                  customVideo
+                    ? {
+                        id: customVideo.uri,
+                        filename: customVideo.name,
+                        name: customVideo.name,
+                        localUri: customVideo.uri
+                      }
+                    : selectedVideoAsset
+                )
+              }
               activeOpacity={0.75}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
@@ -479,52 +601,94 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           </View>
         </View>
 
-        {/* 2. Background Audio Compact Selector (Opens Scrollable Picker Sheet) */}
+        {/* 2. Background Audio Compact Selector (Opens Scrollable Picker Sheet or Custom Upload) */}
         <View style={styles.section}>
           <View style={styles.mediaSectionHeader}>
             <Text style={styles.sectionTitle}>🎵 Background Beat (Low Volume)</Text>
-            <Text style={styles.mediaCountPill}>{availableAudio.length} available</Text>
+            <View style={styles.mediaHeaderRight}>
+              <Text style={styles.mediaCountPill}>{availableAudio.length} available</Text>
+              <TouchableOpacity
+                style={styles.customHeaderBtn}
+                onPress={() => handlePickCustomMedia('audio')}
+                activeOpacity={0.75}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons name="add-circle-outline" size={14} color={THEME.colors.primary} />
+                <Text style={styles.customHeaderBtnText}>Custom</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={styles.compactSelectorRow}>
             <TouchableOpacity
-              style={styles.compactSelectorMain}
+              style={[styles.compactSelectorMain, customAudio && styles.compactSelectorMainCustom]}
               onPress={() => handleOpenPicker('audio')}
               activeOpacity={0.75}
             >
               <View style={styles.compactIconBox}>
-                <Ionicons name="musical-notes" size={20} color={THEME.colors.primary} />
+                <Ionicons
+                  name={customAudio ? 'cloud-upload' : 'musical-notes'}
+                  size={20}
+                  color={customAudio ? '#10b981' : THEME.colors.primary}
+                />
               </View>
               <View style={styles.mediaListTextWrap}>
                 <Text style={styles.mediaListName} numberOfLines={1}>
-                  {selectedAudioAsset.name}
+                  {customAudio ? customAudio.name : selectedAudioAsset.name}
                 </Text>
                 <Text style={styles.mediaListFilename} numberOfLines={1}>
-                  {selectedAudioAsset.filename}
+                  {customAudio ? 'Custom file · This video only' : selectedAudioAsset.filename}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
+              {customAudio ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    setPreviewingAudio(null);
+                    setCustomAudio(null);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ marginLeft: 8 }}
+                >
+                  <Ionicons name="close-circle" size={20} color="#94a3b8" />
+                </TouchableOpacity>
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.compactPreviewBtn,
-                previewingAudio?.filename === selectedAudioAsset.filename &&
+                previewingAudio?.filename === (customAudio ? customAudio.name : selectedAudioAsset.filename) &&
                   activePicker === null &&
                   styles.mediaPreviewBtnActive
               ]}
-              onPress={() => handleToggleAudioPreview(selectedAudioAsset)}
+              onPress={() =>
+                handleToggleAudioPreview(
+                  customAudio
+                    ? {
+                        id: customAudio.uri,
+                        filename: customAudio.name,
+                        name: customAudio.name,
+                        localUri: customAudio.uri
+                      }
+                    : selectedAudioAsset
+                )
+              }
               activeOpacity={0.75}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Ionicons
                 name={
-                  previewingAudio?.filename === selectedAudioAsset.filename && activePicker === null
+                  previewingAudio?.filename === (customAudio ? customAudio.name : selectedAudioAsset.filename) &&
+                  activePicker === null
                     ? 'stop-circle'
                     : 'play-circle'
                 }
                 size={20}
                 color={
-                  previewingAudio?.filename === selectedAudioAsset.filename && activePicker === null
+                  previewingAudio?.filename === (customAudio ? customAudio.name : selectedAudioAsset.filename) &&
+                  activePicker === null
                     ? '#020617'
                     : THEME.colors.primary
                 }
@@ -870,12 +1034,20 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.previewBtn, (!isScheduleValid || isLoading) && styles.previewBtnDisabled]}
+          style={[
+            styles.previewBtn,
+            (!isScheduleValid || isLoading || isUploadingCustom) && styles.previewBtnDisabled
+          ]}
           onPress={handleStartGeneration}
-          disabled={isLoading || !isScheduleValid}
+          disabled={isLoading || isUploadingCustom || !isScheduleValid}
           activeOpacity={0.8}
         >
-          {isLoading ? (
+          {isUploadingCustom ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <ActivityIndicator color="#020617" size="small" />
+              <Text style={styles.previewBtnText}>Uploading custom media...</Text>
+            </View>
+          ) : isLoading ? (
             <ActivityIndicator color="#020617" size="small" />
           ) : !isScheduleValid ? (
             <Text style={styles.previewBtnText}>Must be ≥ 30m in future ⚠️</Text>
@@ -889,8 +1061,8 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
       {/* Inline Background Audio Preview Player */}
       {previewingAudio && (
         <BackgroundAudioPreviewPlayer
-          key={`audio_${previewingAudio.filename}`}
-          uri={mobileApi.getMediaAssetUrl(previewingAudio.filename)}
+          key={`audio_${previewingAudio.localUri || previewingAudio.filename}`}
+          uri={previewingAudio.localUri || mobileApi.getMediaAssetUrl(previewingAudio.filename)}
           loop={true}
         />
       )}
@@ -978,6 +1150,28 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                   </TouchableOpacity>
                 )}
               </View>
+            )}
+
+            {/* One-Time Custom Upload Action inside Video/Audio Picker Sheet */}
+            {(activePicker === 'video' || activePicker === 'audio') && (
+              <TouchableOpacity
+                style={styles.sheetCustomUploadBtn}
+                onPress={() => handlePickCustomMedia(activePicker)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="cloud-upload-outline" size={18} color="#10b981" style={{ marginRight: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sheetCustomUploadTitle}>
+                    {activePicker === 'video'
+                      ? 'Choose Custom Video from Device'
+                      : 'Choose Custom Audio from Device'}
+                  </Text>
+                  <Text style={styles.sheetCustomUploadSub}>
+                    Used only for this generated video (not saved to library)
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#10b981" />
+              </TouchableOpacity>
             )}
 
             {/* Embedded Live Video Preview Stage (when previewing a video inside the sheet) */}
@@ -1087,8 +1281,10 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                         onPress={() => {
                           triggerHaptic();
                           if (isVideo) {
+                            setCustomVideo(null);
                             setSelectedVideo(item.filename);
                           } else {
+                            setCustomAudio(null);
                             setSelectedAudio(item.filename);
                           }
                           handleClosePicker();
@@ -1170,8 +1366,8 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
 
             {previewingVideo && (
               <BackgroundVideoPreviewPlayer
-                key={previewingVideo.filename}
-                uri={mobileApi.getMediaAssetUrl(previewingVideo.filename)}
+                key={previewingVideo.localUri || previewingVideo.filename}
+                uri={previewingVideo.localUri || mobileApi.getMediaAssetUrl(previewingVideo.filename)}
               />
             )}
 
@@ -1188,7 +1384,10 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                   style={styles.previewModalUseBtn}
                   onPress={() => {
                     triggerHaptic();
-                    setSelectedVideo(previewingVideo.filename);
+                    if (!previewingVideo.localUri) {
+                      setCustomVideo(null);
+                      setSelectedVideo(previewingVideo.filename);
+                    }
                     setPreviewingVideo(null);
                   }}
                 >
@@ -1356,6 +1555,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8
   },
+  mediaHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
   mediaCountPill: {
     fontSize: 11,
     fontWeight: '700',
@@ -1364,6 +1568,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8
+  },
+  customHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(14, 165, 233, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.45)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8
+  },
+  customHeaderBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.primary
+  },
+  compactSelectorMainCustom: {
+    borderColor: '#10b981',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)'
+  },
+  sheetCustomUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12
+  },
+  sheetCustomUploadTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#34d399'
+  },
+  sheetCustomUploadSub: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 1
   },
   compactSelectorRow: {
     flexDirection: 'row',

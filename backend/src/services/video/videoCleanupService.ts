@@ -74,8 +74,27 @@ export class VideoCleanupService {
       if (!entry.isDirectory()) continue;
 
       const folderName = entry.name;
-      // Skip the shared 'recaps' folder itself (unless cleaning inside it)
+      // Skip the shared 'recaps' folder itself
       if (folderName === 'recaps') continue;
+
+      // Clean expired individual files inside 'custom_uploads' without deleting the folder
+      if (folderName === 'custom_uploads') {
+        const customDir = path.join(renderBase, folderName);
+        try {
+          const customFiles = fs.readdirSync(customDir, { withFileTypes: true });
+          for (const cf of customFiles) {
+            if (!cf.isFile()) continue;
+            const cfPath = path.join(customDir, cf.name);
+            const cfStat = fs.statSync(cfPath);
+            if (now - cfStat.mtimeMs >= maxAgeMs) {
+              fs.unlinkSync(cfPath);
+              freedBytes += cfStat.size;
+              console.log(`[VideoCleanup] 🗑️ Removed expired custom upload "${cf.name}"`);
+            }
+          }
+        } catch {}
+        continue;
+      }
 
       const folderPath = path.join(renderBase, folderName);
 
