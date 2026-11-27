@@ -183,11 +183,26 @@ const BackgroundVideoPreviewPlayer: React.FC<{ uri: string; compact?: boolean }>
   );
 };
 
-const BackgroundAudioPreviewPlayer: React.FC<{ uri: string }> = ({ uri }) => {
-  useVideoPlayer(uri, (p) => {
-    p.loop = true;
+const BackgroundAudioPreviewPlayer: React.FC<{
+  uri: string;
+  loop?: boolean;
+  onEnded?: () => void;
+}> = ({ uri, loop = true, onEnded }) => {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = loop;
     p.play();
   });
+
+  React.useEffect(() => {
+    if (!onEnded) return;
+    const sub = player.addListener('playToEnd', () => {
+      onEnded();
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [player, onEnded]);
+
   return null;
 };
 
@@ -215,10 +230,11 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_ACTOR);
   const [thumbnailSeconds, setThumbnailSeconds] = useState(DEFAULT_THUMBNAIL_TIMESTAMP);
   const [description, setDescription] = useState(defaultDesc);
-  const [activePicker, setActivePicker] = useState<'video' | 'audio' | null>(null);
+  const [activePicker, setActivePicker] = useState<'video' | 'audio' | 'voice' | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
   const [previewingVideo, setPreviewingVideo] = useState<MediaAsset | null>(null);
   const [previewingAudio, setPreviewingAudio] = useState<MediaAsset | null>(null);
+  const [previewingVoice, setPreviewingVoice] = useState<VoiceOption | null>(null);
 
   const selectedVideoAsset = useMemo(
     () =>
@@ -242,15 +258,37 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     [availableAudio, selectedAudio]
   );
 
+  const selectedVoiceOption = useMemo<VoiceOption>(
+    () =>
+      availableVoices.find((v) => v.id === selectedVoice) || {
+        id: selectedVoice,
+        name: selectedVoice,
+        gender: 'female',
+        accent: 'American',
+        description: ''
+      },
+    [availableVoices, selectedVoice]
+  );
+
   const filteredPickerItems = useMemo(() => {
-    const source = activePicker === 'video' ? availableVideos : availableAudio;
     const q = pickerSearch.trim().toLowerCase();
+    if (activePicker === 'voice') {
+      if (!q) return availableVoices;
+      return availableVoices.filter(
+        (v) =>
+          v.name.toLowerCase().includes(q) ||
+          v.gender.toLowerCase().includes(q) ||
+          (v.accent || '').toLowerCase().includes(q) ||
+          (v.description || '').toLowerCase().includes(q)
+      );
+    }
+    const source = activePicker === 'video' ? availableVideos : availableAudio;
     if (!q) return source;
     return source.filter(
       (item) =>
         item.name.toLowerCase().includes(q) || item.filename.toLowerCase().includes(q)
     );
-  }, [activePicker, availableVideos, availableAudio, pickerSearch]);
+  }, [activePicker, availableVideos, availableAudio, availableVoices, pickerSearch]);
 
   // Option to schedule the post or create it instantly
   const [isScheduled, setIsScheduled] = useState<boolean>(true);
@@ -307,14 +345,16 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     setActivePicker(null);
     setPreviewingAudio(null);
     setPreviewingVideo(null);
+    setPreviewingVoice(null);
     onBack();
   };
 
-  const handleOpenPicker = (type: 'video' | 'audio') => {
+  const handleOpenPicker = (type: 'video' | 'audio' | 'voice') => {
     triggerHaptic();
     setPickerSearch('');
     setPreviewingAudio(null);
     setPreviewingVideo(null);
+    setPreviewingVoice(null);
     setActivePicker(type);
   };
 
@@ -323,24 +363,35 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     setPickerSearch('');
     setPreviewingAudio(null);
     setPreviewingVideo(null);
+    setPreviewingVoice(null);
   };
 
   const handleOpenVideoPreview = (video: MediaAsset) => {
     triggerHaptic();
     setPreviewingAudio(null);
+    setPreviewingVoice(null);
     setPreviewingVideo((prev) => (prev?.filename === video.filename && activePicker === 'video' ? null : video));
   };
 
   const handleToggleAudioPreview = (audio: MediaAsset) => {
     triggerHaptic();
     setPreviewingVideo(null);
+    setPreviewingVoice(null);
     setPreviewingAudio((prev) => (prev?.filename === audio.filename ? null : audio));
+  };
+
+  const handleToggleVoicePreview = (voice: VoiceOption) => {
+    triggerHaptic();
+    setPreviewingVideo(null);
+    setPreviewingAudio(null);
+    setPreviewingVoice((prev) => (prev?.id === voice.id ? null : voice));
   };
 
   const handleStartGeneration = () => {
     setActivePicker(null);
     setPreviewingAudio(null);
     setPreviewingVideo(null);
+    setPreviewingVoice(null);
     if (isScheduled && !isScheduleValid) {
       Alert.alert(
         'Invalid Scheduled Time',
@@ -482,25 +533,58 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           </View>
         </View>
 
-        {/* 3. Voice Actor Selector */}
+        {/* 3. Voice Actor Compact Selector (Opens Scrollable Picker Sheet) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎙️ Voice Actor</Text>
-          <View style={styles.voiceGrid}>
-            {availableVoices.map((voice) => {
-              const isSelected = selectedVoice === voice.id;
-              return (
-                <TouchableOpacity
-                  key={voice.id}
-                  style={[styles.voiceCard, isSelected && styles.voiceCardSelected]}
-                  onPress={() => setSelectedVoice(voice.id)}
-                >
-                  <Text style={[styles.voiceName, isSelected && styles.voiceNameSelected]}>
-                    {voice.name}
-                  </Text>
-                  <Text style={styles.voiceGender}>{voice.gender} • {voice.accent || 'US'}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.mediaSectionHeader}>
+            <Text style={styles.sectionTitle}>🎙️ Voice Actor</Text>
+            <Text style={styles.mediaCountPill}>{availableVoices.length} available</Text>
+          </View>
+          <View style={styles.compactSelectorRow}>
+            <TouchableOpacity
+              style={styles.compactSelectorMain}
+              onPress={() => handleOpenPicker('voice')}
+              activeOpacity={0.75}
+            >
+              <View style={styles.compactIconBox}>
+                <Ionicons name="mic" size={20} color={THEME.colors.primary} />
+              </View>
+              <View style={styles.mediaListTextWrap}>
+                <Text style={styles.mediaListName} numberOfLines={1}>
+                  {selectedVoiceOption.name}
+                </Text>
+                <Text style={styles.mediaListFilename} numberOfLines={1}>
+                  {selectedVoiceOption.gender} • {selectedVoiceOption.accent || 'US'}
+                  {selectedVoiceOption.description ? ` • ${selectedVoiceOption.description}` : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.compactPreviewBtn,
+                previewingVoice?.id === selectedVoiceOption.id &&
+                  activePicker === null &&
+                  styles.mediaPreviewBtnActive
+              ]}
+              onPress={() => handleToggleVoicePreview(selectedVoiceOption)}
+              activeOpacity={0.75}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons
+                name={
+                  previewingVoice?.id === selectedVoiceOption.id && activePicker === null
+                    ? 'stop-circle'
+                    : 'play-circle'
+                }
+                size={20}
+                color={
+                  previewingVoice?.id === selectedVoiceOption.id && activePicker === null
+                    ? '#020617'
+                    : THEME.colors.primary
+                }
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -805,12 +889,23 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
       {/* Inline Background Audio Preview Player */}
       {previewingAudio && (
         <BackgroundAudioPreviewPlayer
-          key={previewingAudio.filename}
+          key={`audio_${previewingAudio.filename}`}
           uri={mobileApi.getMediaAssetUrl(previewingAudio.filename)}
+          loop={true}
         />
       )}
 
-      {/* Scrollable Media Picker Bottom Sheet (Scales cleanly to any number of videos/audios) */}
+      {/* Inline Voice Actor Preview Player (plays first intro sentence once) */}
+      {previewingVoice && (
+        <BackgroundAudioPreviewPlayer
+          key={`voice_${previewingVoice.id}`}
+          uri={mobileApi.getVoicePreviewUrl(previewingVoice.id)}
+          loop={false}
+          onEnded={() => setPreviewingVoice(null)}
+        />
+      )}
+
+      {/* Scrollable Media Picker Bottom Sheet (Scales cleanly to any number of videos/audios/voices) */}
       <Modal
         visible={activePicker !== null}
         transparent={true}
@@ -830,10 +925,20 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             <View style={styles.previewModalHeader}>
               <View style={{ flex: 1, marginRight: 12 }}>
                 <Text style={styles.previewModalTitle}>
-                  {activePicker === 'video' ? '🎬 Select Background Video' : '🎵 Select Background Beat'}
+                  {activePicker === 'video'
+                    ? '🎬 Select Background Video'
+                    : activePicker === 'audio'
+                      ? '🎵 Select Background Beat'
+                      : '🎙️ Select Voice Actor'}
                 </Text>
                 <Text style={styles.previewModalSubtitle}>
-                  {(activePicker === 'video' ? availableVideos : availableAudio).length} items • Tap Preview to audition
+                  {(activePicker === 'video'
+                    ? availableVideos
+                    : activePicker === 'audio'
+                      ? availableAudio
+                      : availableVoices
+                  ).length}{' '}
+                  items • Tap Preview to audition
                 </Text>
               </View>
               <TouchableOpacity
@@ -845,14 +950,25 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             </View>
 
             {/* Search Filter (auto-shown when there are 5+ items) */}
-            {(activePicker === 'video' ? availableVideos : availableAudio).length > 4 && (
+            {(activePicker === 'video'
+              ? availableVideos
+              : activePicker === 'audio'
+                ? availableAudio
+                : availableVoices
+            ).length > 4 && (
               <View style={styles.pickerSearchWrap}>
                 <Ionicons name="search" size={16} color="#64748b" style={{ marginRight: 8 }} />
                 <TextInput
                   style={styles.pickerSearchInput}
                   value={pickerSearch}
                   onChangeText={setPickerSearch}
-                  placeholder={`Search ${activePicker === 'video' ? 'videos' : 'audio tracks'}...`}
+                  placeholder={`Search ${
+                    activePicker === 'video'
+                      ? 'videos'
+                      : activePicker === 'audio'
+                        ? 'audio tracks'
+                        : 'voice actors'
+                  }...`}
                   placeholderTextColor="#64748b"
                   autoCorrect={false}
                 />
@@ -883,7 +999,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               </View>
             )}
 
-            {/* Scrollable Media List */}
+            {/* Scrollable Media / Voice List */}
             <ScrollView
               style={styles.pickerSheetScroll}
               contentContainerStyle={styles.mediaList}
@@ -892,8 +1008,67 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             >
               {filteredPickerItems.length === 0 ? (
                 <Text style={styles.pickerEmptyText}>No matching items found.</Text>
+              ) : activePicker === 'voice' ? (
+                (filteredPickerItems as VoiceOption[]).map((voice) => {
+                  const isSelected = selectedVoice === voice.id;
+                  const isPreviewing = previewingVoice?.id === voice.id;
+
+                  return (
+                    <View
+                      key={voice.id}
+                      style={[styles.mediaListRow, isSelected && styles.mediaListRowSelected]}
+                    >
+                      <TouchableOpacity
+                        style={styles.mediaListSelectArea}
+                        onPress={() => {
+                          triggerHaptic();
+                          setSelectedVoice(voice.id);
+                          handleClosePicker();
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[styles.mediaRadio, isSelected && styles.mediaRadioSelected]}>
+                          {isSelected && <Ionicons name="checkmark" size={13} color="#020617" />}
+                        </View>
+                        <View style={styles.mediaListTextWrap}>
+                          <Text
+                            style={[styles.mediaListName, isSelected && styles.mediaListNameSelected]}
+                            numberOfLines={1}
+                          >
+                            {voice.name}
+                          </Text>
+                          <Text style={styles.mediaListFilename} numberOfLines={1}>
+                            {voice.gender} • {voice.accent || 'US'}
+                            {voice.description ? ` • ${voice.description}` : ''}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.mediaPreviewBtn, isPreviewing && styles.mediaPreviewBtnActive]}
+                        onPress={() => handleToggleVoicePreview(voice)}
+                        activeOpacity={0.75}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Ionicons
+                          name={isPreviewing ? 'stop-circle' : 'play-circle-outline'}
+                          size={16}
+                          color={isPreviewing ? '#020617' : THEME.colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.mediaPreviewBtnText,
+                            isPreviewing && styles.mediaPreviewBtnTextActive
+                          ]}
+                        >
+                          {isPreviewing ? 'Stop' : 'Preview'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
               ) : (
-                filteredPickerItems.map((item) => {
+                (filteredPickerItems as MediaAsset[]).map((item) => {
                   const isVideo = activePicker === 'video';
                   const isSelected = isVideo
                     ? selectedVideo === item.filename

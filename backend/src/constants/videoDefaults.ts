@@ -11,3 +11,6 @@ export const DEFAULT_DESCRIPTION_TEMPLATE =
   'Football predictions for {date} ⚽🔥 \n #football #soccer #predictions #fyp';
 export const DEFAULT_VIDEO_RETENTION_HOURS = 72;
 export const MIN_SCHEDULE_ADVANCE_MINUTES = 29.5;
+export const DEFAULT_TTS_SPEED = 1.2;
+export const VOICE_PREVIEW_SAMPLE_TEXT =
+  'best 5 predictions for the football games going on on 25th November';

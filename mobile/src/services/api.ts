@@ -155,6 +155,10 @@ export class MobileApiService {
     return `${this.baseUrl}/api/media/stream/${encodeURIComponent(filename)}`;
   }
 
+  getVoicePreviewUrl(voiceId: string): string {
+    return `${this.baseUrl}/api/media/voice-preview/${encodeURIComponent(voiceId)}`;
+  }
+
   getRecapImageUrl(groupId: string, download = false): string {
     return `${this.baseUrl}/api/predictions/recap-image/${groupId}${download ? '?download=1' : ''}`;
   }

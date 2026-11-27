@@ -67,6 +67,21 @@ test('Regression API: GET /api/media/stream/:filename streams valid asset and bl
   }
 });
 
+test('Regression API: GET /api/media/voice-preview/:voiceId streams valid voice preview and blocks invalid voices', async () => {
+  const invalidRes = await request(app).get('/api/media/voice-preview/unknown_voice');
+  assert.equal(invalidRes.status, 404);
+
+  const traversalRes = await request(app).get('/api/media/voice-preview/..%2Fpackage.json');
+  assert.equal(traversalRes.status, 404);
+
+  const validRes = await request(app)
+    .get('/api/media/voice-preview/hearth')
+    .set('Range', 'bytes=0-1023');
+  assert.equal(validRes.status, 206);
+  assert.equal(validRes.headers['content-type'], 'audio/wav');
+  assert.equal(validRes.headers['accept-ranges'], 'bytes');
+});
+
 test('Regression API: GET /api/predictions/options', async () => {
   const res = await request(app).get('/api/predictions/options');
   assert.equal(res.status, 200);

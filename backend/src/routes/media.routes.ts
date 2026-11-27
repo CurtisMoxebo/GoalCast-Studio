@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { assetsManager } from '../services/video/assetsManager';
 import { AVAILABLE_VOICES } from '../services/tts/kokoroTtsService';
+import { voicePreviewService } from '../services/tts/voicePreviewService';
 import {
   DEFAULT_BACKGROUND_VIDEO,
   DEFAULT_BACKGROUND_AUDIO,
@@ -44,6 +45,44 @@ router.get('/assets', (_req: Request, res: Response) => {
 });
 
 /**
+ * Shared HTTP Range-aware media file streamer
+ */
+function streamFileWithRange(req: Request, res: Response, filePath: string, contentType: string): void {
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (isNaN(start) || start < 0 || start >= fileSize || end >= fileSize || start > end) {
+      res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
+      return;
+    }
+
+    const chunkSize = end - start + 1;
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    fs.createReadStream(filePath, { start, end }).pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Accept-Ranges': 'bytes',
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
+}
+
+/**
  * GET /api/media/stream/:filename
  * Streams a background video (.mp4) or background audio (.mp3 / .wav) asset
  * with HTTP Range support for mobile preview playback.
@@ -64,8 +103,6 @@ router.get('/stream/:filename', (req: Request, res: Response): void => {
     return;
   }
 
-  const stat = fs.statSync(matched.path);
-  const fileSize = stat.size;
   const lower = safeName.toLowerCase();
   const contentType = lower.endsWith('.mp4')
     ? 'video/mp4'
@@ -73,34 +110,32 @@ router.get('/stream/:filename', (req: Request, res: Response): void => {
       ? 'audio/wav'
       : 'audio/mpeg';
 
-  const range = req.headers.range;
-  if (range) {
-    const parts = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+  streamFileWithRange(req, res, matched.path, contentType);
+});
 
-    if (isNaN(start) || start < 0 || start >= fileSize || end >= fileSize || start > end) {
-      res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
+/**
+ * GET /api/media/voice-preview/:voiceId
+ * Streams the pre-generated preview WAV for a voice actor (generating & caching it
+ * in `<resources>/voice_previews/` on demand if not yet created on disk).
+ */
+router.get('/voice-preview/:voiceId', async (req: Request, res: Response): Promise<void> => {
+  const voiceId = path.basename(String(req.params.voiceId || '')).toLowerCase();
+
+  if (!voicePreviewService.isValidVoiceId(voiceId)) {
+    res.status(404).json({ error: 'Voice actor not found' });
+    return;
+  }
+
+  try {
+    const filePath = await voicePreviewService.ensureVoicePreview(voiceId);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'Voice preview audio not available' });
       return;
     }
-
-    const chunkSize = end - start + 1;
-    res.writeHead(206, {
-      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-      'Accept-Ranges': 'bytes',
-      'Content-Length': chunkSize,
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=3600'
-    });
-    fs.createReadStream(matched.path, { start, end }).pipe(res);
-  } else {
-    res.writeHead(200, {
-      'Content-Length': fileSize,
-      'Accept-Ranges': 'bytes',
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=3600'
-    });
-    fs.createReadStream(matched.path).pipe(res);
+    streamFileWithRange(req, res, filePath, 'audio/wav');
+  } catch (err: any) {
+    console.error(`[MediaRoutes] ❌ Failed to stream voice preview for "${voiceId}":`, err?.message);
+    res.status(500).json({ error: 'Failed to generate voice preview audio' });
   }
 });
 

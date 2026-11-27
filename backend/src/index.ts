@@ -9,6 +9,7 @@ import videoRoutes from './routes/video.routes';
 import socialRoutes from './routes/social.routes';
 import { socialSchedulerService } from './services/social/socialSchedulerService';
 import { videoCleanupService } from './services/video/videoCleanupService';
+import { voicePreviewService } from './services/tts/voicePreviewService';
 
 dotenv.config();
 
@@ -110,6 +111,11 @@ if (!isTest) {
 
     // Start 72-hour automated video render cleanup service (runs hourly)
     videoCleanupService.start();
+
+    // Ensure voice actor preview WAVs exist in <resources>/voice_previews/ (non-blocking)
+    voicePreviewService.ensureAllVoicePreviews().catch((err: any) => {
+      console.warn('[VoicePreview] Background preview pre-generation warning:', err?.message);
+    });
   });
 }
 
