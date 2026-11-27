@@ -535,7 +535,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="Add custom background video"
             >
-              <Ionicons name="add" size={16} color={THEME.colors.primary} />
+              <Ionicons name="add" size={20} color={THEME.colors.primary} />
             </TouchableOpacity>
           </View>
           <View style={styles.compactSelectorRow}>
@@ -609,7 +609,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="Add custom background audio"
             >
-              <Ionicons name="add" size={16} color={THEME.colors.primary} />
+              <Ionicons name="add" size={20} color={THEME.colors.primary} />
             </TouchableOpacity>
           </View>
           <View style={styles.compactSelectorRow}>
@@ -1535,14 +1535,10 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   customHeaderBtn: {
-    width: 26,
-    height: 26,
+    width: 28,
+    height: 28,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(14, 165, 233, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.45)',
-    borderRadius: 8
+    justifyContent: 'center'
   },
   compactSelectorMainCustom: {
     borderColor: '#10b981',
