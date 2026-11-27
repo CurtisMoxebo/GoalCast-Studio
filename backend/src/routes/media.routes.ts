@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { assetsManager } from '../services/video/assetsManager';
 import { AVAILABLE_VOICES } from '../services/tts/kokoroTtsService';
 import {
@@ -39,6 +41,67 @@ router.get('/assets', (_req: Request, res: Response) => {
       descriptionTemplate: DEFAULT_DESCRIPTION_TEMPLATE
     }
   });
+});
+
+/**
+ * GET /api/media/stream/:filename
+ * Streams a background video (.mp4) or background audio (.mp3 / .wav) asset
+ * with HTTP Range support for mobile preview playback.
+ */
+router.get('/stream/:filename', (req: Request, res: Response): void => {
+  const rawName = String(req.params.filename || '');
+  const safeName = path.basename(rawName);
+
+  // Strict allowlist: only serve registered background videos or background audio tracks
+  const allowedAssets = [
+    ...assetsManager.getAvailableBackgroundVideos(),
+    ...assetsManager.getAvailableBackgroundAudio()
+  ];
+  const matched = allowedAssets.find((asset) => asset.filename === safeName);
+
+  if (!matched || !fs.existsSync(matched.path)) {
+    res.status(404).json({ error: 'Media asset not found' });
+    return;
+  }
+
+  const stat = fs.statSync(matched.path);
+  const fileSize = stat.size;
+  const lower = safeName.toLowerCase();
+  const contentType = lower.endsWith('.mp4')
+    ? 'video/mp4'
+    : lower.endsWith('.wav')
+      ? 'audio/wav'
+      : 'audio/mpeg';
+
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (isNaN(start) || start < 0 || start >= fileSize || end >= fileSize || start > end) {
+      res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
+      return;
+    }
+
+    const chunkSize = end - start + 1;
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    fs.createReadStream(matched.path, { start, end }).pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Accept-Ranges': 'bytes',
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    fs.createReadStream(matched.path).pipe(res);
+  }
 });
 
 export default router;

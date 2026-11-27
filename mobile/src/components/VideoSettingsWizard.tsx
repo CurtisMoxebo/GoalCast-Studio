@@ -14,6 +14,7 @@ import {
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME } from '../constants/theme';
 import {
@@ -25,6 +26,7 @@ import {
   DEFAULT_SCHEDULE_HOUR,
   DEFAULT_SCHEDULE_MINUTE
 } from '../constants/config';
+import { mobileApi } from '../services/api';
 import { MediaAsset, VoiceOption, VideoSettings } from '../types';
 import { formatOrdinalDate } from '../utils/dateUtils';
 import { triggerHaptic } from '../utils/haptics';
@@ -160,6 +162,32 @@ const ThumbnailTimeSlider: React.FC<ThumbnailTimeSliderProps> = ({
   );
 };
 
+const BackgroundVideoPreviewPlayer: React.FC<{ uri: string }> = ({ uri }) => {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.play();
+  });
+
+  return (
+    <View style={styles.previewModalVideoWrap}>
+      <VideoView
+        player={player}
+        style={styles.previewModalVideo}
+        nativeControls={true}
+        contentFit="contain"
+      />
+    </View>
+  );
+};
+
+const BackgroundAudioPreviewPlayer: React.FC<{ uri: string }> = ({ uri }) => {
+  useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.play();
+  });
+  return null;
+};
+
 export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   targetDate,
   selectedMatchesCount,
@@ -184,6 +212,8 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_ACTOR);
   const [thumbnailSeconds, setThumbnailSeconds] = useState(DEFAULT_THUMBNAIL_TIMESTAMP);
   const [description, setDescription] = useState(defaultDesc);
+  const [previewingVideo, setPreviewingVideo] = useState<MediaAsset | null>(null);
+  const [previewingAudio, setPreviewingAudio] = useState<MediaAsset | null>(null);
 
   // Option to schedule the post or create it instantly
   const [isScheduled, setIsScheduled] = useState<boolean>(true);
@@ -236,7 +266,27 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     setScheduledDate(getDefaultScheduledDate());
   };
 
+  const handleBackPress = () => {
+    setPreviewingAudio(null);
+    setPreviewingVideo(null);
+    onBack();
+  };
+
+  const handleOpenVideoPreview = (video: MediaAsset) => {
+    triggerHaptic();
+    setPreviewingAudio(null);
+    setPreviewingVideo(video);
+  };
+
+  const handleToggleAudioPreview = (audio: MediaAsset) => {
+    triggerHaptic();
+    setPreviewingVideo(null);
+    setPreviewingAudio((prev) => (prev?.filename === audio.filename ? null : audio));
+  };
+
   const handleStartGeneration = () => {
+    setPreviewingAudio(null);
+    setPreviewingVideo(null);
     if (isScheduled && !isScheduleValid) {
       Alert.alert(
         'Invalid Scheduled Time',
@@ -274,7 +324,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           <View style={styles.titleRow}>
             <TouchableOpacity
               style={styles.backArrowBtn}
-              onPress={onBack}
+              onPress={handleBackPress}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               activeOpacity={0.7}
             >
@@ -287,48 +337,116 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           </Text>
         </View>
 
-        {/* 1. Background Video Selector */}
+        {/* 1. Background Video Selector (Vertical List + Preview Button) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎬 Background Video (Looped)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+          <View style={styles.mediaList}>
             {availableVideos.map((video) => {
               const isSelected = selectedVideo === video.filename;
               return (
-                <TouchableOpacity
+                <View
                   key={video.id}
-                  style={[styles.mediaCard, isSelected && styles.mediaCardSelected]}
-                  onPress={() => setSelectedVideo(video.filename)}
+                  style={[styles.mediaListRow, isSelected && styles.mediaListRowSelected]}
                 >
-                  <Text style={styles.mediaIcon}>📹</Text>
-                  <Text style={[styles.mediaName, isSelected && styles.mediaNameSelected]}>
-                    {video.name}
-                  </Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.mediaListSelectArea}
+                    onPress={() => {
+                      triggerHaptic();
+                      setSelectedVideo(video.filename);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.mediaRadio, isSelected && styles.mediaRadioSelected]}>
+                      {isSelected && <Ionicons name="checkmark" size={13} color="#020617" />}
+                    </View>
+                    <View style={styles.mediaListTextWrap}>
+                      <Text
+                        style={[styles.mediaListName, isSelected && styles.mediaListNameSelected]}
+                        numberOfLines={1}
+                      >
+                        {video.name}
+                      </Text>
+                      <Text style={styles.mediaListFilename} numberOfLines={1}>
+                        {video.filename}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.mediaPreviewBtn}
+                    onPress={() => handleOpenVideoPreview(video)}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Ionicons name="play-circle-outline" size={16} color={THEME.colors.primary} />
+                    <Text style={styles.mediaPreviewBtnText}>Preview</Text>
+                  </TouchableOpacity>
+                </View>
               );
             })}
-          </ScrollView>
+          </View>
         </View>
 
-        {/* 2. Background Audio Selector */}
+        {/* 2. Background Audio Selector (Vertical List + Inline Play/Stop Preview) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎵 Background Beat (Low Volume)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+          <View style={styles.mediaList}>
             {availableAudio.map((audio) => {
               const isSelected = selectedAudio === audio.filename;
+              const isPlaying = previewingAudio?.filename === audio.filename;
               return (
-                <TouchableOpacity
+                <View
                   key={audio.id}
-                  style={[styles.mediaCard, isSelected && styles.mediaCardSelected]}
-                  onPress={() => setSelectedAudio(audio.filename)}
+                  style={[styles.mediaListRow, isSelected && styles.mediaListRowSelected]}
                 >
-                  <Text style={styles.mediaIcon}>🎧</Text>
-                  <Text style={[styles.mediaName, isSelected && styles.mediaNameSelected]}>
-                    {audio.name}
-                  </Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.mediaListSelectArea}
+                    onPress={() => {
+                      triggerHaptic();
+                      setSelectedAudio(audio.filename);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.mediaRadio, isSelected && styles.mediaRadioSelected]}>
+                      {isSelected && <Ionicons name="checkmark" size={13} color="#020617" />}
+                    </View>
+                    <View style={styles.mediaListTextWrap}>
+                      <Text
+                        style={[styles.mediaListName, isSelected && styles.mediaListNameSelected]}
+                        numberOfLines={1}
+                      >
+                        {audio.name}
+                      </Text>
+                      <Text style={styles.mediaListFilename} numberOfLines={1}>
+                        {audio.filename}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.mediaPreviewBtn, isPlaying && styles.mediaPreviewBtnActive]}
+                    onPress={() => handleToggleAudioPreview(audio)}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Ionicons
+                      name={isPlaying ? 'stop-circle' : 'play-circle-outline'}
+                      size={16}
+                      color={isPlaying ? '#020617' : THEME.colors.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.mediaPreviewBtnText,
+                        isPlaying && styles.mediaPreviewBtnTextActive
+                      ]}
+                    >
+                      {isPlaying ? 'Stop' : 'Preview'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               );
             })}
-          </ScrollView>
+          </View>
         </View>
 
         {/* 3. Voice Actor Selector */}
@@ -626,7 +744,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
       >
         <TouchableOpacity
           style={styles.bottomBackBtn}
-          onPress={onBack}
+          onPress={handleBackPress}
           disabled={isLoading}
           activeOpacity={0.7}
         >
@@ -651,6 +769,72 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           )}
         </TouchableOpacity>
       </View>
+      {/* Inline Background Audio Preview Player */}
+      {previewingAudio && (
+        <BackgroundAudioPreviewPlayer
+          key={previewingAudio.filename}
+          uri={mobileApi.getMediaAssetUrl(previewingAudio.filename)}
+        />
+      )}
+
+      {/* Background Video Preview Modal */}
+      <Modal
+        visible={previewingVideo !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewingVideo(null)}
+      >
+        <View style={styles.previewModalOverlay}>
+          <View style={styles.previewModalCard}>
+            <View style={styles.previewModalHeader}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.previewModalTitle} numberOfLines={1}>
+                  {previewingVideo?.name || 'Video Preview'}
+                </Text>
+                <Text style={styles.previewModalSubtitle} numberOfLines={1}>
+                  {previewingVideo?.filename}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setPreviewingVideo(null)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            {previewingVideo && (
+              <BackgroundVideoPreviewPlayer
+                key={previewingVideo.filename}
+                uri={mobileApi.getMediaAssetUrl(previewingVideo.filename)}
+              />
+            )}
+
+            <View style={styles.previewModalActions}>
+              <TouchableOpacity
+                style={styles.previewModalCloseBtn}
+                onPress={() => setPreviewingVideo(null)}
+              >
+                <Text style={styles.previewModalCloseBtnText}>Close</Text>
+              </TouchableOpacity>
+
+              {previewingVideo && (
+                <TouchableOpacity
+                  style={styles.previewModalUseBtn}
+                  onPress={() => {
+                    triggerHaptic();
+                    setSelectedVideo(previewingVideo.filename);
+                    setPreviewingVideo(null);
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#020617" style={{ marginRight: 6 }} />
+                  <Text style={styles.previewModalUseBtnText}>Use This Video</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -801,37 +985,158 @@ const styles = StyleSheet.create({
     color: THEME.colors.textSecondary,
     marginBottom: 10
   },
-  horizontalScroll: {
-    flexDirection: 'row',
-    marginTop: 4
+  mediaList: {
+    marginTop: 6,
+    gap: 8
   },
-  mediaCard: {
+  mediaListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#1e293b',
     borderRadius: 12,
-    padding: 12,
-    marginRight: 10,
-    alignItems: 'center',
-    width: 130,
-    borderWidth: 2,
-    borderColor: 'transparent'
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: '#334155'
   },
-  mediaCardSelected: {
+  mediaListRowSelected: {
     borderColor: THEME.colors.primary,
-    backgroundColor: '#0c4a6e'
+    backgroundColor: 'rgba(14, 165, 233, 0.12)'
   },
-  mediaIcon: {
-    fontSize: 26,
-    marginBottom: 6
+  mediaListSelectArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10
   },
-  mediaName: {
+  mediaRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#64748b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10
+  },
+  mediaRadioSelected: {
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary
+  },
+  mediaListTextWrap: {
+    flex: 1
+  },
+  mediaListName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: THEME.colors.textPrimary
+  },
+  mediaListNameSelected: {
+    color: THEME.colors.primary
+  },
+  mediaListFilename: {
+    fontSize: 11,
+    color: THEME.colors.textMuted,
+    marginTop: 2
+  },
+  mediaPreviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.45)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10
+  },
+  mediaPreviewBtnActive: {
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary
+  },
+  mediaPreviewBtnText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: THEME.colors.textSecondary,
-    textAlign: 'center'
+    fontWeight: '700',
+    color: THEME.colors.primary
   },
-  mediaNameSelected: {
-    color: THEME.colors.primary,
-    fontWeight: 'bold'
+  mediaPreviewBtnTextActive: {
+    color: '#020617'
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(2, 6, 23, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 18
+  },
+  previewModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#0f172a',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  previewModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12
+  },
+  previewModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#f8fafc'
+  },
+  previewModalSubtitle: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2
+  },
+  previewModalVideoWrap: {
+    width: '100%',
+    height: 360,
+    backgroundColor: '#020617',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 14
+  },
+  previewModalVideo: {
+    width: '100%',
+    height: '100%'
+  },
+  previewModalActions: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  previewModalCloseBtn: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  previewModalCloseBtnText: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  previewModalUseBtn: {
+    flex: 1.5,
+    flexDirection: 'row',
+    backgroundColor: THEME.colors.primary,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  previewModalUseBtnText: {
+    color: '#020617',
+    fontSize: 14,
+    fontWeight: '800'
   },
   voiceGrid: {
     flexDirection: 'row',

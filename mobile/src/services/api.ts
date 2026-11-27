@@ -151,6 +151,10 @@ export class MobileApiService {
     return `${this.baseUrl}/api/video/thumbnail/${jobId}`;
   }
 
+  getMediaAssetUrl(filename: string): string {
+    return `${this.baseUrl}/api/media/stream/${encodeURIComponent(filename)}`;
+  }
+
   getRecapImageUrl(groupId: string, download = false): string {
     return `${this.baseUrl}/api/predictions/recap-image/${groupId}${download ? '?download=1' : ''}`;
   }

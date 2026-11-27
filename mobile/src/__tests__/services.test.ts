@@ -186,6 +186,8 @@ test('Mobile Regression: MobileApiService URL builder methods and social endpoin
   const api = new MobileApiService('http://test-server:5000/');
   assert.equal(api.getVideoDownloadUrl('job_99'), 'http://test-server:5000/api/video/download/job_99');
   assert.equal(api.getThumbnailUrl('job_99'), 'http://test-server:5000/api/video/thumbnail/job_99');
+  assert.equal(api.getMediaAssetUrl('background_video_1.mp4'), 'http://test-server:5000/api/media/stream/background_video_1.mp4');
+  assert.equal(api.getMediaAssetUrl('background_track_2.mp3'), 'http://test-server:5000/api/media/stream/background_track_2.mp3');
   assert.equal(typeof api.scheduleSocialPost, 'function');
   assert.equal(typeof api.getSocialPipeline, 'function');
 });

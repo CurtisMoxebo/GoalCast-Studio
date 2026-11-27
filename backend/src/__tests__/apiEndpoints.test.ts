@@ -44,6 +44,29 @@ test('Regression API: GET /api/media/assets', async () => {
   assert.equal(res.body.defaultSettings.descriptionTemplate, DEFAULT_DESCRIPTION_TEMPLATE);
 });
 
+test('Regression API: GET /api/media/stream/:filename streams valid asset and blocks invalid/traversal names', async () => {
+  const assetsRes = await request(app).get('/api/media/assets');
+  assert.equal(assetsRes.status, 200);
+
+  // Path traversal / unknown file must be rejected with 404
+  const badRes = await request(app).get('/api/media/stream/..%2Fpackage.json');
+  assert.equal(badRes.status, 404);
+
+  const missingRes = await request(app).get('/api/media/stream/non_existent_video.mp4');
+  assert.equal(missingRes.status, 404);
+
+  // If a background audio asset exists on disk, verify range streaming returns 206
+  if (assetsRes.body.backgroundAudio.length > 0) {
+    const filename = assetsRes.body.backgroundAudio[0].filename;
+    const rangeRes = await request(app)
+      .get(`/api/media/stream/${encodeURIComponent(filename)}`)
+      .set('Range', 'bytes=0-1023');
+    assert.equal(rangeRes.status, 206);
+    assert.ok(String(rangeRes.headers['content-type']).startsWith('audio/'));
+    assert.equal(rangeRes.headers['accept-ranges'], 'bytes');
+  }
+});
+
 test('Regression API: GET /api/predictions/options', async () => {
   const res = await request(app).get('/api/predictions/options');
   assert.equal(res.status, 200);
