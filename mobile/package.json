@@ -7,6 +7,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "tsc --noEmit",
+    "build:android": "npx eas-cli build --platform android --profile production",
     "test": "tsx --test src/__tests__/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
