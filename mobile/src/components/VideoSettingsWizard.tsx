@@ -414,10 +414,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                   {selectedVideoAsset.filename}
                 </Text>
               </View>
-              <View style={styles.changeChip}>
-                <Text style={styles.changeChipText}>Change</Text>
-                <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
-              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -454,10 +451,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                   {selectedAudioAsset.filename}
                 </Text>
               </View>
-              <View style={styles.changeChip}>
-                <Text style={styles.changeChipText}>Change</Text>
-                <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
-              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1220,21 +1214,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10
-  },
-  changeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    marginLeft: 8
-  },
-  changeChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#cbd5e1'
   },
   compactPreviewBtn: {
     width: 46,
