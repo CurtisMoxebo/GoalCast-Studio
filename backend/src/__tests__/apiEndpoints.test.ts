@@ -217,7 +217,7 @@ test('Prediction Reason API: POST /api/predictions/reason validates selections a
   assert.equal(/^because\s+/i.test(resValid.body.reason.trim()), false);
 });
 
-test('VideoComposer.buildMatchPredictionSpeech uses default phrasing when no reason and "we expect ... because ..." when reason is given', () => {
+test('VideoComposer.buildMatchPredictionSpeech uses default phrasing when no reason and "We expect ... because ..." when reason is given', () => {
   const composer = new VideoComposer();
 
   // Single selection, no reason
@@ -243,7 +243,7 @@ test('VideoComposer.buildMatchPredictionSpeech uses default phrasing when no rea
       [{ code: '1', label: 'Home Win', spokenText: 'Arsenal to win' }],
       'Arsenal have won 7 straight home games'
     ),
-    'we expect Arsenal to win because Arsenal have won 7 straight home games.'
+    'We expect Arsenal to win because Arsenal have won 7 straight home games.'
   );
 
   // Strips accidental leading "because"
@@ -252,6 +252,6 @@ test('VideoComposer.buildMatchPredictionSpeech uses default phrasing when no rea
       [{ code: 'BTTS_YES', label: 'Both Teams to Score - Yes', spokenText: 'Both teams to score' }],
       'because both sides have scored in five consecutive matches.'
     ),
-    'we expect Both teams to score because both sides have scored in five consecutive matches.'
+    'We expect Both teams to score because both sides have scored in five consecutive matches.'
   );
 });

@@ -62,7 +62,7 @@ export class VideoComposer {
     const trimmedReason = (reason || '').trim().replace(/^because\s+/i, '').trim();
     if (trimmedReason.length > 0) {
       const punctuated = /[.!?]$/.test(trimmedReason) ? trimmedReason : `${trimmedReason}.`;
-      return `we expect ${predSpoken} because ${punctuated}`;
+      return `We expect ${predSpoken} because ${punctuated}`;
     }
 
     return hasMultiple
