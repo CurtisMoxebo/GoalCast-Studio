@@ -5,6 +5,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import { assetsManager } from './assetsManager';
 import { overlayGenerator, OverlayGameData } from './overlayGenerator';
 import { getTTSService } from '../tts/ttsFactory';
+import { DEFAULT_TTS_SPEED } from '../../constants/videoDefaults';
 
 // Configure ffmpeg & ffprobe paths
 try {
@@ -68,9 +69,9 @@ export class VideoComposer {
     const voice = input.voiceActor || 'hearth';
     const soundEffects = assetsManager.getSoundEffects();
 
-    // 1. Generate Voice Audio Clips & Measure Timelines (Speed: 1.2x)
-    notify(15, 'Synthesizing voice actor speech clips with Kokoro TTS (speed 1.2x)');
-    const ttsSpeed = 1.2;
+    // 1. Generate Voice Audio Clips & Measure Timelines
+    notify(15, `Synthesizing voice actor speech clips with Kokoro TTS (speed ${DEFAULT_TTS_SPEED}x)`);
+    const ttsSpeed = DEFAULT_TTS_SPEED;
 
     // Speech 1: Optional Custom Opening Speech + Intro
     const baseIntroText = `Here comes our best ${input.games.length} predictions for the football games going on on ${formattedDate}`;

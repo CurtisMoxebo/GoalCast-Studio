@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ITTSService, VoiceOption, GenerateSpeechOptions } from './ttsService.interface';
+import { DEFAULT_TTS_SPEED } from '../../constants/videoDefaults';
 
 // Voice mapping from user requested names to Kokoro voice IDs
 const VOICE_MAP: Record<string, string> = {
@@ -72,7 +73,7 @@ export class KokoroTTSService implements ITTSService {
       const tts = await this.getTTS();
       const audio = await tts.generate(text, {
         voice: kokoroVoiceId,
-        speed: options.speed || 1.2
+        speed: options.speed || DEFAULT_TTS_SPEED
       });
 
       // Save to audio file
