@@ -1236,20 +1236,13 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                         onPress={() => handleToggleVoicePreview(voice)}
                         activeOpacity={0.75}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        accessibilityLabel={isPreviewing ? 'Stop voice preview' : 'Preview voice'}
                       >
                         <Ionicons
                           name={isPreviewing ? 'stop-circle' : 'play-circle-outline'}
-                          size={16}
+                          size={20}
                           color={isPreviewing ? '#020617' : THEME.colors.primary}
                         />
-                        <Text
-                          style={[
-                            styles.mediaPreviewBtnText,
-                            isPreviewing && styles.mediaPreviewBtnTextActive
-                          ]}
-                        >
-                          {isPreviewing ? 'Stop' : 'Preview'}
-                        </Text>
                       </TouchableOpacity>
                     </View>
                   );
@@ -1307,20 +1300,13 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                         }
                         activeOpacity={0.75}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        accessibilityLabel={isPreviewing ? 'Stop preview' : 'Preview'}
                       >
                         <Ionicons
                           name={isPreviewing ? 'stop-circle' : 'play-circle-outline'}
-                          size={16}
+                          size={20}
                           color={isPreviewing ? '#020617' : THEME.colors.primary}
                         />
-                        <Text
-                          style={[
-                            styles.mediaPreviewBtnText,
-                            isPreviewing && styles.mediaPreviewBtnTextActive
-                          ]}
-                        >
-                          {isPreviewing ? 'Stop' : 'Preview'}
-                        </Text>
                       </TouchableOpacity>
                     </View>
                   );
@@ -1747,27 +1733,18 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   mediaPreviewBtn: {
-    flexDirection: 'row',
+    width: 36,
+    height: 36,
     alignItems: 'center',
-    gap: 5,
+    justifyContent: 'center',
     backgroundColor: '#0f172a',
     borderWidth: 1,
     borderColor: 'rgba(56, 189, 248, 0.45)',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10
+    borderRadius: 10
   },
   mediaPreviewBtnActive: {
     backgroundColor: THEME.colors.primary,
     borderColor: THEME.colors.primary
-  },
-  mediaPreviewBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.primary
-  },
-  mediaPreviewBtnTextActive: {
-    color: '#020617'
   },
   previewModalOverlay: {
     flex: 1,
