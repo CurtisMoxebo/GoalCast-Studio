@@ -534,10 +534,10 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                 style={styles.customHeaderBtn}
                 onPress={() => handlePickCustomMedia('video')}
                 activeOpacity={0.75}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Add custom background video"
               >
-                <Ionicons name="add-circle-outline" size={14} color={THEME.colors.primary} />
-                <Text style={styles.customHeaderBtnText}>Custom</Text>
+                <Ionicons name="add" size={16} color={THEME.colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -611,10 +611,10 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                 style={styles.customHeaderBtn}
                 onPress={() => handlePickCustomMedia('audio')}
                 activeOpacity={0.75}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Add custom background audio"
               >
-                <Ionicons name="add-circle-outline" size={14} color={THEME.colors.primary} />
-                <Text style={styles.customHeaderBtnText}>Custom</Text>
+                <Ionicons name="add" size={16} color={THEME.colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1570,20 +1570,14 @@ const styles = StyleSheet.create({
     borderRadius: 8
   },
   customHeaderBtn: {
-    flexDirection: 'row',
+    width: 26,
+    height: 26,
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
     backgroundColor: 'rgba(14, 165, 233, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(56, 189, 248, 0.45)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
     borderRadius: 8
-  },
-  customHeaderBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: THEME.colors.primary
   },
   compactSelectorMainCustom: {
     borderColor: '#10b981',
