@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   PanResponder,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Modal,
@@ -207,6 +208,60 @@ const BackgroundAudioPreviewPlayer: React.FC<{
   return null;
 };
 
+const useDragToDismiss = (isOpen: boolean, onClose: () => void) => {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  React.useEffect(() => {
+    if (isOpen) {
+      translateY.setValue(0);
+    }
+  }, [isOpen, translateY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          translateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 90 || gesture.vy > 0.7) {
+          Animated.timing(translateY, {
+            toValue: 500,
+            duration: 180,
+            useNativeDriver: true
+          }).start(() => {
+            onCloseRef.current();
+            translateY.setValue(0);
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            bounciness: 6,
+            useNativeDriver: true
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true
+        }).start();
+      }
+    })
+  ).current;
+
+  return {
+    panHandlers: panResponder.panHandlers,
+    animatedStyle: { transform: [{ translateY }] }
+  };
+};
+
 export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
   targetDate,
   selectedMatchesCount,
@@ -369,6 +424,12 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     setPreviewingVideo(null);
     setPreviewingVoice(null);
   };
+
+  const pickerDrag = useDragToDismiss(activePicker !== null, handleClosePicker);
+  const videoPreviewDrag = useDragToDismiss(
+    previewingVideo !== null && activePicker === null,
+    () => setPreviewingVideo(null)
+  );
 
   const handleOpenVideoPreview = (video: MediaAsset & { localUri?: string }) => {
     triggerHaptic();
@@ -1080,35 +1141,44 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             activeOpacity={1}
             onPress={handleClosePicker}
           />
-          <View style={[styles.pickerSheetCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <View style={styles.pickerSheetHandle} />
+          <Animated.View
+            style={[
+              styles.pickerSheetCard,
+              { paddingBottom: Math.max(insets.bottom, 16) },
+              pickerDrag.animatedStyle
+            ]}
+          >
+            {/* Draggable Top Handle + Header Area */}
+            <View {...pickerDrag.panHandlers}>
+              <View style={styles.pickerSheetHandle} />
 
-            {/* Sheet Header */}
-            <View style={styles.previewModalHeader}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={styles.previewModalTitle}>
-                  {activePicker === 'video'
-                    ? '🎬 Select Background Video'
-                    : activePicker === 'audio'
-                      ? '🎵 Select Background Beat'
-                      : '🎙️ Select Voice Actor'}
-                </Text>
-                <Text style={styles.previewModalSubtitle}>
-                  {(activePicker === 'video'
-                    ? availableVideos
-                    : activePicker === 'audio'
-                      ? availableAudio
-                      : availableVoices
-                  ).length}{' '}
-                  items • Tap Preview to audition
-                </Text>
+              {/* Sheet Header */}
+              <View style={styles.previewModalHeader}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.previewModalTitle}>
+                    {activePicker === 'video'
+                      ? '🎬 Select Background Video'
+                      : activePicker === 'audio'
+                        ? '🎵 Select Background Beat'
+                        : '🎙️ Select Voice Actor'}
+                  </Text>
+                  <Text style={styles.previewModalSubtitle}>
+                    {(activePicker === 'video'
+                      ? availableVideos
+                      : activePicker === 'audio'
+                        ? availableAudio
+                        : availableVoices
+                    ).length}{' '}
+                    items • Drag down to close
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleClosePicker}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={24} color="#94a3b8" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={handleClosePicker}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={24} color="#94a3b8" />
-              </TouchableOpacity>
             </View>
 
             {/* Search Filter */}
@@ -1303,7 +1373,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                 })
               )}
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -1315,22 +1385,25 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         onRequestClose={() => setPreviewingVideo(null)}
       >
         <View style={styles.previewModalOverlay}>
-          <View style={styles.previewModalCard}>
-            <View style={styles.previewModalHeader}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={styles.previewModalTitle} numberOfLines={1}>
-                  {previewingVideo?.name || 'Video Preview'}
-                </Text>
-                <Text style={styles.previewModalSubtitle} numberOfLines={1}>
-                  {previewingVideo?.filename}
-                </Text>
+          <Animated.View style={[styles.previewModalCard, videoPreviewDrag.animatedStyle]}>
+            <View {...videoPreviewDrag.panHandlers}>
+              <View style={styles.pickerSheetHandle} />
+              <View style={styles.previewModalHeader}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.previewModalTitle} numberOfLines={1}>
+                    {previewingVideo?.name || 'Video Preview'}
+                  </Text>
+                  <Text style={styles.previewModalSubtitle} numberOfLines={1}>
+                    {previewingVideo?.filename}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setPreviewingVideo(null)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={24} color="#94a3b8" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => setPreviewingVideo(null)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={24} color="#94a3b8" />
-              </TouchableOpacity>
             </View>
 
             {previewingVideo && (
@@ -1365,7 +1438,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </KeyboardAvoidingView>
