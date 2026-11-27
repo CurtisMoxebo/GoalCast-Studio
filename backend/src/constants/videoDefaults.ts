@@ -13,4 +13,4 @@ export const DEFAULT_VIDEO_RETENTION_HOURS = 72;
 export const MIN_SCHEDULE_ADVANCE_MINUTES = 29.5;
 export const DEFAULT_TTS_SPEED = 1.25;
 export const VOICE_PREVIEW_SAMPLE_TEXT =
-  'Here comes our best 5 predictions for the football games going on on 25th November';
+  'Here comes our best 5 analysis for the football games going on on 25th November';

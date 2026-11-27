@@ -74,7 +74,7 @@ export class VideoComposer {
     const ttsSpeed = DEFAULT_TTS_SPEED;
 
     // Speech 1: Optional Custom Opening Speech + Intro
-    const baseIntroText = `Here comes our best ${input.games.length} predictions for the football games going on on ${formattedDate}`;
+    const baseIntroText = `Here comes our best ${input.games.length} analysis for the football games going on on ${formattedDate}`;
     const customIntro = (input.customIntroSpeech || '').trim();
     const introText = customIntro
       ? `${customIntro}${/[.!?]$/.test(customIntro) ? '' : '.'} ${baseIntroText}`
@@ -92,7 +92,7 @@ export class VideoComposer {
     if (input.previousWonGroup && input.previousWonGroup.games.length > 0) {
       celebrationAudioPath = path.join(workDir, 'speech_celebration.wav');
       celebrationSpeech = await tts.generateSpeech(
-        'Congratulations everyone! Our last prediction was a success! We won big!',
+        'Congratulations everyone! Our last analysis was a success! We nailed every single call!',
         { voice, speed: ttsSpeed, outputFilePath: celebrationAudioPath }
       );
     }
@@ -158,7 +158,7 @@ export class VideoComposer {
     // Speech 5: Outro
     const outroAudioPath = path.join(workDir, 'speech_outro.wav');
     const outroSpeech = await tts.generateSpeech(
-      'Like, share and subscribe to get more daily predictions.',
+      'Like, share and subscribe to get more daily analysis.',
       { voice, speed: ttsSpeed, outputFilePath: outroAudioPath }
     );
 
@@ -293,7 +293,7 @@ export class VideoComposer {
     // Celebration speech (if present)
     if (celebrationSpeech) {
       spokenPhrases.push({
-        text: 'Congratulations everyone! Our last prediction was a success! We won big!',
+        text: 'Congratulations everyone! Our last analysis was a success! We nailed every single call!',
         startTime: phraseOffset,
         duration: celebrationSpeech.durationSeconds,
         marginV: 100
@@ -349,7 +349,7 @@ export class VideoComposer {
 
     // Outro speech
     spokenPhrases.push({
-      text: 'Like, share and subscribe to get more daily predictions.',
+      text: 'Like, share and subscribe to get more daily analysis.',
       startTime: phraseOffset,
       duration: outroSpeech.durationSeconds,
       marginV: 100

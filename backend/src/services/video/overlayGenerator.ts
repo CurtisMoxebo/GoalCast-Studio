@@ -292,7 +292,7 @@ export class OverlayGenerator {
       })
       .join('\n');
 
-    const titleText = `⚽Best football predictions for ${slashDate}⚽`;
+    const titleText = `⚽Best football analysis for ${slashDate}⚽`;
 
     const svg = `
       <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
@@ -789,12 +789,12 @@ export class OverlayGenerator {
     let headerIcon = '⏳';
 
     if (groupOutcome === 'HIT') {
-      headerTitle = '🎉 ALL PREDICTIONS HIT 🎉';
+      headerTitle = '🎉 ALL ANALYSIS HIT 🎉';
       headerBadgeText = '100% SUCCESS';
       headerBadgeColor = '#16a34a'; // Green
       headerIcon = '🏆';
     } else if (groupOutcome === 'MISS') {
-      headerTitle = 'MATCHDAY PREDICTIONS RECAP';
+      headerTitle = 'MATCHDAY ANALYSIS RECAP';
       headerBadgeText = 'MISSED';
       headerBadgeColor = '#dc2626'; // Red
       headerIcon = '❌';
