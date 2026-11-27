@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../index';
+import { VideoComposer } from '../services/video/videoComposer';
 import {
   DEFAULT_BACKGROUND_VIDEO,
   DEFAULT_BACKGROUND_AUDIO,
@@ -190,4 +191,67 @@ test('Regression API: GET /api/video/progress and /download 404 on missing jobs'
 
   const resDownload = await request(app).get('/api/video/download/non_existent_job_123');
   assert.equal(resDownload.status, 404);
+});
+
+test('Prediction Reason API: POST /api/predictions/reason validates selections and returns a one-sentence reason', async () => {
+  const resNoSelection = await request(app)
+    .post('/api/predictions/reason')
+    .send({
+      game: { homeTeam: 'Arsenal', awayTeam: 'Chelsea', competition: 'Premier League' },
+      selections: []
+    });
+  assert.equal(resNoSelection.status, 400);
+
+  const resValid = await request(app)
+    .post('/api/predictions/reason')
+    .send({
+      game: { homeTeam: 'Arsenal', awayTeam: 'Chelsea', competition: 'Premier League' },
+      selections: [
+        { code: '1', label: 'Home Win', spokenText: 'Arsenal to win' }
+      ]
+    });
+  assert.equal(resValid.status, 200);
+  assert.equal(resValid.body.success, true);
+  assert.equal(typeof resValid.body.reason, 'string');
+  assert.ok(resValid.body.reason.trim().length > 5);
+  assert.equal(/^because\s+/i.test(resValid.body.reason.trim()), false);
+});
+
+test('VideoComposer.buildMatchPredictionSpeech uses default phrasing when no reason and "we expect ... because ..." when reason is given', () => {
+  const composer = new VideoComposer();
+
+  // Single selection, no reason
+  assert.equal(
+    composer.buildMatchPredictionSpeech([
+      { code: '1', label: 'Home Win', spokenText: 'Arsenal to win' }
+    ]),
+    'Arsenal to win stands out as the strongest outcome.'
+  );
+
+  // Two selections, no reason
+  assert.equal(
+    composer.buildMatchPredictionSpeech([
+      { code: '1', label: 'Home Win', spokenText: 'Arsenal to win' },
+      { code: 'OVER_2.5_GOALS', label: 'Total Goals Over 2.5', spokenText: 'Over 2.5 total goals' }
+    ]),
+    'Arsenal to win and Over 2.5 total goals stand out as the strongest outcomes.'
+  );
+
+  // Single selection, with reason
+  assert.equal(
+    composer.buildMatchPredictionSpeech(
+      [{ code: '1', label: 'Home Win', spokenText: 'Arsenal to win' }],
+      'Arsenal have won 7 straight home games'
+    ),
+    'we expect Arsenal to win because Arsenal have won 7 straight home games.'
+  );
+
+  // Strips accidental leading "because"
+  assert.equal(
+    composer.buildMatchPredictionSpeech(
+      [{ code: 'BTTS_YES', label: 'Both Teams to Score - Yes', spokenText: 'Both teams to score' }],
+      'because both sides have scored in five consecutive matches.'
+    ),
+    'we expect Both teams to score because both sides have scored in five consecutive matches.'
+  );
 });

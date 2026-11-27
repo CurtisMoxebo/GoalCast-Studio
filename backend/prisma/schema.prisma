@@ -95,6 +95,7 @@ model GamePrediction {
   competitionLogo      String?                @db.Text
   kickoffTime          DateTime
   orderIndex           Int                    @default(0)
+  reason               String?                @db.Text
 
   // Real outcome of the game prediction: PENDING, HIT, MISS (set manually from mobile history)
   realOutcome          String                 @default("PENDING") // PENDING, HIT, MISS

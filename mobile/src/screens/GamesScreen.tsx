@@ -62,7 +62,12 @@ export const GamesScreen: React.FC = () => {
     return sessionStore.getSelections();
   });
 
-  // Sync selected date & selections to sessionStore
+  // Per-game spoken reasons map: gameId -> reason string (restored from session store)
+  const [gameReasons, setGameReasons] = useState<Record<string, string>>(() => {
+    return sessionStore.getReasons();
+  });
+
+  // Sync selected date, selections & reasons to sessionStore
   useEffect(() => {
     sessionStore.setSelectedDate(selectedDate);
   }, [selectedDate]);
@@ -70,6 +75,10 @@ export const GamesScreen: React.FC = () => {
   useEffect(() => {
     sessionStore.setSelections(gameSelections);
   }, [gameSelections]);
+
+  useEffect(() => {
+    sessionStore.setReasons(gameReasons);
+  }, [gameReasons]);
 
   // Filter to show only games with predictions
   const [showOnlyPredicted, setShowOnlyPredicted] = useState(false);
@@ -296,10 +305,16 @@ export const GamesScreen: React.FC = () => {
 
   const handleRemoveSelection = (gameId: string, code: string) => {
     const current = gameSelections[gameId] || [];
+    const remaining = current.filter((s) => s.code !== code);
     setGameSelections({
       ...gameSelections,
-      [gameId]: current.filter((s) => s.code !== code)
+      [gameId]: remaining
     });
+    if (remaining.length === 0 && gameReasons[gameId]) {
+      const nextReasons = { ...gameReasons };
+      delete nextReasons[gameId];
+      setGameReasons(nextReasons);
+    }
   };
 
   const handleConfirmModalSelections = (selections: PredictionSelection[]) => {
@@ -308,6 +323,14 @@ export const GamesScreen: React.FC = () => {
       ...gameSelections,
       [activeGameForPicker.id]: selections
     });
+  };
+
+  const handleModalReasonChange = (reason: string) => {
+    if (!activeGameForPicker) return;
+    setGameReasons((prev) => ({
+      ...prev,
+      [activeGameForPicker.id]: reason
+    }));
   };
 
   const handleNextToWizard = () => {
@@ -327,6 +350,7 @@ export const GamesScreen: React.FC = () => {
 
     const formattedPayloadGames = gamesWithPredictions.map((gameId) => {
       const g = games.find((m) => m.id === gameId);
+      const trimmedReason = gameReasons[gameId]?.trim();
       return {
         homeTeam: g?.homeTeam || 'Home',
         homeTeamLogo: g?.homeTeamLogo,
@@ -335,7 +359,8 @@ export const GamesScreen: React.FC = () => {
         competition: g?.competition || 'Competition',
         competitionLogo: g?.competitionLogo,
         kickoffTime: g?.kickoffTime || new Date().toISOString(),
-        selections: gameSelections[gameId] || []
+        selections: gameSelections[gameId] || [],
+        reason: trimmedReason || undefined
       };
     });
 
@@ -738,9 +763,11 @@ export const GamesScreen: React.FC = () => {
         visible={activeGameForPicker !== null}
         game={activeGameForPicker}
         currentSelections={activeGameForPicker ? gameSelections[activeGameForPicker.id] || [] : []}
+        currentReason={activeGameForPicker ? gameReasons[activeGameForPicker.id] || '' : ''}
         availableOptions={bettingOptions}
         onClose={() => setActiveGameForPicker(null)}
         onConfirm={handleConfirmModalSelections}
+        onReasonChange={handleModalReasonChange}
       />
 
       {/* AI Loading Overlay */}

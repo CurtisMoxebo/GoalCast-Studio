@@ -12,6 +12,7 @@ export interface OverlayGameData {
   awayTeamLogo?: string;
   competitionLogo?: string;
   selections?: { code: string; label: string; spokenText: string }[];
+  reason?: string;
 }
 
 export class OverlayGenerator {

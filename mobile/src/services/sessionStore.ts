@@ -9,6 +9,7 @@ export class SessionStore {
   private gamesByDate: Map<string, UpcomingGame[]> = new Map();
   private history: HistoryItem[] | null = null;
   private gameSelections: Record<string, PredictionSelection[]> = {};
+  private gameReasons: Record<string, string> = {};
   private selectedDate: string | null = null;
 
   // --- Games by Date ---
@@ -64,6 +65,15 @@ export class SessionStore {
     this.gameSelections = selections;
   }
 
+  // --- Prediction Reasons ---
+  getReasons(): Record<string, string> {
+    return this.gameReasons;
+  }
+
+  setReasons(reasons: Record<string, string>): void {
+    this.gameReasons = reasons;
+  }
+
   // --- Current Selected Date ---
   getSelectedDate(): string | null {
     return this.selectedDate;
@@ -78,6 +88,7 @@ export class SessionStore {
     this.gamesByDate.clear();
     this.history = null;
     this.gameSelections = {};
+    this.gameReasons = {};
     this.selectedDate = null;
   }
 }

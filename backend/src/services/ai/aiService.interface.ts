@@ -61,10 +61,23 @@ export interface GameOutcomeEvaluationResult {
   realOutcomeDetails?: string;
 }
 
+export interface PredictionReasonInput {
+  homeTeam: string;
+  awayTeam: string;
+  competition?: string;
+  kickoffTime?: string;
+  selections: {
+    code: string;
+    label: string;
+    spokenText?: string;
+  }[];
+}
+
 export interface IAIService {
   readonly providerName: string;
   fetchUpcomingGames(targetDate: string, timezone: string): Promise<UpcomingGame[]>;
   generatePredictions(games: UpcomingGame[]): Promise<GamePredictionResult[]>;
+  generatePredictionReason?(input: PredictionReasonInput): Promise<string>;
   validatePreviousPredictions(games: ValidatableGame[]): Promise<ValidationResult>;
   resolveGameOutcomes?(games: GameOutcomeEvaluationInput[]): Promise<GameOutcomeEvaluationResult[]>;
 }

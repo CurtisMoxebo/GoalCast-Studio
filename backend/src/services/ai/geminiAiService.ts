@@ -7,7 +7,8 @@ import {
   ValidationResult,
   PredictionSuggestion,
   GameOutcomeEvaluationInput,
-  GameOutcomeEvaluationResult
+  GameOutcomeEvaluationResult,
+  PredictionReasonInput
 } from './aiService.interface';
 import {
   findBettingOptionByCode,
@@ -425,6 +426,59 @@ Return a JSON array of objects with the exact schema:
 
       console.error(`----------------------------------------------------------------------------\n`);
       throw err;
+    }
+  }
+
+  /**
+   * Generate a concise one-sentence spoken reason justifying the user's selected prediction(s).
+   */
+  async generatePredictionReason(input: PredictionReasonInput): Promise<string> {
+    const ai = this.getClient();
+    const picksSummary = input.selections
+      .map((s) => s.spokenText || s.label || s.code)
+      .join(' and ');
+
+    const prompt = `
+You are a sharp football analyst writing a single short spoken reason for a short-form sports video.
+
+Match: ${input.homeTeam} vs ${input.awayTeam}
+Competition: ${input.competition || 'Football Match'}
+Selected Pick: ${picksSummary}
+
+Write ONE short, punchy, natural-sounding sentence (10 to 20 words max) explaining WHY this pick makes sense based on team form, attacking/defensive strength, or head-to-head trends.
+
+CRITICAL RULES:
+- Your sentence will be spoken right after "We expect ${picksSummary} because ...".
+- Therefore, DO NOT start your sentence with "Because", "We expect", or repeat the pick name.
+- Start directly with the reason clause (e.g., "${input.homeTeam} have scored in five straight home matches while ${input.awayTeam} struggle defensively on the road.").
+- Return ONLY a JSON object: { "reason": "..." }
+`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: this.modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.35
+        }
+      });
+
+      const rawText = response.text || '{}';
+      const parsed = JSON.parse(rawText);
+      let reason = String(parsed.reason || '').trim();
+      // Strip any accidental leading "because"
+      reason = reason.replace(/^because\s+/i, '').trim();
+
+      if (!reason) {
+        const { MockAIService } = require('./mockAiService');
+        return new MockAIService().generatePredictionReason(input);
+      }
+      return reason;
+    } catch (err: any) {
+      console.warn('[GeminiAIService] generatePredictionReason fallback due to error:', err?.message);
+      const { MockAIService } = require('./mockAiService');
+      return new MockAIService().generatePredictionReason(input);
     }
   }
 

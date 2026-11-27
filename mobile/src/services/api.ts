@@ -1,5 +1,13 @@
 import { API_BASE_URL } from '../constants/config';
-import { UpcomingGame, BettingCategory, BettingOption, MediaAsset, VoiceOption, HistoryItem } from '../types';
+import {
+  UpcomingGame,
+  BettingCategory,
+  BettingOption,
+  MediaAsset,
+  VoiceOption,
+  HistoryItem,
+  PredictionSelection
+} from '../types';
 
 export class MobileApiService {
   private baseUrl: string;
@@ -79,6 +87,23 @@ export class MobileApiService {
     }
     const data = await res.json();
     return data.predictions || [];
+  }
+
+  async requestPredictionReason(
+    game: UpcomingGame,
+    selections: PredictionSelection[]
+  ): Promise<string> {
+    const res = await fetch(`${this.baseUrl}/api/predictions/reason`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game, selections })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to generate AI prediction reason');
+    }
+    const data = await res.json();
+    return data.reason || '';
   }
 
   async generatePreviewVideo(payload: {

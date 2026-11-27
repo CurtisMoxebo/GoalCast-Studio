@@ -110,6 +110,53 @@ router.post('/ai', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * POST /api/predictions/reason
+ * Generates a short one-sentence AI reason for a single game and its selected prediction(s).
+ */
+router.post('/reason', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { game, selections } = req.body || {};
+
+    if (!game || !game.homeTeam || !game.awayTeam) {
+      res.status(400).json({ error: 'Valid game details (homeTeam, awayTeam) are required.' });
+      return;
+    }
+
+    if (!Array.isArray(selections) || selections.length === 0) {
+      res.status(400).json({ error: 'At least one selected prediction is required to generate a reason.' });
+      return;
+    }
+
+    const ai = getAIService();
+    let reason = '';
+    if (typeof ai.generatePredictionReason === 'function') {
+      reason = await ai.generatePredictionReason({
+        homeTeam: game.homeTeam,
+        awayTeam: game.awayTeam,
+        competition: game.competition,
+        kickoffTime: game.kickoffTime,
+        selections
+      });
+    } else {
+      const labels = selections.map((s: any) => s.label || s.code).join(' and ');
+      reason = `${game.homeTeam} and ${game.awayTeam} show strong statistical form supporting ${labels.toLowerCase()}.`;
+    }
+
+    res.json({
+      success: true,
+      provider: ai.providerName,
+      reason
+    });
+  } catch (error: any) {
+    console.error('[PredictionsRoute] Error generating prediction reason:', error?.message);
+    res.status(500).json({
+      error: 'Failed to generate prediction reason.',
+      details: error?.message
+    });
+  }
+});
+
+/**
  * POST /api/predictions/preview
  * Initiates video generation, saves group in PREVIEW status
  */
@@ -156,7 +203,8 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
         competitionLogo: g.competitionLogo || undefined,
         kickoffTime: g.kickoffTime,
         orderIndex: index,
-        selections
+        selections,
+        reason: typeof g.reason === 'string' && g.reason.trim() ? g.reason.trim() : undefined
       };
     });
 
@@ -209,6 +257,7 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
               competitionLogo: g.competitionLogo || null,
               kickoffTime: new Date(g.kickoffTime),
               orderIndex: g.orderIndex,
+              reason: g.reason || null,
               selections: {
                 create: g.selections.map((s: any) => ({
                   category: s.category,

@@ -6,11 +6,17 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert
+  Alert,
+  TextInput,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
 import { UpcomingGame, PredictionSelection, BettingOption } from '../types';
 import { getConflictingCodes } from '../utils/predictionUtils';
+import { mobileApi } from '../services/api';
 
 export { getConflictingCodes };
 
@@ -18,9 +24,11 @@ interface PredictionPickerModalProps {
   visible: boolean;
   game: UpcomingGame | null;
   currentSelections: PredictionSelection[];
+  currentReason: string;
   availableOptions: BettingOption[];
   onClose: () => void;
   onConfirm: (selections: PredictionSelection[]) => void;
+  onReasonChange: (reason: string) => void;
 }
 
 const GOAL_TOTALS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5];
@@ -115,19 +123,23 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   visible,
   game,
   currentSelections,
+  currentReason,
   availableOptions,
   onClose,
-  onConfirm
+  onConfirm,
+  onReasonChange
 }) => {
   const [activeTab, setActiveTab] = useState<'RESULT' | 'GOALS' | 'CORNERS'>('RESULT');
   const [selectedCodes, setSelectedCodes] = useState<string[]>(
     currentSelections.map((s) => s.code)
   );
+  const [isGeneratingReason, setIsGeneratingReason] = useState(false);
 
   // Sync state when modal becomes visible
   React.useEffect(() => {
     if (visible) {
       setSelectedCodes(currentSelections.map((s) => s.code));
+      setIsGeneratingReason(false);
     }
   }, [visible, currentSelections]);
 
@@ -165,7 +177,47 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
   const updateSelectionsAndSave = (nextCodes: string[]) => {
     setSelectedCodes(nextCodes);
     onConfirm(buildSelections(nextCodes));
+    if (nextCodes.length === 0 && currentReason) {
+      onReasonChange('');
+    }
   };
+
+  const hasSelections = selectedCodes.length > 0;
+
+  const handleGenerateAiReason = async () => {
+    if (!hasSelections) {
+      Alert.alert(
+        'Prediction Required',
+        'Please select at least 1 prediction before generating an AI reason.'
+      );
+      return;
+    }
+
+    setIsGeneratingReason(true);
+    try {
+      const selections = buildSelections(selectedCodes);
+      const generatedReason = await mobileApi.requestPredictionReason(game, selections);
+      if (generatedReason) {
+        onReasonChange(generatedReason);
+      }
+    } catch (err: any) {
+      Alert.alert('AI Reason Error', err?.message || 'Failed to generate AI reason');
+    } finally {
+      setIsGeneratingReason(false);
+    }
+  };
+
+  const spokenPreview = (() => {
+    const trimmed = currentReason.trim();
+    if (!hasSelections || !trimmed) return '';
+    const built = buildSelections(selectedCodes);
+    const predText =
+      built.length === 1
+        ? built[0].spokenText
+        : `${built[0].spokenText} and ${built[1].spokenText}`;
+    const cleanedReason = trimmed.replace(/^because\s+/i, '');
+    return `We expect ${predText} because ${cleanedReason}`;
+  })();
 
   const toggleSelection = (code: string) => {
     // If already selected, deselect it
@@ -253,7 +305,10 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
@@ -273,6 +328,80 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
             <Text style={styles.counterText}>
               Selected: <Text style={styles.counterHighlight}>{selectedCodes.length}/2 max</Text>
             </Text>
+          </View>
+
+          {/* Reason for Prediction (Spoken in Video) */}
+          <View style={[styles.reasonCard, !hasSelections && styles.reasonCardDisabled]}>
+            <View style={styles.reasonHeaderRow}>
+              <Text style={styles.reasonTitle}>💬 Reason (Spoken in Video)</Text>
+              <TouchableOpacity
+                style={[
+                  styles.aiReasonBtn,
+                  (!hasSelections || isGeneratingReason) && styles.aiReasonBtnDisabled
+                ]}
+                onPress={handleGenerateAiReason}
+                disabled={!hasSelections || isGeneratingReason}
+                activeOpacity={0.75}
+              >
+                {isGeneratingReason ? (
+                  <ActivityIndicator size="small" color="#000000" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="sparkles"
+                      size={13}
+                      color={hasSelections ? '#000000' : THEME.colors.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.aiReasonBtnText,
+                        !hasSelections && styles.aiReasonBtnTextDisabled
+                      ]}
+                    >
+                      AI Reason
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {!hasSelections ? (
+              <View style={styles.reasonLockedBox}>
+                <Ionicons name="lock-closed-outline" size={14} color={THEME.colors.textMuted} />
+                <Text style={styles.reasonLockedText}>
+                  Select at least 1 prediction to write or generate a reason
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.reasonInputWrapper}>
+                  <TextInput
+                    style={styles.reasonInput}
+                    value={currentReason}
+                    onChangeText={onReasonChange}
+                    placeholder="Optional: e.g. Arsenal have scored in 8 straight home matches"
+                    placeholderTextColor={THEME.colors.textMuted}
+                    multiline={true}
+                    maxLength={240}
+                    editable={hasSelections && !isGeneratingReason}
+                  />
+                  {currentReason.length > 0 && !isGeneratingReason && (
+                    <TouchableOpacity
+                      style={styles.reasonClearBtn}
+                      onPress={() => onReasonChange('')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close-circle" size={18} color={THEME.colors.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {spokenPreview ? (
+                  <Text style={styles.reasonPreviewText} numberOfLines={2}>
+                    🗣️ "{spokenPreview}"
+                  </Text>
+                ) : null}
+              </>
+            )}
           </View>
 
           {/* Category Tabs: Result, Goals, Corners */}
@@ -534,7 +663,7 @@ export const PredictionPickerModal: React.FC<PredictionPickerModalProps> = ({
             )}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -806,5 +935,96 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 14,
     fontWeight: '900'
+  },
+  reasonCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b'
+  },
+  reasonCardDisabled: {
+    opacity: 0.72
+  },
+  reasonHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  reasonTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4
+  },
+  aiReasonBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: THEME.colors.accentGold,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    minWidth: 88,
+    justifyContent: 'center'
+  },
+  aiReasonBtnDisabled: {
+    backgroundColor: '#1e293b'
+  },
+  aiReasonBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000000'
+  },
+  aiReasonBtnTextDisabled: {
+    color: THEME.colors.textMuted
+  },
+  reasonLockedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#131d2f',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9
+  },
+  reasonLockedText: {
+    fontSize: 12,
+    color: THEME.colors.textMuted,
+    flex: 1
+  },
+  reasonInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  reasonInput: {
+    flex: 1,
+    color: THEME.colors.textPrimary,
+    fontSize: 13,
+    lineHeight: 18,
+    minHeight: 36,
+    maxHeight: 74,
+    padding: 0,
+    textAlignVertical: 'top'
+  },
+  reasonClearBtn: {
+    marginLeft: 6,
+    marginTop: 2
+  },
+  reasonPreviewText: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#94a3b8',
+    fontStyle: 'italic'
   }
 });

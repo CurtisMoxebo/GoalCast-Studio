@@ -76,6 +76,7 @@ export interface HistoryItem {
     awayTeamLogo?: string;
     competition?: string;
     kickoffTime?: string;
+    reason?: string | null;
     realOutcome?: 'PENDING' | 'HIT' | 'MISS';
     selections: {
       code: string;

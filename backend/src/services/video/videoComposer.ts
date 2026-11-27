@@ -39,6 +39,37 @@ export interface VideoComposerResult {
 }
 
 export class VideoComposer {
+  /**
+   * Builds the spoken prediction reveal sentence for a match.
+   * - With a user/AI reason: "we expect {prediction} because {reason}"
+   * - Without a reason: "{prediction} stands out as the strongest outcome(s)."
+   */
+  public buildMatchPredictionSpeech(
+    selections: { code: string; label: string; spokenText: string }[] = [],
+    reason?: string
+  ): string {
+    let predSpoken = 'Both teams to score';
+    const hasMultiple = selections.length >= 2;
+
+    if (hasMultiple) {
+      const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
+      const spoken2 = selections[1].spokenText || selections[1].label || selections[1].code;
+      predSpoken = `${spoken1} and ${spoken2}`;
+    } else if (selections.length === 1) {
+      predSpoken = selections[0].spokenText || selections[0].label || selections[0].code;
+    }
+
+    const trimmedReason = (reason || '').trim().replace(/^because\s+/i, '').trim();
+    if (trimmedReason.length > 0) {
+      const punctuated = /[.!?]$/.test(trimmedReason) ? trimmedReason : `${trimmedReason}.`;
+      return `we expect ${predSpoken} because ${punctuated}`;
+    }
+
+    return hasMultiple
+      ? `${predSpoken} stand out as the strongest outcomes.`
+      : `${predSpoken} stands out as the strongest outcome.`;
+  }
+
   private formatDisplayDate(dateStr: string): string {
     try {
       const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`);
@@ -114,25 +145,11 @@ export class VideoComposer {
       const g = input.games[i];
       const selections = g.selections || [];
 
-      // If a game has multiple predictions, speak both: "{pred1} and {pred2}"
-      let predSpoken = 'Both teams to score';
-      let predText = '';
-
+      const predText = this.buildMatchPredictionSpeech(selections, g.reason);
       if (selections.length >= 2) {
-        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
-        const spoken2 = selections[1].spokenText || selections[1].label || selections[1].code;
-        predSpoken = `${spoken1} and ${spoken2}`;
-        predText = `${spoken1} and ${spoken2} stand out as the strongest outcomes.`;
         console.log(
           `[VideoComposer] 🎙️ Match ${i + 1} (${g.homeTeam} vs ${g.awayTeam}): 2 predictions spoken => "${predText}"`
         );
-      } else if (selections.length === 1) {
-        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
-        predSpoken = spoken1;
-        predText = `${predSpoken} stands out as the strongest outcome.`;
-      } else {
-        predSpoken = 'Both teams to score';
-        predText = `${predSpoken} stands out as the strongest outcome.`;
       }
 
       // 4a. Match Announcement (Spoken as game box slides in)
@@ -316,17 +333,7 @@ export class VideoComposer {
       const m = matchScenes[i];
       const selections = g.selections || [];
 
-      let matchPredText = '';
-      if (selections.length >= 2) {
-        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
-        const spoken2 = selections[1].spokenText || selections[1].label || selections[1].code;
-        matchPredText = `${spoken1} and ${spoken2} stand out as the strongest outcomes.`;
-      } else if (selections.length === 1) {
-        const spoken1 = selections[0].spokenText || selections[0].label || selections[0].code;
-        matchPredText = `${spoken1} stands out as the strongest outcome.`;
-      } else {
-        matchPredText = 'Both teams to score stands out as the strongest outcome.';
-      }
+      const matchPredText = this.buildMatchPredictionSpeech(selections, g.reason);
 
       const matchIntroText = `Match ${i + 1}, ${g.homeTeam} versus ${g.awayTeam}.`;
       spokenPhrases.push({

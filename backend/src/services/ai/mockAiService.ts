@@ -5,7 +5,8 @@ import {
   ValidatableGame,
   ValidationResult,
   GameOutcomeEvaluationInput,
-  GameOutcomeEvaluationResult
+  GameOutcomeEvaluationResult,
+  PredictionReasonInput
 } from './aiService.interface';
 import { formatSpokenPrediction, findBettingOptionByCode } from '../../constants/bettingRules';
 
@@ -106,6 +107,11 @@ export class MockAIService implements IAIService {
     console.log(`[MockAIService] 🏁 Generated mock predictions for ${results.length} games in ${Date.now() - startTime}ms`);
     console.log(`--------------------------------------------------------------------------\n`);
     return results;
+  }
+
+  async generatePredictionReason(input: PredictionReasonInput): Promise<string> {
+    const labels = input.selections.map((s) => s.label || s.code).join(' and ');
+    return `${input.homeTeam} and ${input.awayTeam} show strong recent form and statistical trends supporting ${labels.toLowerCase()}.`;
   }
 
   async validatePreviousPredictions(_games: ValidatableGame[]): Promise<ValidationResult> {
