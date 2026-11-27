@@ -77,8 +77,8 @@ export class VideoCleanupService {
       // Skip the shared 'recaps' folder itself
       if (folderName === 'recaps') continue;
 
-      // Clean expired individual files inside 'custom_uploads' without deleting the folder
-      if (folderName === 'custom_uploads') {
+      // Clean expired individual files inside 'custom_uploads' and 'direct_post_uploads'
+      if (folderName === 'custom_uploads' || folderName === 'direct_post_uploads') {
         const customDir = path.join(renderBase, folderName);
         try {
           const customFiles = fs.readdirSync(customDir, { withFileTypes: true });

@@ -87,6 +87,7 @@ export class MobileApiService {
     backgroundVideo: string;
     backgroundAudio: string;
     voiceActor: string;
+    customIntroSpeech?: string;
     thumbnailTimestamp: number;
     description: string;
     scheduledPostTime?: string;
@@ -161,6 +162,129 @@ export class MobileApiService {
 
   getCustomMediaUploadUrl(type: 'video' | 'audio', filename: string): string {
     return `${this.baseUrl}/api/media/upload-custom?type=${encodeURIComponent(type)}&filename=${encodeURIComponent(filename)}`;
+  }
+
+  getDirectPostUploadUrl(mediaType: 'photo' | 'video', filename: string): string {
+    return `${this.baseUrl}/api/direct-post/upload?mediaType=${encodeURIComponent(mediaType)}&filename=${encodeURIComponent(filename)}`;
+  }
+
+  async fetchDirectPostPlatforms(): Promise<{
+    enabledMediaTypes: ('text' | 'photo' | 'video')[];
+    platforms: Array<{
+      id: string;
+      name: string;
+      subtitle: string;
+      color: string;
+      supportedMediaTypes: ('text' | 'photo' | 'video')[];
+      configured: boolean;
+    }>;
+  }> {
+    const res = await fetch(`${this.baseUrl}/api/direct-post/platforms`);
+    if (!res.ok) throw new Error('Failed to load social platforms');
+    return res.json();
+  }
+
+  async uploadDirectPostMedia(
+    localUri: string,
+    mediaType: 'photo' | 'video',
+    filename: string
+  ): Promise<{ mediaToken: string; sizeBytes: number }> {
+    const url = this.getDirectPostUploadUrl(mediaType, filename);
+    const extMatch = filename.match(/\.[a-zA-Z0-9]+$/);
+    const ext = extMatch ? extMatch[0].toLowerCase() : mediaType === 'photo' ? '.jpg' : '.mp4';
+
+    try {
+      const FileSystem = await import('expo-file-system/legacy');
+      let uploadUri = localUri;
+      let tempCacheUri: string | null = null;
+
+      if (FileSystem.cacheDirectory) {
+        const candidate = `${FileSystem.cacheDirectory}goalcast_direct_${Date.now()}${ext}`;
+        try {
+          await FileSystem.copyAsync({ from: localUri, to: candidate });
+          uploadUri = candidate;
+          tempCacheUri = candidate;
+        } catch {
+          uploadUri = localUri;
+        }
+      }
+
+      try {
+        const result = await FileSystem.uploadAsync(url, uploadUri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: {
+            'Content-Type': 'application/octet-stream'
+          }
+        });
+
+        let parsed: any = {};
+        try {
+          parsed = JSON.parse(result.body || '{}');
+        } catch {}
+
+        if (result.status < 200 || result.status >= 300 || !parsed.mediaToken) {
+          throw new Error(parsed.error || `Failed to upload ${mediaType} (Status ${result.status})`);
+        }
+        return { mediaToken: parsed.mediaToken, sizeBytes: parsed.sizeBytes || 0 };
+      } finally {
+        if (tempCacheUri) {
+          FileSystem.deleteAsync(tempCacheUri, { idempotent: true }).catch(() => {});
+        }
+      }
+    } catch (fsErr: any) {
+      const localRes = await fetch(localUri);
+      if (!localRes.ok) {
+        throw new Error(fsErr?.message || `Could not read selected ${mediaType} from device.`);
+      }
+      const blob = await localRes.blob();
+      const uploadRes = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream'
+        },
+        body: blob
+      });
+
+      const bodyText = await uploadRes.text();
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(bodyText || '{}');
+      } catch {}
+
+      if (!uploadRes.ok || !parsed.mediaToken) {
+        throw new Error(parsed.error || `Failed to upload ${mediaType} (Status ${uploadRes.status})`);
+      }
+      return { mediaToken: parsed.mediaToken, sizeBytes: parsed.sizeBytes || 0 };
+    }
+  }
+
+  async publishDirectPost(payload: {
+    mediaToken?: string;
+    mediaType: 'text' | 'photo' | 'video';
+    description: string;
+    platforms: string[];
+  }): Promise<{
+    success: boolean;
+    results: Array<{
+      platform: string;
+      platformName: string;
+      status: 'SUCCESS' | 'FAILED';
+      remotePostId?: string;
+      remoteUrl?: string;
+      error?: string;
+    }>;
+  }> {
+    const res = await fetch(`${this.baseUrl}/api/direct-post/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to publish post (Status ${res.status})`);
+    }
+    return data;
   }
 
   async uploadCustomMedia(

@@ -7,6 +7,7 @@ import predictionsRoutes from './routes/predictions.routes';
 import mediaRoutes from './routes/media.routes';
 import videoRoutes from './routes/video.routes';
 import socialRoutes from './routes/social.routes';
+import directPostRoutes from './routes/directPost.routes';
 import { socialSchedulerService } from './services/social/socialSchedulerService';
 import { videoCleanupService } from './services/video/videoCleanupService';
 import { voicePreviewService } from './services/tts/voicePreviewService';
@@ -57,6 +58,7 @@ app.use('/api/predictions', predictionsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/video', videoRoutes);
 app.use('/api/social', socialRoutes);
+app.use('/api/direct-post', directPostRoutes);
 app.use('/', socialRoutes);
 
 // Health Check

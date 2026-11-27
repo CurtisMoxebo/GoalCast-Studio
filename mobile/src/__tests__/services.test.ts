@@ -197,6 +197,10 @@ test('Mobile Regression: MobileApiService URL builder methods and social endpoin
     api.getCustomMediaUploadUrl('audio', 'my_beat.mp3'),
     'http://test-server:5000/api/media/upload-custom?type=audio&filename=my_beat.mp3'
   );
+  assert.equal(
+    api.getDirectPostUploadUrl('photo', 'matchday.jpg'),
+    'http://test-server:5000/api/direct-post/upload?mediaType=photo&filename=matchday.jpg'
+  );
   assert.equal(typeof api.scheduleSocialPost, 'function');
   assert.equal(typeof api.getSocialPipeline, 'function');
 });

@@ -121,6 +121,7 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
       backgroundVideo = DEFAULT_BACKGROUND_VIDEO,
       backgroundAudio = DEFAULT_BACKGROUND_AUDIO,
       voiceActor = DEFAULT_VOICE_ACTOR,
+      customIntroSpeech = '',
       thumbnailTimestamp = DEFAULT_THUMBNAIL_TIMESTAMP,
       description = '',
       scheduledPostTime
@@ -235,6 +236,7 @@ router.post('/preview', async (req: Request, res: Response): Promise<void> => {
           backgroundVideo,
           backgroundAudio,
           voiceActor,
+          customIntroSpeech: typeof customIntroSpeech === 'string' ? customIntroSpeech.trim() : undefined,
           thumbnailTimestamp,
           previousWonGroup,
           onProgress: (pct, msg) => {

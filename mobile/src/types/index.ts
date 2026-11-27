@@ -34,7 +34,8 @@ export interface VideoSettings {
   backgroundVideo: string;
   backgroundAudio: string;
   voiceActor: string;
-  thumbnailTimestamp: number; // e.g. 3.0
+  customIntroSpeech?: string;
+  thumbnailTimestamp: number; // e.g. 5.0
   description: string;
   scheduledPostTime?: string; // ISO 8601 string, must be >= now + 30 mins
 }

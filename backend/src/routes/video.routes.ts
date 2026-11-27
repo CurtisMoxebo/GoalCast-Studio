@@ -190,6 +190,8 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
     const backgroundVideo = params.backgroundVideo || DEFAULT_BACKGROUND_VIDEO;
     const backgroundAudio = params.backgroundAudio || DEFAULT_BACKGROUND_AUDIO;
     const voiceActor = params.voiceActor || DEFAULT_VOICE_ACTOR;
+    const customIntroSpeech =
+      typeof params.customIntroSpeech === 'string' ? params.customIntroSpeech.trim() : undefined;
     const thumbnailTimestamp = parseFloat(params.thumbnailTimestamp) || DEFAULT_THUMBNAIL_TIMESTAMP;
 
     const defaultGames = [
@@ -239,6 +241,7 @@ const handleTestRoute = async (req: Request, res: Response): Promise<void> => {
       backgroundVideo,
       backgroundAudio,
       voiceActor,
+      customIntroSpeech,
       thumbnailTimestamp,
       previousWonGroup,
       onProgress: (percent, step) => {

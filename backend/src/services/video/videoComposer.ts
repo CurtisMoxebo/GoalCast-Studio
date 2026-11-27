@@ -23,6 +23,7 @@ export interface VideoComposerInput {
   backgroundVideo?: string;
   backgroundAudio?: string;
   voiceActor?: string;
+  customIntroSpeech?: string;
   thumbnailTimestamp?: number;
   previousWonGroup?: {
     games: OverlayGameData[];
@@ -71,8 +72,12 @@ export class VideoComposer {
     notify(15, 'Synthesizing voice actor speech clips with Kokoro TTS (speed 1.2x)');
     const ttsSpeed = 1.2;
 
-    // Speech 1: Intro
-    const introText = `best ${input.games.length} predictions for the football games going on on ${formattedDate}`;
+    // Speech 1: Optional Custom Opening Speech + Intro
+    const baseIntroText = `Here comes our best ${input.games.length} predictions for the football games going on on ${formattedDate}`;
+    const customIntro = (input.customIntroSpeech || '').trim();
+    const introText = customIntro
+      ? `${customIntro}${/[.!?]$/.test(customIntro) ? '' : '.'} ${baseIntroText}`
+      : baseIntroText;
     const introAudioPath = path.join(workDir, 'speech_intro.wav');
     const introSpeech = await tts.generateSpeech(introText, {
       voice,

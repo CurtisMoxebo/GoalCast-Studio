@@ -346,6 +346,7 @@ export const GamesScreen: React.FC = () => {
         backgroundVideo: settings.backgroundVideo,
         backgroundAudio: settings.backgroundAudio,
         voiceActor: settings.voiceActor,
+        customIntroSpeech: settings.customIntroSpeech,
         thumbnailTimestamp: settings.thumbnailTimestamp,
         description: settings.description,
         scheduledPostTime: settings.scheduledPostTime

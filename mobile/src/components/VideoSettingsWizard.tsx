@@ -284,6 +284,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
     availableAudio[0]?.filename || DEFAULT_BACKGROUND_AUDIO
   );
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_ACTOR);
+  const [customIntroSpeech, setCustomIntroSpeech] = useState('');
   const [thumbnailSeconds, setThumbnailSeconds] = useState(DEFAULT_THUMBNAIL_TIMESTAMP);
   const [description, setDescription] = useState(defaultDesc);
   const [activePicker, setActivePicker] = useState<'video' | 'audio' | 'voice' | null>(null);
@@ -546,6 +547,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
       backgroundVideo: finalVideo,
       backgroundAudio: finalAudio,
       voiceActor: selectedVoice,
+      customIntroSpeech: customIntroSpeech.trim() || undefined,
       thumbnailTimestamp: thumbnailSeconds,
       description,
       scheduledPostTime: isScheduled ? scheduledDate.toISOString() : undefined
@@ -806,7 +808,37 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
           </View>
         </View>
 
-        {/* 4. Description Input Field */}
+        {/* 4. Custom Opening TTS Line (Spoken first in the video) */}
+        <View style={styles.section}>
+          <View style={styles.mediaSectionHeader}>
+            <Text style={styles.sectionTitle}>🗣️ Opening Voiceover (Optional)</Text>
+            {customIntroSpeech.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  triggerHaptic();
+                  setCustomIntroSpeech('');
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close-circle" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={styles.sectionSubtitle}>
+            Spoken first by the voice actor before &quot;Here comes our best predictions...&quot;
+          </Text>
+          <TextInput
+            style={styles.customTtsInput}
+            multiline
+            numberOfLines={3}
+            value={customIntroSpeech}
+            onChangeText={setCustomIntroSpeech}
+            placeholder="e.g. Yesterday was a clean sweep! Let's keep the streak going..."
+            placeholderTextColor={THEME.colors.textMuted}
+          />
+        </View>
+
+        {/* 5. Description Input Field */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📝 Caption & Description</Text>
           <TextInput
@@ -1935,6 +1967,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: THEME.colors.primary,
     letterSpacing: 0.5
+  },
+  customTtsInput: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    padding: 12,
+    color: THEME.colors.textPrimary,
+    fontSize: 14,
+    textAlignVertical: 'top',
+    minHeight: 78,
+    borderWidth: 1,
+    borderColor: THEME.colors.cardBorder
   },
   descInput: {
     backgroundColor: '#1e293b',

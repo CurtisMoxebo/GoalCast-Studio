@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME } from './src/constants/theme';
 import { GamesScreen } from './src/screens/GamesScreen';
+import { PostScreen } from './src/screens/PostScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AppInitialLoadingScreen } from './src/components/AppInitialLoadingScreen';
@@ -66,7 +67,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-type Tab = 'GAMES' | 'HISTORY' | 'SETTINGS';
+type Tab = 'GAMES' | 'POST' | 'HISTORY' | 'SETTINGS';
 
 function MainApp() {
   const [currentTab, setCurrentTab] = useState<Tab>('GAMES');
@@ -81,6 +82,9 @@ function MainApp() {
         <View style={[styles.tabContent, currentTab !== 'GAMES' && styles.hiddenTab]}>
           <GamesScreen />
         </View>
+        <View style={[styles.tabContent, currentTab !== 'POST' && styles.hiddenTab]}>
+          <PostScreen />
+        </View>
         <View style={[styles.tabContent, currentTab !== 'HISTORY' && styles.hiddenTab]}>
           <HistoryScreen />
         </View>
@@ -89,7 +93,7 @@ function MainApp() {
         </View>
       </View>
 
-      {/* Bottom Tab Bar (3 Tabs) with Device Safe Area Insets */}
+      {/* Bottom Tab Bar (4 Tabs) with Device Safe Area Insets */}
       <View
         style={[
           styles.tabBar,
@@ -107,6 +111,17 @@ function MainApp() {
           <Text style={styles.tabIcon}>⚽</Text>
           <Text style={[styles.tabLabel, currentTab === 'GAMES' && styles.tabLabelActive]}>
             Games
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setCurrentTab('POST')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.tabIcon}>📤</Text>
+          <Text style={[styles.tabLabel, currentTab === 'POST' && styles.tabLabelActive]}>
+            Post
           </Text>
         </TouchableOpacity>
 

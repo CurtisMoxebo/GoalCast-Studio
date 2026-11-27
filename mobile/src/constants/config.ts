@@ -70,3 +70,29 @@ export const DEFAULT_SELECTED_SOCIAL_PLATFORMS = [
   'tiktok',
   'youtube_shorts'
 ] as const;
+
+export interface DirectPostTemplate {
+  id: string;
+  label: string;
+  content: string;
+}
+
+/**
+ * Selectable description templates for the Direct Social Post tab.
+ * Add new templates here to expose them in the mobile Post tab automatically.
+ */
+export const DIRECT_POST_DESCRIPTION_TEMPLATES: DirectPostTemplate[] = [
+  {
+    id: 'sportybet_slip',
+    label: '⚽ Sportybet Slip',
+    content:
+      '⚽️ Sportybet Slip\n\n🎟️ Code: \n📊 Total Odds: \n\n💡 Note: Stake responsibly. Edit to your preference if needed'
+  },
+  {
+    id: 'blank',
+    label: '✍️ Blank',
+    content: ''
+  }
+];
+
+export const DEFAULT_DIRECT_POST_DESCRIPTION = DIRECT_POST_DESCRIPTION_TEMPLATES[0].content;
