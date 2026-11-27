@@ -168,21 +168,79 @@ export class MobileApiService {
     type: 'video' | 'audio',
     filename: string
   ): Promise<{ token: string; sizeBytes: number }> {
-    const FileSystem = await import('expo-file-system/legacy');
     const url = this.getCustomMediaUploadUrl(type, filename);
-    const result = await FileSystem.uploadAsync(url, localUri, {
-      httpMethod: 'POST',
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-      headers: {
-        'Content-Type': 'application/octet-stream'
-      }
-    });
+    const extMatch = filename.match(/\.[a-zA-Z0-9]+$/);
+    const ext = extMatch ? extMatch[0].toLowerCase() : type === 'video' ? '.mp4' : '.mp3';
 
-    const parsed = JSON.parse(result.body || '{}');
-    if (result.status < 200 || result.status >= 300 || !parsed.token) {
-      throw new Error(parsed.error || `Failed to upload custom ${type} (Status ${result.status})`);
+    // 1. Try native Expo FileSystem upload (normalizing URI to a clean cache file first
+    //    to avoid Android "Location isn't readable" errors on content:// or spaced URIs)
+    try {
+      const FileSystem = await import('expo-file-system/legacy');
+      let uploadUri = localUri;
+      let tempCacheUri: string | null = null;
+
+      if (FileSystem.cacheDirectory) {
+        const candidate = `${FileSystem.cacheDirectory}goalcast_upload_${Date.now()}${ext}`;
+        try {
+          await FileSystem.copyAsync({ from: localUri, to: candidate });
+          uploadUri = candidate;
+          tempCacheUri = candidate;
+        } catch {
+          // If copyAsync fails (e.g. already a direct file path), try original URI
+          uploadUri = localUri;
+        }
+      }
+
+      try {
+        const result = await FileSystem.uploadAsync(url, uploadUri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: {
+            'Content-Type': 'application/octet-stream'
+          }
+        });
+
+        let parsed: any = {};
+        try {
+          parsed = JSON.parse(result.body || '{}');
+        } catch {}
+
+        if (result.status < 200 || result.status >= 300 || !parsed.token) {
+          throw new Error(parsed.error || `Failed to upload custom ${type} (Status ${result.status})`);
+        }
+        return { token: parsed.token, sizeBytes: parsed.sizeBytes || 0 };
+      } finally {
+        if (tempCacheUri) {
+          FileSystem.deleteAsync(tempCacheUri, { idempotent: true }).catch(() => {});
+        }
+      }
+    } catch (fsErr: any) {
+      // 2. Fallback: read local URI via fetch -> Blob and POST directly
+      //    (works cleanly for Android content:// URIs and Web)
+      const localRes = await fetch(localUri);
+      if (!localRes.ok) {
+        throw new Error(fsErr?.message || `Could not read selected ${type} file from device.`);
+      }
+      const blob = await localRes.blob();
+      const uploadRes = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream'
+        },
+        body: blob
+      });
+
+      const bodyText = await uploadRes.text();
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(bodyText || '{}');
+      } catch {}
+
+      if (!uploadRes.ok || !parsed.token) {
+        throw new Error(parsed.error || `Failed to upload custom ${type} (Status ${uploadRes.status})`);
+      }
+      return { token: parsed.token, sizeBytes: parsed.sizeBytes || 0 };
     }
-    return { token: parsed.token, sizeBytes: parsed.sizeBytes || 0 };
   }
 
   getRecapImageUrl(groupId: string, download = false): string {
