@@ -527,7 +527,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         {/* 1. Background Video Compact Selector (Opens Scrollable Picker Sheet or Custom Upload) */}
         <View style={styles.section}>
           <View style={styles.mediaSectionHeader}>
-            <Text style={styles.sectionTitle}>🎬 Background Video (Looped)</Text>
+            <Text style={styles.sectionTitle}>🎬 Background Video</Text>
             <View style={styles.mediaHeaderRight}>
               <Text style={styles.mediaCountPill}>{availableVideos.length} available</Text>
               <TouchableOpacity
@@ -604,7 +604,7 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
         {/* 2. Background Audio Compact Selector (Opens Scrollable Picker Sheet or Custom Upload) */}
         <View style={styles.section}>
           <View style={styles.mediaSectionHeader}>
-            <Text style={styles.sectionTitle}>🎵 Background Beat (Low Volume)</Text>
+            <Text style={styles.sectionTitle}>🎵 Background Beat</Text>
             <View style={styles.mediaHeaderRight}>
               <Text style={styles.mediaCountPill}>{availableAudio.length} available</Text>
               <TouchableOpacity
