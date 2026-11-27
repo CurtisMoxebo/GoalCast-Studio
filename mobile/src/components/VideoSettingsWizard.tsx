@@ -784,9 +784,6 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
             max={60}
             onChange={setThumbnailSeconds}
           />
-          <Text style={styles.thumbGuidanceText}>
-            💡 Tip: Match cards appear between 00:05 and 00:25. If the time exceeds the video length, the last prediction card is used.
-          </Text>
         </View>
 
         {/* 6. Post Timing: Instant vs DateTime Picker */}
@@ -1872,13 +1869,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: THEME.colors.primary,
     letterSpacing: 0.5
-  },
-  thumbGuidanceText: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 8,
-    fontStyle: 'italic',
-    lineHeight: 16
   },
   descInput: {
     backgroundColor: '#1e293b',
