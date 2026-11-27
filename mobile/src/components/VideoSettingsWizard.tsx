@@ -1111,36 +1111,29 @@ export const VideoSettingsWizard: React.FC<VideoSettingsWizardProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Search Filter (auto-shown when there are 5+ items) */}
-            {(activePicker === 'video'
-              ? availableVideos
-              : activePicker === 'audio'
-                ? availableAudio
-                : availableVoices
-            ).length > 4 && (
-              <View style={styles.pickerSearchWrap}>
-                <Ionicons name="search" size={16} color="#64748b" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.pickerSearchInput}
-                  value={pickerSearch}
-                  onChangeText={setPickerSearch}
-                  placeholder={`Search ${
-                    activePicker === 'video'
-                      ? 'videos'
-                      : activePicker === 'audio'
-                        ? 'audio tracks'
-                        : 'voice actors'
-                  }...`}
-                  placeholderTextColor="#64748b"
-                  autoCorrect={false}
-                />
-                {pickerSearch.length > 0 && (
-                  <TouchableOpacity onPress={() => setPickerSearch('')}>
-                    <Ionicons name="close-circle" size={18} color="#64748b" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+            {/* Search Filter */}
+            <View style={styles.pickerSearchWrap}>
+              <Ionicons name="search" size={16} color="#64748b" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.pickerSearchInput}
+                value={pickerSearch}
+                onChangeText={setPickerSearch}
+                placeholder={`Search ${
+                  activePicker === 'video'
+                    ? 'videos'
+                    : activePicker === 'audio'
+                      ? 'audio tracks'
+                      : 'voice actors'
+                }...`}
+                placeholderTextColor="#64748b"
+                autoCorrect={false}
+              />
+              {pickerSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setPickerSearch('')}>
+                  <Ionicons name="close-circle" size={18} color="#64748b" />
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* One-Time Custom Upload Action inside Video/Audio Picker Sheet */}
             {(activePicker === 'video' || activePicker === 'audio') && (
