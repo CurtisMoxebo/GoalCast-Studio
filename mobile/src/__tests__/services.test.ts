@@ -428,3 +428,20 @@ test('Mobile Social Selection: Default platforms include all 4 platforms and sup
   assert.equal(allSelected.length, 4);
 });
 
+test('Mobile Regression: SessionStore preserves exact user selection order even for numeric-string game IDs', () => {
+  sessionStore.clearAll();
+
+  // Numeric-string IDs that Object.keys() would otherwise sort numerically as ["704501", "704512", "704530"]
+  sessionStore.setSelections({
+    '704530': [{ code: '1', label: 'Home Win', category: 'RESULT' }],
+    '704501': [{ code: 'BTTS_YES', label: 'Both Teams to Score - Yes', category: 'GOALS' }],
+    '704512': [{ code: 'OVER_2.5_GOALS', label: 'Total Goals Over 2.5', category: 'GOALS' }]
+  });
+  sessionStore.setSelectionOrder(['704530', '704501', '704512']);
+
+  assert.deepEqual(sessionStore.getSelectionOrder(), ['704530', '704501', '704512']);
+
+  sessionStore.clearAll();
+  assert.deepEqual(sessionStore.getSelectionOrder(), []);
+});
+

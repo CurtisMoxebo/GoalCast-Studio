@@ -62,12 +62,17 @@ export const GamesScreen: React.FC = () => {
     return sessionStore.getSelections();
   });
 
+  // Explicit order in which games were selected (avoids JS Object.keys numeric-key sorting)
+  const [selectionOrder, setSelectionOrder] = useState<string[]>(() => {
+    return sessionStore.getSelectionOrder();
+  });
+
   // Per-game spoken reasons map: gameId -> reason string (restored from session store)
   const [gameReasons, setGameReasons] = useState<Record<string, string>>(() => {
     return sessionStore.getReasons();
   });
 
-  // Sync selected date, selections & reasons to sessionStore
+  // Sync selected date, selections, selection order & reasons to sessionStore
   useEffect(() => {
     sessionStore.setSelectedDate(selectedDate);
   }, [selectedDate]);
@@ -77,18 +82,27 @@ export const GamesScreen: React.FC = () => {
   }, [gameSelections]);
 
   useEffect(() => {
+    sessionStore.setSelectionOrder(selectionOrder);
+  }, [selectionOrder]);
+
+  useEffect(() => {
     sessionStore.setReasons(gameReasons);
   }, [gameReasons]);
 
   // Filter to show only games with predictions
   const [showOnlyPredicted, setShowOnlyPredicted] = useState(false);
 
-  // Total games with at least one prediction
+  // Total games with at least one prediction, strictly in user selection order
   const gamesWithPredictions = useMemo(() => {
-    return Object.keys(gameSelections).filter(
+    const ordered = selectionOrder.filter(
       (gId) => (gameSelections[gId] || []).length > 0
     );
-  }, [gameSelections]);
+    const orderedSet = new Set(ordered);
+    const extras = Object.keys(gameSelections).filter(
+      (gId) => !orderedSet.has(gId) && (gameSelections[gId] || []).length > 0
+    );
+    return [...ordered, ...extras];
+  }, [gameSelections, selectionOrder]);
 
   const hasAnyPredictions = gamesWithPredictions.length > 0;
 
@@ -277,23 +291,40 @@ export const GamesScreen: React.FC = () => {
       return;
     }
 
-    const matchesToPredict = games.filter((g) => selectedGameIdsForAi.includes(g.id));
+    // Preserve exact order in which user tapped games in AI selection mode
+    const matchesToPredict = selectedGameIdsForAi
+      .map((id) => games.find((g) => g.id === id))
+      .filter((g): g is UpcomingGame => Boolean(g));
     setIsGeneratingAi(true);
 
     try {
       const predictions = await mobileApi.requestAiPredictions(matchesToPredict);
 
       const updatedMap = { ...gameSelections };
+      const predictedIds = new Set<string>();
       for (const item of predictions) {
-        updatedMap[item.gameId] = item.predictions.map((p) => ({
+        const mapped = item.predictions.map((p) => ({
           code: p.code,
           label: p.label,
           category: p.category,
           spokenText: p.spokenText
         }));
+        updatedMap[item.gameId] = mapped;
+        if (mapped.length > 0) {
+          predictedIds.add(item.gameId);
+        }
       }
 
       setGameSelections(updatedMap);
+      setSelectionOrder((prev) => {
+        const next = [...prev];
+        for (const id of selectedGameIdsForAi) {
+          if (predictedIds.has(id) && !next.includes(id)) {
+            next.push(id);
+          }
+        }
+        return next;
+      });
       setIsSelectionMode(false);
       setSelectedGameIdsForAi([]);
     } catch (err: any) {
@@ -310,18 +341,28 @@ export const GamesScreen: React.FC = () => {
       ...gameSelections,
       [gameId]: remaining
     });
-    if (remaining.length === 0 && gameReasons[gameId]) {
-      const nextReasons = { ...gameReasons };
-      delete nextReasons[gameId];
-      setGameReasons(nextReasons);
+    if (remaining.length === 0) {
+      setSelectionOrder((prev) => prev.filter((id) => id !== gameId));
+      if (gameReasons[gameId]) {
+        const nextReasons = { ...gameReasons };
+        delete nextReasons[gameId];
+        setGameReasons(nextReasons);
+      }
     }
   };
 
   const handleConfirmModalSelections = (selections: PredictionSelection[]) => {
     if (!activeGameForPicker) return;
+    const gameId = activeGameForPicker.id;
     setGameSelections({
       ...gameSelections,
-      [activeGameForPicker.id]: selections
+      [gameId]: selections
+    });
+    setSelectionOrder((prev) => {
+      if (selections.length > 0) {
+        return prev.includes(gameId) ? prev : [...prev, gameId];
+      }
+      return prev.filter((id) => id !== gameId);
     });
   };
 
